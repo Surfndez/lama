@@ -8,7 +8,8 @@ import co.ledger.lama.bitcoin.common.models.interpreter.{
   CurrentBalance,
   GetBalanceHistoryResult,
   GetOperationsResult,
-  GetUtxosResult
+  GetUtxosResult,
+  Operation
 }
 import co.ledger.lama.common.models.Notification.BalanceUpdated
 import co.ledger.lama.common.models.Status.{Deleted, Published, Registered, Synchronized}
@@ -29,12 +30,21 @@ import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
+class AccountControllerIT_Btc extends AccountControllerIT {
+  runTests("/test-accounts-btc.json")
+}
+
+class AccountControllerIT_BtcTestnet extends AccountControllerIT {
+  runTests("/test-accounts-btc_testnet.json")
+}
+
 trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)
 
   val conf      = ConfigSource.default.loadOrThrow[ConfigSpec]
   val serverUrl = s"http://${conf.server.host}:${conf.server.port}"
+  val accounts  = Uri.unsafeFromString(serverUrl) / "accounts"
 
   private def accountsRes(resourceName: String): Resource[IO, List[TestAccount]] =
     Resource
@@ -46,15 +56,15 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
       }
 
   private val accountRegisteringRequest =
-    Request[IO](method = Method.POST, uri = Uri.unsafeFromString(s"$serverUrl/accounts"))
+    Request[IO](method = Method.POST, uri = accounts)
 
   private def accountUpdateRequest(accountId: UUID) =
-    Request[IO](method = Method.PUT, uri = Uri.unsafeFromString(s"$serverUrl/accounts/$accountId"))
+    Request[IO](method = Method.PUT, uri = accounts / accountId.toString)
 
   private def getAccountRequest(accountId: UUID) =
     Request[IO](
       method = Method.GET,
-      uri = Uri.unsafeFromString(s"$serverUrl/accounts/$accountId")
+      uri = accounts / accountId.toString
     )
 
   private def getOperationsRequest(accountId: UUID, offset: Int, limit: Int, sort: Sort) =
@@ -68,7 +78,7 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
   private def removeAccountRequest(accountId: UUID) =
     Request[IO](
       method = Method.DELETE,
-      uri = Uri.unsafeFromString(s"$serverUrl/accounts/$accountId")
+      uri = accounts / accountId.toString
     )
 
   private def getUTXOsRequest(accountId: UUID, offset: Int, limit: Int, sort: Sort) =
@@ -82,9 +92,13 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
   private def getBalancesHistoryRequest(accountId: UUID) =
     Request[IO](
       method = Method.GET,
-      uri = Uri.unsafeFromString(
-        s"$serverUrl/accounts/$accountId/balances"
-      )
+      uri = accounts / accountId.toString / "balances"
+    )
+
+  private def getOperation(accountid: UUID, operationId: Operation.UID) =
+    Request[IO](
+      method = Method.GET,
+      uri = accounts / accountid.toString / "operations" / operationId.hex
     )
 
   def runTests(resourceName: String): Seq[Unit] = IOAssertion {
@@ -159,6 +173,13 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
               .compile
               .toList
               .map(_.flatMap(_.operations))
+
+            firstOperation <- operations.headOption
+              .map(o =>
+                client
+                  .expect[Option[Operation]](getOperation(accountRegistered.accountId, o.uid))
+              )
+              .getOrElse(IO.none[Operation])
 
             utxos <- IOUtils
               .fetchPaginatedItems[GetUtxosResult](
@@ -257,6 +278,10 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
               lastTxHash shouldBe account.expected.lastTxHash
             }
 
+            it should "have its operations accessible by uid" in {
+              firstOperation shouldBe operations.headOption
+            }
+
             it should "be updated" in {
               accountUpdateStatus.code shouldBe 200
               accountInfoAfterUpdate.syncFrequency shouldBe 60
@@ -270,14 +295,6 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
         }
       }
   }
-}
-
-class AccountControllerIT_Btc extends AccountControllerIT {
-  runTests("/test-accounts-btc.json")
-}
-
-class AccountControllerIT_BtcTestnet extends AccountControllerIT {
-  runTests("/test-accounts-btc_testnet.json")
 }
 
 object AccountNotifications {
