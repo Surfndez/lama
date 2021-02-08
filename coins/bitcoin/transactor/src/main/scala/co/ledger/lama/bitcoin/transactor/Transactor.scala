@@ -85,6 +85,8 @@ class Transactor(
         outputs.map(_.value).sum
       )
 
+      _ <- keychainClient.markAddressesAsUsed(keychainId, List(changeAddress.accountAddress))
+
     } yield rawTransaction
 
   }
