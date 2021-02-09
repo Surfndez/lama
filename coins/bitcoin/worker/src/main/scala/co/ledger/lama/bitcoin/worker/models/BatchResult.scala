@@ -5,6 +5,5 @@ import co.ledger.lama.bitcoin.common.models.interpreter.AccountAddress
 
 case class BatchResult[Tx <: Transaction](
     addresses: List[AccountAddress],
-    transactions: List[Tx],
-    continue: Boolean
+    transactions: List[Tx]
 )

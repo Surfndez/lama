@@ -4,15 +4,18 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import co.ledger.lama.bitcoin.common.clients.grpc.{InterpreterClient, KeychainClient}
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
-import co.ledger.lama.bitcoin.common.models.explorer.{Block, ConfirmedTransaction, DefaultInput}
+import co.ledger.lama.bitcoin.common.models.explorer.{
+  Block,
+  ConfirmedTransaction,
+  UnconfirmedTransaction
+}
 import co.ledger.lama.bitcoin.worker.config.Config
-import co.ledger.lama.bitcoin.worker.models.BatchResult
 import co.ledger.lama.bitcoin.worker.services._
 import co.ledger.lama.common.logging.IOLogging
 import co.ledger.lama.common.models.Status.{Registered, Unregistered}
 import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
 import co.ledger.lama.common.models.{Coin, ReportError, ReportableEvent}
-import fs2.{Chunk, Pull, Stream}
+import fs2.Stream
 import io.circe.syntax._
 
 import java.util.UUID
@@ -28,7 +31,7 @@ class Worker(
 ) extends IOLogging {
 
   val bookkeeper = new Bookkeeper(
-    keychainClient,
+    new Keychain(keychainClient),
     explorerClient,
     interpreterClient,
     conf.maxTxsToSavePerBatch,
@@ -79,8 +82,6 @@ class Worker(
       _          <- log.info(s"Syncing from cursor state: $previousBlockState")
       keychainId <- IO.fromTry(Try(UUID.fromString(account.key)))
 
-      keychainInfo <- keychainClient.getKeychainInfo(keychainId)
-
       // REORG
       lastValidBlock <- previousBlockState.map { block =>
         for {
@@ -100,28 +101,25 @@ class Worker(
       }.sequence
 
       addressesUsedByMempool <- bookkeeper
-        .recordUnconfirmedTransactions(
+        .record[UnconfirmedTransaction](
           account.coin,
           account.id,
           keychainId,
-          keychainInfo.lookaheadSize,
-          0,
-          keychainInfo.lookaheadSize
+          None
         )
-        .stream
         .flatMap(r => Stream.emits(r.addresses))
         .compile
         .toList
 
-      batchResults <- syncAccountBatch(
-        account.coin,
-        account.id,
-        keychainId,
-        keychainInfo.lookaheadSize,
-        lastValidBlock.map(_.hash),
-        0,
-        keychainInfo.lookaheadSize
-      ).stream.compile.toList
+      batchResults <- bookkeeper
+        .record[ConfirmedTransaction](
+          account.coin,
+          account.id,
+          keychainId,
+          lastValidBlock.map(_.hash)
+        )
+        .compile
+        .toList
 
       addresses = batchResults.flatMap(_.addresses)
 
@@ -147,96 +145,6 @@ class Worker(
       workableEvent.asReportableSuccessEvent(lastBlock)
     }
   }
-
-  /** Sync account algorithm:
-    *   - 1) Get addresses per batch from the keychain
-    *   - 2) Get transactions per batch from the explorer
-    *   - 3a) If there are transactions for this batch of addresses:
-    *       - mark addresses as used
-    *       - repeat 1)
-    *   - 3b) Otherwise, stop sync because we consider this batch as fresh addresses
-    */
-  private def syncAccountBatch(
-      coin: Coin,
-      accountId: UUID,
-      keychainId: UUID,
-      lookaheadSize: Int,
-      blockHashCursor: Option[String],
-      fromAddrIndex: Int,
-      toAddrIndex: Int
-  )(implicit
-      cs: ContextShift[IO],
-      t: Timer[IO]
-  ): Pull[IO, BatchResult[ConfirmedTransaction], Unit] =
-    Pull
-      .eval {
-        for {
-          // Get batch of addresses from the keychain
-          _            <- log.info("Calling keychain to get addresses")
-          addressInfos <- keychainClient.getAddresses(keychainId, fromAddrIndex, toAddrIndex)
-
-          // For this batch of addresses, fetch transactions from the explorer.
-          _ <- log.info("Fetching transactions from explorer")
-          transactions <- explorerClient(coin)
-            .getConfirmedTransactions(addressInfos.map(_.accountAddress), blockHashCursor)
-            .prefetch
-            .chunkN(conf.maxTxsToSavePerBatch)
-            .map(_.toList)
-            .parEvalMapUnordered(conf.maxConcurrent) { txs =>
-              // Ask to interpreter to save transactions.
-              for {
-                _             <- log.info(s"Sending ${txs.size} transactions to interpreter")
-                savedTxsCount <- interpreterClient.saveTransactions(accountId, txs)
-                _             <- log.info(s"$savedTxsCount new transactions saved")
-              } yield txs
-            }
-            .flatMap(Stream.emits(_))
-            .compile
-            .toList
-
-          // Filter only used addresses.
-          usedAddressesInfos = addressInfos.filter { a =>
-            transactions.exists { t =>
-              val isInputAddress = t.inputs.collectFirst {
-                case i: DefaultInput if i.address == a.accountAddress => i
-              }.isDefined
-
-              isInputAddress || t.outputs.exists(_.address == a.accountAddress)
-            }
-          }
-
-          _ <-
-            if (transactions.nonEmpty) {
-              // Mark addresses as used.
-              log.info(s"Marking addresses as used") *>
-                keychainClient.markAddressesAsUsed(
-                  keychainId,
-                  usedAddressesInfos.map(_.accountAddress)
-                )
-            } else IO.unit
-
-          // Flag to know if we continue or not to discover addresses
-          continue <- keychainClient
-            .getAddresses(keychainId, toAddrIndex, toAddrIndex + lookaheadSize)
-            .map(_.nonEmpty)
-
-        } yield BatchResult(usedAddressesInfos, transactions, continue)
-      }
-      .flatMap { batchResult =>
-        if (batchResult.continue)
-          Pull.output(Chunk(batchResult)) >>
-            syncAccountBatch(
-              coin,
-              accountId,
-              keychainId,
-              lookaheadSize,
-              blockHashCursor,
-              toAddrIndex,
-              toAddrIndex + lookaheadSize
-            )
-        else
-          Pull.output(Chunk(batchResult))
-      }
 
   def deleteAccount(message: WorkerMessage[Block]): IO[ReportableEvent[Block]] =
     interpreterClient

@@ -16,8 +16,7 @@ import co.ledger.lama.bitcoin.common.models.explorer.{
 import co.ledger.lama.bitcoin.common.models.interpreter.{AccountAddress, ChangeType}
 import co.ledger.lama.bitcoin.common.models.keychain.{AccountKey, KeychainInfo}
 import co.ledger.lama.bitcoin.common.models.{BitcoinNetwork, Scheme}
-import co.ledger.lama.bitcoin.worker.models.BatchResult
-import co.ledger.lama.bitcoin.worker.services.Bookkeeper
+import co.ledger.lama.bitcoin.worker.services.{Bookkeeper, Keychain}
 import co.ledger.lama.common.models.Coin
 import co.ledger.lama.common.models.Coin.Btc
 import org.scalatest.flatspec.AnyFlatSpec
@@ -45,7 +44,7 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
   "Bookkeeper.recordUnconfirmedTransactions" should "return the currently used addresses of the mempool by an account" in {
 
     val bookkeeper = new Bookkeeper(
-      KeychainFixture.keychainClient(usedAndFreshAddresses),
+      new Keychain(KeychainFixture.keychainClient(usedAndFreshAddresses)),
       explorerClient(
         mempool = usedAndFreshAddresses
           .slice(10, 13)
@@ -62,22 +61,18 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
     )
 
     val batchResults = bookkeeper
-      .recordUnconfirmedTransactions(
+      .record[UnconfirmedTransaction](
         Btc,
         accountId,
         keychainId,
-        lookaheadSize = 20,
-        fromAddrIndex = 0,
-        toAddrIndex = 20
+        None
       )
-      .stream
       .compile
       .toList
       .unsafeRunSync()
 
-    batchResults should have size 2
-    batchResults(0).addresses.map(_.accountAddress) should be(List("11", "12", "13"))
-    batchResults(1).addresses.map(_.accountAddress) should be(List())
+    batchResults should have size 1
+    batchResults.head.addresses.map(_.accountAddress) should be(List("11", "12", "13"))
   }
 
   it should "add all transactions referencing an account's address" in {
@@ -92,7 +87,7 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
     }
 
     val crawler = new Bookkeeper(
-      KeychainFixture.keychainClient(usedAndFreshAddresses),
+      new Keychain(KeychainFixture.keychainClient(usedAndFreshAddresses)),
       explorerClient(bookkeeper),
       new InterpreterClientMock,
       maxTxsToSavePerBatch = 100,
@@ -100,27 +95,24 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
     )
 
     val batchResults = crawler
-      .recordUnconfirmedTransactions(
+      .record[UnconfirmedTransaction](
         Btc,
         accountId,
         keychainId,
-        lookaheadSize = 20,
-        fromAddrIndex = 0,
-        toAddrIndex = 20
+        None
       )
-      .stream
       .compile
       .toList
       .unsafeRunSync()
 
-    batchResults should have size 2
-    batchResults(0).transactions should contain only (bookkeeper.values.toList.flatten: _*)
-    batchResults(1).addresses.map(_.accountAddress) should be(List())
+    batchResults should have size 1
+    batchResults.head.transactions should contain only (bookkeeper.values.toList.flatten: _*)
   }
 
   it should "mark all met addresses as used in the keychain" in {
 
-    val keychain = KeychainFixture.keychainClient(usedAndFreshAddresses)
+    val keychainClient = KeychainFixture.keychainClient(usedAndFreshAddresses)
+    val keychain       = new Keychain(keychainClient)
 
     val bookkeeper = new Bookkeeper(
       keychain,
@@ -140,20 +132,17 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
     )
 
     val _ = bookkeeper
-      .recordUnconfirmedTransactions(
+      .record[UnconfirmedTransaction](
         Btc,
         accountId,
         keychainId,
-        lookaheadSize = 20,
-        fromAddrIndex = 0,
-        toAddrIndex = 20
+        None
       )
-      .stream
       .compile
       .toList
       .unsafeRunSync()
 
-    keychain.newlyMarkedAddresses.toList should contain only ((11 to 17).map(_.toString): _*)
+    keychainClient.newlyMarkedAddresses.toList should contain only ((11 to 17).map(_.toString): _*)
   }
 
   it should "send transactions and corresponding used addresses to the interpreter" in {
@@ -170,7 +159,7 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
     val interpreter = new InterpreterClientMock
 
     val bookkeeper = new Bookkeeper(
-      KeychainFixture.keychainClient(usedAndFreshAddresses),
+      new Keychain(KeychainFixture.keychainClient(usedAndFreshAddresses)),
       explorerClient(transactions),
       interpreter,
       maxTxsToSavePerBatch = 100,
@@ -178,15 +167,12 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
     )
 
     val _ = bookkeeper
-      .recordUnconfirmedTransactions(
+      .record[UnconfirmedTransaction](
         Btc,
         accountId,
         keychainId,
-        lookaheadSize = 20,
-        fromAddrIndex = 0,
-        toAddrIndex = 20
+        None
       )
-      .stream
       .compile
       .toList
       .unsafeRunSync()
@@ -198,10 +184,10 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
     interpreter.savedUnconfirmedTransactions.head._2 should contain only (expectedSavedTransactions.toSeq: _*)
   }
 
-  it should "return an empty batch when no matching transaction found" in {
+  it should "be empty when no matching transaction found" in {
 
-    val bookkerper = new Bookkeeper(
-      KeychainFixture.keychainClient(usedAndFreshAddresses),
+    val bookkeeper = new Bookkeeper(
+      new Keychain(KeychainFixture.keychainClient(usedAndFreshAddresses)),
       explorerClient(
         mempool = Map.empty
       ),
@@ -210,24 +196,18 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
       maxConcurrent = 1
     )
 
-    val batches = bookkerper
-      .recordUnconfirmedTransactions(
+    val batches = bookkeeper
+      .record[UnconfirmedTransaction](
         Btc,
         accountId,
         keychainId,
-        lookaheadSize = 20,
-        fromAddrIndex = 0,
-        toAddrIndex = 20
+        None
       )
-      .stream
       .compile
       .toList
       .unsafeRunSync()
 
-    batches shouldBe Seq(
-      BatchResult(List.empty, List.empty, continue = true),
-      BatchResult(List.empty, List.empty, continue = false)
-    )
+    batches shouldBe Seq()
   }
 
 }
@@ -287,7 +267,8 @@ object KeychainFixture {
   }
 
   def keychainClient(
-      addresses: LazyList[Address]
+      addresses: LazyList[Address],
+      lookaheadSize: Int = 20
   ): KeychainClient with UsedAddressesTracker =
     new KeychainClient with UsedAddressesTracker {
 
@@ -298,7 +279,19 @@ object KeychainFixture {
           network: BitcoinNetwork
       ): IO[KeychainInfo] = ???
 
-      override def getKeychainInfo(keychainId: UUID): IO[KeychainInfo] = ???
+      override def getKeychainInfo(keychainId: UUID): IO[KeychainInfo] =
+        IO.delay(
+          KeychainInfo(
+            keychainId,
+            externalDescriptor = "externalDesc",
+            internalDescriptor = "internalDesc",
+            extendedPublicKey = "extendedPublicKey",
+            slip32ExtendedPublicKey = "slip32ExtendedPublicKey",
+            lookaheadSize = lookaheadSize,
+            scheme = Scheme.Bip44,
+            network = BitcoinNetwork.MainNet
+          )
+        )
 
       override def getAddresses(
           keychainId: UUID,
