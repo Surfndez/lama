@@ -4,6 +4,7 @@ services:
   account-manager:
     image: docker.pkg.github.com/ledgerhq/lama/lama-account-manager:${LAMA_VERSION}
     environment:
+      JAVA_OPTS: ${ACCOUNT_MANAGER_JAVA_OPTS}
       ACCOUNT_MANAGER_PORT: ${ACCOUNT_MANAGER_PORT}
       ACCOUNT_MANAGER_JDBC_URL: ${ACCOUNT_MANAGER_JDBC_URL}
       ACCOUNT_MANAGER_POSTGRES_USER: ${ACCOUNT_MANAGER_POSTGRES_USER}
@@ -96,6 +97,7 @@ services:
   bitcoin-api:
     image: docker.pkg.github.com/ledgerhq/lama/lama-bitcoin-api:${LAMA_VERSION}
     environment:
+      JAVA_OPTS: ${BITCOIN_API_JAVA_OPTS}
       BITCOIN_API_HOST: ${BITCOIN_API_HOST}
       BITCOIN_API_PORT: ${BITCOIN_API_PORT}
       ACCOUNT_MANAGER_HOST: ${ACCOUNT_MANAGER_HOST}
@@ -128,6 +130,7 @@ services:
   bitcoin-transactor:
     image: docker.pkg.github.com/ledgerhq/lama/lama-bitcoin-transactor:${LAMA_VERSION}
     environment:
+      JAVA_OPTS: ${BITCOIN_TRANSACTOR_JAVA_OPTS}
       BITCOIN_TRANSACTOR_PORT: ${BITCOIN_TRANSACTOR_PORT}
       BITCOIN_KEYCHAIN_HOST: ${BITCOIN_KEYCHAIN_HOST}
       BITCOIN_KEYCHAIN_PORT: ${BITCOIN_KEYCHAIN_PORT}
@@ -144,6 +147,7 @@ services:
   bitcoin-interpreter:
     image: docker.pkg.github.com/ledgerhq/lama/lama-bitcoin-interpreter:${LAMA_VERSION}
     environment:
+      JAVA_OPTS: ${BITCOIN_INTERPRETER_JAVA_OPTS}
       BITCOIN_INTERPRETER_JDBC_URL: ${BITCOIN_INTERPRETER_JDBC_URL}
       BITCOIN_INTERPRETER_POSTGRES_USER: ${BITCOIN_INTERPRETER_POSTGRES_USER}
       BITCOIN_INTERPRETER_POSTGRES_PASSWORD: ${BITCOIN_INTERPRETER_POSTGRES_PASSWORD}
@@ -164,6 +168,7 @@ services:
   bitcoin-worker:
     image: docker.pkg.github.com/ledgerhq/lama/lama-bitcoin-worker:${LAMA_VERSION}
     environment:
+      JAVA_OPTS: ${BITCOIN_WORKER_JAVA_OPTS}
       WORKER_EVENTS_EXCHANGE_NAME: ${WORKER_EVENTS_EXCHANGE_NAME}
       LAMA_EVENTS_EXCHANGE_NAME: ${LAMA_EVENTS_EXCHANGE_NAME}
       RABBIT_HOST: ${RABBIT_HOST}
