@@ -1,6 +1,5 @@
 syntax = "proto3";
 
-import "google/protobuf/timestamp.proto";
 import "operation.proto";
 
 package pb.v1;
@@ -15,6 +14,7 @@ service BitcoinTransactorService {
 
 enum CoinSelector {
   DEPTH_FIRST = 0;
+  OPTIMIZE_SIZE = 1;
 }
 
 message CreateTransactionRequest {

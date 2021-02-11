@@ -10,11 +10,20 @@ object CoinSelectionService {
       coinSelection: CoinSelectionStrategy,
       utxos: List[Utxo],
       amount: BigInt
-  ): IO[List[Utxo]] = {
+  ): IO[List[Utxo]] =
     coinSelection match {
-      case CoinSelectionStrategy.DepthFirst => depthFirstPickingRec(utxos, amount)
+      case CoinSelectionStrategy.OptimizeSize => optimizeSizePicking(utxos, amount)
+      case CoinSelectionStrategy.DepthFirst   => depthFirstPickingRec(utxos, amount)
     }
-  }
+
+  private def optimizeSizePicking(
+      utxos: List[Utxo],
+      targetAmount: BigInt
+  ) =
+    depthFirstPickingRec(
+      utxos.sortWith(_.value > _.value),
+      targetAmount
+    )
 
   private def depthFirstPickingRec(
       utxos: List[Utxo],

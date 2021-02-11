@@ -10,7 +10,7 @@ import org.scalatest.matchers.should.Matchers
 
 class CoinSelectionServiceTest extends AnyFlatSpecLike with Matchers {
 
-  "A depthsFirstStrategy" should "return oldest utxos first" in {
+  "A depthFirst Strategy" should "return oldest utxos first" in {
 
     val utxo = Utxo(
       "hash",
@@ -36,6 +36,43 @@ class CoinSelectionServiceTest extends AnyFlatSpecLike with Matchers {
       .coinSelection(CoinSelectionStrategy.DepthFirst, utxos, 100001)
       .unsafeRunSync() should have size 2
 
+  }
+
+  "A optimizeSize Strategy" should "biggest utxos first" in {
+
+    val utxo = Utxo(
+      "hash",
+      0,
+      1000,
+      "address",
+      "script",
+      Some(ChangeType.Internal),
+      NonEmptyList.of(0, 1),
+      Instant.now
+    )
+
+    val utxos = List(
+      utxo.copy(value = 5000),
+      utxo.copy(value = 10000),
+      utxo.copy(value = 40000),
+      utxo.copy(value = 2000),
+      utxo.copy(value = 20000)
+    )
+
+    val firstSelection = CoinSelectionService
+      .coinSelection(CoinSelectionStrategy.OptimizeSize, utxos, 10000)
+      .unsafeRunSync()
+
+    firstSelection should have size 1
+    firstSelection.head.value shouldBe 40000
+
+    val secondSelection = CoinSelectionService
+      .coinSelection(CoinSelectionStrategy.OptimizeSize, utxos, 50000)
+      .unsafeRunSync()
+
+    secondSelection should have size 2
+    secondSelection.head.value shouldBe 40000
+    secondSelection.last.value shouldBe 20000
   }
 
 }
