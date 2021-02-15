@@ -18,19 +18,27 @@ trait KeychainClient {
       lookaheadSize: Int,
       network: BitcoinNetwork
   ): IO[KeychainInfo]
+
   def getKeychainInfo(keychainId: UUID): IO[KeychainInfo]
+
   def getAddresses(
       keychainId: UUID,
       fromIndex: Int,
       toIndex: Int,
       changeType: Option[ChangeType] = None
   ): IO[List[AccountAddress]]
+
   def markAddressesAsUsed(keychainId: UUID, addresses: List[String]): IO[Unit]
+
   def getFreshAddresses(keychainId: UUID, change: ChangeType, size: Int): IO[List[AccountAddress]]
+
   def getAddressesPublicKeys(
       keychainId: UUID,
       derivations: NonEmptyList[NonEmptyList[Int]]
   ): IO[List[String]]
+
+  def resetKeychain(keychainId: UUID): IO[Unit]
+
   def deleteKeychain(keychainId: UUID): IO[Unit]
 }
 
@@ -136,10 +144,20 @@ class KeychainGrpcClient(
       )
       .map(_.publicKeys.toList)
 
+  def resetKeychain(keychainId: UUID): IO[Unit] =
+    client
+      .resetKeychain(
+        keychain.ResetKeychainRequest(
+          keychainId = UuidUtils.uuidToBytes(keychainId)
+        ),
+        new Metadata
+      )
+      .void
+
   def deleteKeychain(keychainId: UUID): IO[Unit] =
     client
       .deleteKeychain(
-        new keychain.DeleteKeychainRequest(
+        keychain.DeleteKeychainRequest(
           keychainId = UuidUtils.uuidToBytes(keychainId)
         ),
         new Metadata

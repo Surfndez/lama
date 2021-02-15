@@ -4,7 +4,7 @@ import cats.effect.{ConcurrentEffect, IO}
 import co.ledger.lama.common.logging.IOLogging
 import co.ledger.lama.common.models.{Coin, CoinFamily, Sort}
 import co.ledger.lama.common.utils.UuidUtils
-import co.ledger.lama.manager.protobuf
+import co.ledger.lama.manager.protobuf.{ResyncAccountRequest, SyncEventResult}
 import com.google.protobuf.empty.Empty
 import io.grpc.{Metadata, ServerServiceDefinition}
 
@@ -31,7 +31,7 @@ class AccountManagerGrpcService(accountManager: AccountManager)
   def registerAccount(
       request: protobuf.RegisterAccountRequest,
       ctx: Metadata
-  ): IO[protobuf.RegisterAccountResult] = {
+  ): IO[protobuf.SyncEventResult] = {
 
     // TODO: make Option in request
     val syncFrequencyO = if (request.syncFrequency == 0L) None else Some(request.syncFrequency)
@@ -47,10 +47,16 @@ class AccountManagerGrpcService(accountManager: AccountManager)
       .map(_.toProto)
   }
 
+  def resyncAccount(request: ResyncAccountRequest, ctx: Metadata): IO[SyncEventResult] =
+    for {
+      accountId <- UuidUtils.bytesToUuidIO(request.accountId)
+      response  <- accountManager.resyncAccount(accountId, request.wipe)
+    } yield response.toProto
+
   def unregisterAccount(
       request: protobuf.UnregisterAccountRequest,
       ctx: Metadata
-  ): IO[protobuf.UnregisterAccountResult] =
+  ): IO[protobuf.SyncEventResult] =
     for {
       accountId <- UuidUtils.bytesToUuidIO(request.accountId)
       response  <- accountManager.unregisterAccount(accountId)

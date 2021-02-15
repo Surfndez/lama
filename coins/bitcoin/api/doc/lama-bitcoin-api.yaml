@@ -61,6 +61,25 @@ paths:
       responses:
         200:
           description: OK
+  /accounts/{accountId}/resync:
+    get:
+      summary: Resync account
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: 'uuid'
+        - name: wipe
+          in: query
+          description: '(if needed, set to true to wipe and resync from zero)'
+          schema:
+            type: boolean
+            default: false
+      responses:
+        200:
+          description: OK
   /accounts/{accountId}/utxos:
     get:
       summary: Get account utxos

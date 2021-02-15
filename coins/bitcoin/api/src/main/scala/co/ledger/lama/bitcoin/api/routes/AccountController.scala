@@ -38,6 +38,88 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
   ): HttpRoutes[IO] =
     HttpRoutes.of[IO] {
 
+      // Register account
+      case req @ POST -> Root =>
+        val ra = for {
+          creationRequest <- req.as[CreationRequest]
+          _               <- log.info(s"Creating keychain with arguments: $creationRequest")
+
+          createdKeychain <- keychainClient.create(
+            creationRequest.accountKey,
+            creationRequest.scheme,
+            creationRequest.lookaheadSize,
+            creationRequest.coin.toNetwork
+          )
+          _ <- log.info(s"Keychain created with id: ${createdKeychain.keychainId}")
+          _ <- log.info("Registering account")
+
+          account <- accountManagerClient.registerAccount(
+            createdKeychain.keychainId,
+            creationRequest.coin.coinFamily,
+            creationRequest.coin,
+            creationRequest.syncFrequency,
+            creationRequest.label
+          )
+
+          _ <- log.info(
+            s"Account registered with id: ${account.accountId}"
+          )
+        } yield account
+
+        ra.flatMap(Ok(_))
+
+      // Get account info
+      case GET -> Root / UUIDVar(accountId) =>
+        accountManagerClient
+          .getAccountInfo(accountId)
+          .parProduct(interpreterClient.getBalance(accountId))
+          .flatMap { case (account, balance) =>
+            Ok(
+              AccountWithBalance(
+                account.id,
+                account.coinFamily,
+                account.coin,
+                account.syncFrequency,
+                account.lastSyncEvent,
+                balance.balance,
+                balance.unconfirmedBalance,
+                balance.utxos,
+                balance.received,
+                balance.sent,
+                account.label
+              )
+            )
+          }
+
+      // Get account events
+      case GET -> Root / UUIDVar(accountId) / "events"
+          :? OptionalLimitQueryParamMatcher(limit)
+          +& OptionalOffsetQueryParamMatcher(offset)
+          +& OptionalSortQueryParamMatcher(sort) =>
+        accountManagerClient
+          .getSyncEvents(accountId, limit, offset, sort)
+          .flatMap(Ok(_))
+
+      // Update account
+      case req @ PUT -> Root / UUIDVar(accountId) =>
+        val r = for {
+          updateRequest <- req.as[UpdateRequest]
+
+          _ <- log.info(
+            s"Updating account $accountId with $updateRequest"
+          )
+
+          _ <- updateRequest match {
+            case UpdateLabel(label) => accountManagerClient.updateLabel(accountId, label)
+            case UpdateSyncFrequency(syncFrequency) =>
+              accountManagerClient.updateSyncFrequency(accountId, syncFrequency)
+            case UpdateSyncFrequencyAndLabel(syncFrequency, label) =>
+              accountManagerClient.updateAccount(accountId, syncFrequency, label)
+          }
+        } yield ()
+        r.flatMap(_ => Ok())
+
+      // List accounts
       case GET -> Root
           :? OptionalLimitQueryParamMatcher(limit)
           +& OptionalOffsetQueryParamMatcher(offset) =>
@@ -78,107 +160,7 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
           )
         }
 
-      case GET -> Root / UUIDVar(accountId) =>
-        accountManagerClient
-          .getAccountInfo(accountId)
-          .parProduct(interpreterClient.getBalance(accountId))
-          .flatMap { case (account, balance) =>
-            Ok(
-              AccountWithBalance(
-                account.id,
-                account.coinFamily,
-                account.coin,
-                account.syncFrequency,
-                account.lastSyncEvent,
-                balance.balance,
-                balance.unconfirmedBalance,
-                balance.utxos,
-                balance.received,
-                balance.sent,
-                account.label
-              )
-            )
-          }
-
-      case GET -> Root / UUIDVar(accountId) / "events"
-          :? OptionalLimitQueryParamMatcher(limit)
-          +& OptionalOffsetQueryParamMatcher(offset)
-          +& OptionalSortQueryParamMatcher(sort) =>
-        accountManagerClient
-          .getSyncEvents(accountId, limit, offset, sort)
-          .flatMap(Ok(_))
-
-      case req @ POST -> Root =>
-        val ra = for {
-          creationRequest <- req.as[CreationRequest]
-          _               <- log.info(s"Creating keychain with arguments: $creationRequest")
-
-          createdKeychain <- keychainClient.create(
-            creationRequest.accountKey,
-            creationRequest.scheme,
-            creationRequest.lookaheadSize,
-            creationRequest.coin.toNetwork
-          )
-          _ <- log.info(s"Keychain created with id: ${createdKeychain.keychainId}")
-          _ <- log.info("Registering account")
-
-          account <- accountManagerClient.registerAccount(
-            createdKeychain.keychainId,
-            creationRequest.coin.coinFamily,
-            creationRequest.coin,
-            creationRequest.syncFrequency,
-            creationRequest.label
-          )
-
-          _ <- log.info(
-            s"Account registered with id: ${account.accountId}"
-          )
-        } yield account
-
-        ra.flatMap(Ok(_))
-
-      case req @ PUT -> Root / UUIDVar(accountId) =>
-        val r = for {
-          updateRequest <- req.as[UpdateRequest]
-
-          _ <- log.info(
-            s"Updating account $accountId with $updateRequest"
-          )
-
-          _ <- updateRequest match {
-            case UpdateLabel(label) => accountManagerClient.updateLabel(accountId, label)
-            case UpdateSyncFrequency(syncFrequency) =>
-              accountManagerClient.updateSyncFrequency(accountId, syncFrequency)
-            case UpdateSyncFrequencyAndLabel(syncFrequency, label) =>
-              accountManagerClient.updateAccount(accountId, syncFrequency, label)
-          }
-        } yield ()
-        r.flatMap(_ => Ok())
-
-      case DELETE -> Root / UUIDVar(accountId) =>
-        log.info(s"Fetching account informations for id: $accountId")
-        val r = for {
-
-          _       <- log.info(s"Fetching account informations for id: $accountId")
-          account <- accountManagerClient.getAccountInfo(accountId)
-
-          _          <- log.info("Deleting keychain")
-          keychainId <- UuidUtils.stringToUuidIO(account.key)
-          _ <- keychainClient
-            .deleteKeychain(keychainId)
-            .map(_ => log.info("Keychain deleted"))
-            .handleErrorWith(_ =>
-              log.info("An error occurred while deleting the keychain, moving on")
-            )
-
-          _ <- log.info("Unregistering account")
-          _ <- accountManagerClient.unregisterAccount(account.id)
-          _ <- log.info("Account unregistered")
-
-        } yield ()
-
-        r.flatMap(_ => Ok())
-
+      // List account operations
       case GET -> Root / UUIDVar(
             accountId
           ) / "operations" :? OptionalBlockHeightQueryParamMatcher(blockHeight)
@@ -196,6 +178,7 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
             )
             .flatMap(Ok(_))
 
+      // Get operation info
       case GET -> Root / UUIDVar(
             accountId
           ) / "operations" / uid =>
@@ -210,6 +193,7 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
               case None            => NotFound(s"No operation in account identified by $uid ")
             }
 
+      // List account UTXOs
       case GET -> Root / UUIDVar(
             accountId
           ) / "utxos" :? OptionalLimitQueryParamMatcher(limit)
@@ -225,6 +209,7 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
             )
             .flatMap(Ok(_))
 
+      // Get account balances
       case GET -> Root / UUIDVar(
             accountId
           ) / "balances" :? OptionalStartInstantQueryParamMatcher(start)
@@ -240,6 +225,7 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
             )
             .flatMap(Ok(_))
 
+      // Get account balances with preset
       case GET -> Root / UUIDVar(
             accountId
           ) / "balances" / BalancePreset(preset) =>
@@ -253,6 +239,7 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
             )
             .flatMap(Ok(_))
 
+      // Create transaction
       case req @ POST -> Root / UUIDVar(
             accountId
           ) / "transactions" =>
@@ -277,6 +264,7 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
 
         } yield response
 
+      // Sign transaction (only for testing)
       case req @ POST -> Root / "_internal" / "sign" =>
         for {
           _       <- log.info(s"Signing Transaction")
@@ -291,6 +279,7 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
 
         } yield response
 
+      // Send transaction
       case req @ POST -> Root / UUIDVar(
             accountId
           ) / "transactions" / "send" =>
@@ -312,6 +301,7 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
 
         } yield response
 
+      // List observable account addresses
       case GET -> Root / UUIDVar(
             accountId
           ) / "addresses" :? OptionalFromIndexQueryParamMatcher(from)
@@ -332,6 +322,7 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
 
         } yield response
 
+      // List fresh account addresses
       case GET -> Root / UUIDVar(
             accountId
           ) / "addresses" / "fresh" :? OptionalChangeTypeParamMatcher(change) =>
@@ -349,6 +340,55 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
             .flatMap(Ok(_))
 
         } yield response
+
+      // Resync account
+      case GET -> Root / UUIDVar(accountId) / "resync"
+          :? OptionalWipeQueryParamMatcher(wipe) =>
+        for {
+          _       <- log.info(s"Fetching account informations for id: $accountId")
+          account <- accountManagerClient.getAccountInfo(accountId)
+
+          isWipe = wipe.getOrElse(false)
+
+          _ <- log.info(s"Resyncing account $accountId - wipe=$isWipe")
+
+          _ <-
+            if (isWipe) {
+              for {
+                _          <- log.info("Resetting keychain")
+                keychainId <- UuidUtils.stringToUuidIO(account.key)
+                res        <- keychainClient.resetKeychain(keychainId)
+                _          <- log.info("Removing interpreter data")
+                _          <- interpreterClient.removeDataFromCursor(account.id, None)
+              } yield res
+            } else IO.unit
+
+          res <- accountManagerClient.resyncAccount(accountId, isWipe).flatMap(Ok(_))
+        } yield res
+
+      // Unregister account
+      case DELETE -> Root / UUIDVar(accountId) =>
+        for {
+
+          _       <- log.info(s"Fetching account informations for id: $accountId")
+          account <- accountManagerClient.getAccountInfo(accountId)
+
+          _          <- log.info("Deleting keychain")
+          keychainId <- UuidUtils.stringToUuidIO(account.key)
+          _ <- keychainClient
+            .deleteKeychain(keychainId)
+            .map(_ => log.info("Keychain deleted"))
+            .handleErrorWith(_ =>
+              log.info("An error occurred while deleting the keychain, moving on")
+            )
+
+          _ <- log.info("Unregistering account")
+          _ <- accountManagerClient.unregisterAccount(account.id)
+          _ <- log.info("Account unregistered")
+
+          res <- Ok()
+
+        } yield res
     }
 
 }

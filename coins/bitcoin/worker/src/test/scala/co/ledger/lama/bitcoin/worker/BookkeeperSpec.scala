@@ -321,6 +321,8 @@ object KeychainFixture {
       ): IO[List[String]] = ???
 
       override def deleteKeychain(keychainId: UUID): IO[Unit] = ???
+
+      override def resetKeychain(keychainId: UUID): IO[Unit] = ???
     }
 
 }

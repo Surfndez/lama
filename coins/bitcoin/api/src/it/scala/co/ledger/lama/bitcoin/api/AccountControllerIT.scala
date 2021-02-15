@@ -13,7 +13,7 @@ import co.ledger.lama.bitcoin.common.models.interpreter.{
 }
 import co.ledger.lama.common.models.Notification.BalanceUpdated
 import co.ledger.lama.common.models.Status.{Deleted, Published, Registered, Synchronized}
-import co.ledger.lama.common.models.{AccountRegistered, BalanceUpdatedNotification, Sort}
+import co.ledger.lama.common.models.{SyncEventResult, BalanceUpdatedNotification, Sort}
 import co.ledger.lama.common.utils.{IOAssertion, IOUtils, RabbitUtils}
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.{AMQPChannel, ExchangeName, QueueName, RoutingKey}
@@ -121,8 +121,8 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
           for {
 
             // This is retried because sometimes, the keychain service isn't ready when the tests start
-            accountRegistered <- IOUtils.retry[AccountRegistered](
-              client.expect[AccountRegistered](
+            accountRegistered <- IOUtils.retry[SyncEventResult](
+              client.expect[SyncEventResult](
                 accountRegisteringRequest.withEntity(account.registerRequest)
               )
             )

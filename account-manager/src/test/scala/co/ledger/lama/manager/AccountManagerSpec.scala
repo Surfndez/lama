@@ -61,8 +61,7 @@ class AccountManagerSpec extends AnyFlatSpecLike with Matchers with BeforeAndAft
 
   it should "register a new account" in IOAssertion {
     transactor.use { db =>
-      val service                     = new AccountManager(db, conf.coins)
-      val defaultBitcoinSyncFrequency = conf.coins.head.syncFrequency.toSeconds
+      val service = new AccountManager(db, conf.coins)
 
       for {
         response <- service.registerAccount(testKey, coinFamily, coin, None, None)
@@ -78,9 +77,6 @@ class AccountManagerSpec extends AnyFlatSpecLike with Matchers with BeforeAndAft
             CoinFamily.Bitcoin,
             Coin.Btc
           ).id
-
-        // it should be the default sync frequency from the bitcoin config
-        response.syncFrequency shouldBe defaultBitcoinSyncFrequency
 
         // check event
         event.map(_.accountId) shouldBe Some(response.accountId)

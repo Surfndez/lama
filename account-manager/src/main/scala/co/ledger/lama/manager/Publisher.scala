@@ -69,19 +69,22 @@ trait Publisher[K, V <: WithBusinessId[K]] {
   // If next pending event exists, publish it.
   def dequeue(key: K): IO[Unit] =
     for {
-      countOnGoingMessages <- decrOnGoingMessages(key)
-      nextEvent <-
-        if (countOnGoingMessages < maxOnGoingMessages) lpopPendingMessages(key)
-        else IO.pure(None)
+      _         <- decrOnGoingMessages(key)
+      nextEvent <- lpopPendingMessages(key)
       result <- nextEvent match {
-        case Some(next) => publish(next)
-        case None       => IO.unit
+        case Some(next) =>
+          publish(next)
+        case None => IO.unit
       }
     } yield result
 
+  // Count the number of ongoing messages
+  private def countOnGoingMessages(key: K): IO[Long] =
+    IO(redis.get[Long](onGoingMessagesCounterKey(key)).getOrElse(0))
+
   // Check if the counter of ongoing messages has reached the max.
   private def hasMaxOnGoingMessages(key: K): IO[Boolean] =
-    IO(redis.get[Int](onGoingMessagesCounterKey(key)).exists(_ >= maxOnGoingMessages))
+    countOnGoingMessages(key).map(_ >= maxOnGoingMessages)
 
   // https://redis.io/commands/incr
   // Increment the counter of ongoing messages for a key and return the value after.
@@ -89,9 +92,13 @@ trait Publisher[K, V <: WithBusinessId[K]] {
     IO.fromOption(redis.incr(onGoingMessagesCounterKey(key)))(RedisUnexpectedException)
 
   // https://redis.io/commands/decr
-  // Decrement the counter of ongoing messages for a key and return the value after.
+  // If the counter is above 0,
+  // decrement the counter of ongoing messages for a key and return the value after.
   private def decrOnGoingMessages(key: K): IO[Long] =
-    IO.fromOption(redis.decr(onGoingMessagesCounterKey(key)))(RedisUnexpectedException)
+    countOnGoingMessages(key).flatMap {
+      case 0 => IO.pure(0)
+      case _ => IO.fromOption(redis.decr(onGoingMessagesCounterKey(key)))(RedisUnexpectedException)
+    }
 
   // https://redis.io/commands/rpush
   // Add an event at the last and return the length after.

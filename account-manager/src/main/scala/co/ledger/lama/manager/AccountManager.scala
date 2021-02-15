@@ -32,7 +32,7 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig]) 
       coin: Coin,
       syncFrequencyO: Option[Long],
       label: Option[String]
-  ): IO[AccountRegistered] = {
+  ): IO[SyncEventResult] = {
 
     val account = AccountIdentifier(
       key,
@@ -80,19 +80,35 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig]) 
         // Run queries and return an sync event result.
         queries
           .transact(db)
-          .map { case (accountId, syncId, syncFrequency) =>
-            AccountRegistered(
-              accountId,
-              syncId,
-              syncFrequency
-            )
+          .map { case (accountId, syncId, _) =>
+            SyncEventResult(accountId, syncId)
           }
     } yield response
   }
 
+  def resyncAccount(accountId: UUID, wipe: Boolean): IO[SyncEventResult] =
+    for {
+      account <- getAccountInfo(accountId)
+
+      resyncFromCursor =
+        if (wipe) None
+        else account.lastSyncEvent.flatMap(_.cursor)
+
+      // Create then insert the registered event.
+      syncEvent = WorkableEvent[JsonObject](
+        account.id,
+        UUID.randomUUID(),
+        Status.Registered,
+        resyncFromCursor,
+        None,
+        Instant.now()
+      )
+      _ <- Queries.insertSyncEvent(syncEvent).transact(db)
+    } yield SyncEventResult(syncEvent.accountId, syncEvent.syncId)
+
   def unregisterAccount(
       accountId: UUID
-  ): IO[AccountUnregistered] =
+  ): IO[SyncEventResult] =
     for {
 
       existing <- Queries
@@ -105,7 +121,7 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig]) 
       result <- existing match {
         case Some(e) =>
           IO.pure(
-            AccountUnregistered(
+            SyncEventResult(
               e.accountId,
               e.syncId
             )
@@ -128,12 +144,7 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig]) 
             result <- Queries
               .insertSyncEvent(event)
               .transact(db)
-              .map(_ =>
-                AccountUnregistered(
-                  event.accountId,
-                  event.syncId
-                )
-              )
+              .map(_ => SyncEventResult(event.accountId, event.syncId))
           } yield result
       }
     } yield result

@@ -9,9 +9,10 @@ option java_package = "co.ledger.lama.manager.protobuf";
 // Exposes a gRPC interface to manage synchronization of
 // account infos and transactions.
 service AccountManagerService {
-    rpc RegisterAccount(RegisterAccountRequest) returns (RegisterAccountResult) {}
+    rpc RegisterAccount(RegisterAccountRequest) returns (SyncEventResult) {}
     rpc UpdateAccount(UpdateAccountRequest) returns (google.protobuf.Empty) {}
-    rpc UnregisterAccount(UnregisterAccountRequest) returns (UnregisterAccountResult) {}
+    rpc ResyncAccount(ResyncAccountRequest) returns (SyncEventResult) {}
+    rpc UnregisterAccount(UnregisterAccountRequest) returns (SyncEventResult) {}
     rpc GetAccountInfo(AccountInfoRequest) returns (AccountInfoResult) {}
     rpc GetAccounts(GetAccountsRequest) returns (AccountsResult) {}
     rpc GetSyncEvents(GetSyncEventsRequest) returns (GetSyncEventsResult) {}
@@ -55,17 +56,16 @@ message UpdateAccountRequest {
     }
 }
 
+message ResyncAccountRequest {
+    bytes account_id = 1;
+    bool wipe = 2;
+}
+
 message UnregisterAccountRequest {
     bytes account_id = 1;
 }
 
-message RegisterAccountResult {
-    bytes account_id = 1;
-    bytes sync_id = 2;
-    uint64 sync_frequency = 3;
-}
-
-message UnregisterAccountResult {
+message SyncEventResult {
     bytes account_id = 1;
     bytes sync_id = 2;
 }

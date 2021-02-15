@@ -32,7 +32,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
           conf.orchestrator.coins.head
         )
 
-        val nbEvents = 12
+        val nbEvents = 15
 
         def runTests(): IO[Unit] =
           for {
@@ -70,13 +70,26 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
               )
             )
 
+            // reseed scenario
+            _ <- service.resyncAccount(accountTest.id, wipe = true)
+
+            messageSent3 <- worker.consumeWorkerMessage()
+
+            // Report after a reseed a successful sync event
+            _ <- worker.publishReportMessage(
+              ReportMessage(
+                account = messageSent3.account,
+                event = messageSent3.event.asReportableSuccessEvent(syncedCursorJson)
+              )
+            )
+
             // Unregister an account.
             unregisteredResult <- service.unregisterAccount(accountTest.id)
 
             unregisteredAccountId = unregisteredResult.accountId
             unregisteredSyncId    = unregisteredResult.syncId
 
-            messageSent3 <- worker.consumeWorkerMessage()
+            messageSent4 <- worker.consumeWorkerMessage()
 
             // Report a failed delete event with an error message.
             deleteFailedError = ReportError(
@@ -85,18 +98,18 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
             )
             _ <- worker.publishReportMessage(
               ReportMessage(
-                account = messageSent3.account,
-                event = messageSent3.event.asReportableFailureEvent(deleteFailedError)
+                account = messageSent4.account,
+                event = messageSent4.event.asReportableFailureEvent(deleteFailedError)
               )
             )
 
-            messageSent4 <- worker.consumeWorkerMessage()
+            messageSent5 <- worker.consumeWorkerMessage()
 
             // Report a successful delete event.
             _ <- worker.publishReportMessage(
               ReportMessage(
-                account = messageSent4.account,
-                event = messageSent4.event.asReportableSuccessEvent(None)
+                account = messageSent5.account,
+                event = messageSent5.event.asReportableSuccessEvent(None)
               )
             )
 
@@ -140,8 +153,8 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                   account = accountTest,
                   event = WorkableEvent(
                     accountTest.id,
-                    unregisteredSyncId,
-                    Status.Unregistered,
+                    messageSent3.event.syncId,
+                    Status.Registered,
                     None,
                     None,
                     messageSent3.event.time
@@ -153,11 +166,24 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                   account = accountTest,
                   event = WorkableEvent(
                     accountTest.id,
-                    messageSent4.event.syncId,
+                    unregisteredSyncId,
+                    Status.Unregistered,
+                    None,
+                    None,
+                    messageSent4.event.time
+                  )
+                )
+
+              messageSent5 shouldBe
+                WorkerMessage(
+                  account = accountTest,
+                  event = WorkableEvent(
+                    accountTest.id,
+                    messageSent5.event.syncId,
                     Status.Unregistered,
                     None,
                     Some(deleteFailedError),
-                    messageSent4.event.time
+                    messageSent5.event.time
                   )
                 )
             }
@@ -230,17 +256,13 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
               )
             }
 
-            it should "succeed to unregister an account" in {
-              unregisteredAccountId shouldBe accountTest.id
-            }
-
-            it should "have (unregistered -> published -> delete_failed) events for the next iteration" in {
+            it should "have (registered -> published -> synchronized) events after a reseed (force sync manual from 0)" in {
               val eventsBatch3 = syncEvents.slice(6, 9)
               eventsBatch3 shouldBe List(
                 WorkableEvent(
                   accountTest.id,
                   messageSent3.event.syncId,
-                  Status.Unregistered,
+                  Status.Registered,
                   None,
                   None,
                   eventsBatch3.head.time
@@ -256,15 +278,19 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                 ReportableEvent(
                   accountTest.id,
                   messageSent3.event.syncId,
-                  Status.DeleteFailed,
+                  Status.Synchronized,
+                  syncedCursorJson,
                   None,
-                  Some(deleteFailedError),
                   eventsBatch3(2).time
                 )
               )
             }
 
-            it should "have (unregistered -> published -> deleted) events at the end" in {
+            it should "succeed to unregister an account" in {
+              unregisteredAccountId shouldBe accountTest.id
+            }
+
+            it should "have (unregistered -> published -> delete_failed) events for the next iteration" in {
               val eventsBatch4 = syncEvents.slice(9, 12)
               eventsBatch4 shouldBe List(
                 WorkableEvent(
@@ -272,7 +298,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                   messageSent4.event.syncId,
                   Status.Unregistered,
                   None,
-                  Some(deleteFailedError),
+                  None,
                   eventsBatch4.head.time
                 ),
                 FlaggedEvent(
@@ -280,16 +306,46 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                   messageSent4.event.syncId,
                   Status.Published,
                   None,
-                  Some(deleteFailedError),
+                  None,
                   eventsBatch4(1).time
                 ),
                 ReportableEvent(
                   accountTest.id,
                   messageSent4.event.syncId,
+                  Status.DeleteFailed,
+                  None,
+                  Some(deleteFailedError),
+                  eventsBatch4(2).time
+                )
+              )
+            }
+
+            it should "have (unregistered -> published -> deleted) events at the end" in {
+              val eventsBatch5 = syncEvents.slice(12, 15)
+              eventsBatch5 shouldBe List(
+                WorkableEvent(
+                  accountTest.id,
+                  messageSent5.event.syncId,
+                  Status.Unregistered,
+                  None,
+                  Some(deleteFailedError),
+                  eventsBatch5.head.time
+                ),
+                FlaggedEvent(
+                  accountTest.id,
+                  messageSent5.event.syncId,
+                  Status.Published,
+                  None,
+                  Some(deleteFailedError),
+                  eventsBatch5(1).time
+                ),
+                ReportableEvent(
+                  accountTest.id,
+                  messageSent5.event.syncId,
                   Status.Deleted,
                   None,
                   None,
-                  eventsBatch4(2).time
+                  eventsBatch5(2).time
                 )
               )
             }

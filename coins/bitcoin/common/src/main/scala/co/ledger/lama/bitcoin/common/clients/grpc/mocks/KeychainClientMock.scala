@@ -116,4 +116,6 @@ class KeychainClientMock extends KeychainClient with IOLogging {
 
   override def deleteKeychain(keychainId: UUID): IO[Unit] = ???
 
+  override def resetKeychain(keychainId: UUID): IO[Unit] = ???
+
 }

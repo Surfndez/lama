@@ -44,4 +44,6 @@ object RouterUtils {
   object OptionalChangeTypeParamMatcher
       extends OptionalQueryParamDecoderMatcher[ChangeType]("change")
 
+  object OptionalWipeQueryParamMatcher extends OptionalQueryParamDecoderMatcher[Boolean]("wipe")
+
 }

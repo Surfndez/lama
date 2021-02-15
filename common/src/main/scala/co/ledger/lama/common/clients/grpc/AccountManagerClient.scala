@@ -1,13 +1,13 @@
 package co.ledger.lama.common.clients.grpc
 
-import java.util.UUID
-
 import cats.effect.{ContextShift, IO}
 import co.ledger.lama.common.models._
 import co.ledger.lama.common.utils.UuidUtils
 import co.ledger.lama.manager.protobuf
 import io.circe.JsonObject
 import io.grpc.{ManagedChannel, Metadata}
+
+import java.util.UUID
 
 trait AccountManagerClient {
   def registerAccount(
@@ -16,13 +16,18 @@ trait AccountManagerClient {
       coin: Coin,
       syncFrequency: Option[Long],
       label: Option[String]
-  ): IO[AccountRegistered]
+  ): IO[SyncEventResult]
 
   def updateSyncFrequency(accountId: UUID, frequency: Long): IO[Unit]
+
   def updateLabel(accountId: UUID, label: String): IO[Unit]
+
   def updateAccount(accountId: UUID, frequency: Long, label: String): IO[Unit]
 
-  def unregisterAccount(accountId: UUID): IO[AccountUnregistered]
+  def resyncAccount(accountId: UUID, wipe: Boolean): IO[SyncEventResult]
+
+  def unregisterAccount(accountId: UUID): IO[SyncEventResult]
+
   def getAccountInfo(accountId: UUID): IO[AccountInfo]
   def getAccounts(limit: Option[Int], offset: Option[Int]): IO[AccountsResult]
   def getSyncEvents(
@@ -47,7 +52,7 @@ class AccountManagerGrpcClient(
       coin: Coin,
       syncFrequency: Option[Long],
       label: Option[String]
-  ): IO[AccountRegistered] =
+  ): IO[SyncEventResult] =
     client
       .registerAccount(
         protobuf.RegisterAccountRequest(
@@ -59,7 +64,7 @@ class AccountManagerGrpcClient(
         ),
         new Metadata
       )
-      .map(AccountRegistered.fromProto)
+      .map(SyncEventResult.fromProto)
 
   private def update(accountId: UUID, field: protobuf.UpdateAccountRequest.Field) =
     client
@@ -84,7 +89,18 @@ class AccountManagerGrpcClient(
       protobuf.UpdateAccountRequest.Field.Info(protobuf.UpdateAccountRequest.Info(frequency, label))
     )
 
-  def unregisterAccount(accountId: UUID): IO[AccountUnregistered] =
+  def resyncAccount(accountId: UUID, wipe: Boolean): IO[SyncEventResult] =
+    client
+      .resyncAccount(
+        protobuf.ResyncAccountRequest(
+          UuidUtils.uuidToBytes(accountId),
+          wipe
+        ),
+        new Metadata()
+      )
+      .map(SyncEventResult.fromProto)
+
+  def unregisterAccount(accountId: UUID): IO[SyncEventResult] =
     client
       .unregisterAccount(
         protobuf.UnregisterAccountRequest(
@@ -92,7 +108,7 @@ class AccountManagerGrpcClient(
         ),
         new Metadata
       )
-      .map(AccountUnregistered.fromProto)
+      .map(SyncEventResult.fromProto)
 
   def getAccountInfo(accountId: UUID): IO[AccountInfo] =
     client

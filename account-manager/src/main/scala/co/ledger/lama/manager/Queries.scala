@@ -12,8 +12,7 @@ import co.ledger.lama.common.models.{
   Sort,
   SyncEvent,
   TriggerableEvent,
-  TriggerableStatus,
-  WorkableStatus
+  TriggerableStatus
 }
 import co.ledger.lama.manager.models._
 import co.ledger.lama.manager.models.implicits._
@@ -37,14 +36,13 @@ object Queries {
       coinFamily: CoinFamily,
       coin: Coin
   ): Stream[ConnectionIO, WorkerMessage[JsonObject]] =
-    (
-      sql"""SELECT "key", coin_family, coin, account_id, sync_id, status, "cursor", "error", updated
-            FROM account_sync_status
-            WHERE coin_family = $coinFamily
-            AND coin = $coin
-            AND """
-        ++ Fragments.in(fr"status", NonEmptyList.fromListUnsafe(WorkableStatus.all.values.toList))
-    ).query[WorkerMessage[JsonObject]].stream
+    sql"""SELECT "key", coin_family, coin, account_id, sync_id, status, "cursor", "error", updated
+          FROM workable_event
+          WHERE coin_family = $coinFamily
+          AND coin = $coin
+       """
+      .query[WorkerMessage[JsonObject]]
+      .stream
 
   def fetchTriggerableEvents(
       coinFamily: CoinFamily,
