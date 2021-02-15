@@ -35,7 +35,7 @@ object App extends IOApp {
     } yield WorkerResources(rabbitClient, httpClient, keychainGrpcChannel, interpreterGrpcChannel)
 
     resources.use { res =>
-      val syncEventService = new SyncEventService(
+      val syncEventService = new RabbitSyncEventService(
         res.rabbitClient,
         conf.queueName(conf.workerEventsExchangeName),
         conf.lamaEventsExchangeName,
@@ -48,8 +48,8 @@ object App extends IOApp {
 
       val explorerClient = new ExplorerHttpClient(res.httpClient, conf.explorer, _)
 
-      val cursorStateService: Coin => CursorStateService =
-        c => new CursorStateService(explorerClient(c), interpreterClient)
+      val cursorStateService: Coin => CursorStateService[IO] =
+        c => CursorStateService(explorerClient(c), interpreterClient).getLastValidState(_, _)
 
       val worker = new Worker(
         syncEventService,
@@ -57,7 +57,8 @@ object App extends IOApp {
         explorerClient,
         interpreterClient,
         cursorStateService,
-        conf
+        conf.maxTxsToSavePerBatch,
+        conf.maxConcurrent
       )
 
       for {

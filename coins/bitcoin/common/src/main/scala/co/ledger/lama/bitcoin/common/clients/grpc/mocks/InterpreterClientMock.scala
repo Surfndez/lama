@@ -80,41 +80,43 @@ class InterpreterClientMock extends InterpreterClient {
       lastblockHeight: Option[Long]
   ): IO[Int] = {
 
-    val txViews = savedTransactions(accountId).map(tx =>
-      TransactionView(
-        tx.id,
-        tx.hash,
-        tx.receivedAt,
-        tx.lockTime,
-        tx.fees,
-        tx.inputs.collect { case i: DefaultInput =>
-          InputView(
-            i.outputHash,
-            i.outputIndex,
-            i.inputIndex,
-            i.value,
-            i.address,
-            i.scriptSignature,
-            i.txinwitness,
-            i.sequence,
-            addresses.find(_.accountAddress == i.address).map(_.derivation)
-          )
+    val txViews = savedTransactions
+      .getOrElse(accountId, List.empty)
+      .map(tx =>
+        TransactionView(
+          tx.id,
+          tx.hash,
+          tx.receivedAt,
+          tx.lockTime,
+          tx.fees,
+          tx.inputs.collect { case i: DefaultInput =>
+            InputView(
+              i.outputHash,
+              i.outputIndex,
+              i.inputIndex,
+              i.value,
+              i.address,
+              i.scriptSignature,
+              i.txinwitness,
+              i.sequence,
+              addresses.find(_.accountAddress == i.address).map(_.derivation)
+            )
 
-        },
-        tx.outputs.map(o =>
-          OutputView(
-            o.outputIndex,
-            o.value,
-            o.address,
-            o.scriptHex,
-            addresses.find(a => a.accountAddress == o.address).map(a => a.changeType),
-            addresses.find(_.accountAddress == o.address).map(_.derivation)
-          )
-        ),
-        Some(BlockView(tx.block.hash, tx.block.height, tx.block.time)),
-        tx.confirmations
+          },
+          tx.outputs.map(o =>
+            OutputView(
+              o.outputIndex,
+              o.value,
+              o.address,
+              o.scriptHex,
+              addresses.find(a => a.accountAddress == o.address).map(a => a.changeType),
+              addresses.find(_.accountAddress == o.address).map(_.derivation)
+            )
+          ),
+          Some(BlockView(tx.block.hash, tx.block.height, tx.block.time)),
+          tx.confirmations
+        )
       )
-    )
 
     transactions.update(accountId, txViews)
 

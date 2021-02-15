@@ -57,14 +57,16 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
   }
 
   private def callExpect[A](uri: Uri)(implicit d: EntityDecoder[IO, A]): IO[A] =
-    httpClient
-      .expect[A](uri)
-      .handleErrorWith(e => IO.raiseError(ExplorerClientException(uri, e)))
+    log.debug(uri.toString()) *>
+      httpClient
+        .expect[A](uri)
+        .handleErrorWith(e => IO.raiseError(ExplorerClientException(uri, e)))
 
   private def callExpect[A](req: Request[IO])(implicit c: EntityDecoder[IO, A]): IO[A] =
-    httpClient
-      .expect[A](req)
-      .handleErrorWith(e => IO.raiseError(ExplorerClientException(req.uri, e)))
+    log.debug(req.toString()) *>
+      httpClient
+        .expect[A](req)
+        .handleErrorWith(e => IO.raiseError(ExplorerClientException(req.uri, e)))
 
   private def callWithRetry[A](
       req: Request[IO],

@@ -10,12 +10,18 @@ import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.{ExchangeName, QueueName, RoutingKey}
 import fs2.Stream
 
-class SyncEventService(
+trait SyncEventService {
+  def consumeWorkerMessages: Stream[IO, WorkerMessage[Block]]
+  def reportMessage(message: ReportMessage[Block]): IO[Unit]
+}
+
+class RabbitSyncEventService(
     rabbitClient: RabbitClient[IO],
     workerQueueName: QueueName,
     lamaExchangeName: ExchangeName,
     lamaRoutingKey: RoutingKey
-) extends IOLogging {
+) extends SyncEventService
+    with IOLogging {
 
   def consumeWorkerMessages: Stream[IO, WorkerMessage[Block]] =
     RabbitUtils.createAutoAckConsumer[WorkerMessage[Block]](rabbitClient, workerQueueName)

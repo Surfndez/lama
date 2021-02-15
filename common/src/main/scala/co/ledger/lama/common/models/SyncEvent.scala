@@ -96,6 +96,7 @@ case class WorkableEvent[T](
       Instant.now()
     )
 
+  // TODO: newCursor should not be optional
   def asReportableSuccessEvent(newCursor: Option[T]): ReportableEvent[T] =
     ReportableEvent(
       accountId,

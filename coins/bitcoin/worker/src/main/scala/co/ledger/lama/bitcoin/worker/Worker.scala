@@ -9,16 +9,17 @@ import co.ledger.lama.bitcoin.common.models.explorer.{
   ConfirmedTransaction,
   UnconfirmedTransaction
 }
-import co.ledger.lama.bitcoin.worker.config.Config
+import co.ledger.lama.bitcoin.worker.services.CursorStateService.AccountId
 import co.ledger.lama.bitcoin.worker.services._
 import co.ledger.lama.common.logging.IOLogging
 import co.ledger.lama.common.models.Status.{Registered, Unregistered}
 import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
-import co.ledger.lama.common.models.{Coin, ReportError, ReportableEvent}
+import co.ledger.lama.common.models.{AccountIdentifier, Coin, ReportError, ReportableEvent}
 import fs2.Stream
 import io.circe.syntax._
 
 import java.util.UUID
+import scala.math.Ordering.Implicits._
 import scala.util.Try
 
 class Worker(
@@ -26,16 +27,17 @@ class Worker(
     keychainClient: KeychainClient,
     explorerClient: Coin => ExplorerClient,
     interpreterClient: InterpreterClient,
-    cursorStateService: Coin => CursorStateService,
-    conf: Config
+    cursorService: Coin => CursorStateService[IO],
+    maxTxsToSavePerBatch: Int,
+    maxConcurrent: Int
 ) extends IOLogging {
 
   val bookkeeper = new Bookkeeper(
     new Keychain(keychainClient),
     explorerClient,
     interpreterClient,
-    conf.maxTxsToSavePerBatch,
-    conf.maxConcurrent
+    maxTxsToSavePerBatch,
+    maxConcurrent
   )
 
   def run(implicit cs: ContextShift[IO], t: Timer[IO]): Stream[IO, Unit] =
@@ -79,26 +81,8 @@ class Worker(
 
     // sync the whole account per streamed batch
     for {
-      _          <- log.info(s"Syncing from cursor state: $previousBlockState")
-      keychainId <- IO.fromTry(Try(UUID.fromString(account.key)))
 
-      // REORG
-      lastValidBlock <- previousBlockState.map { block =>
-        for {
-          lvb <- cursorStateService(account.coin).getLastValidState(account.id, block)
-          _   <- log.info(s"Last valid block : $lvb")
-          _ <-
-            if (lvb.hash.endsWith(block.hash))
-              // If the previous block is still valid, do not reorg
-              IO.unit
-            else {
-              // remove all transactions and operations up until last valid block
-              log.info(
-                s"${block.hash} is different than ${lvb.hash}, reorg is happening"
-              ) *> interpreterClient.removeDataFromCursor(account.id, Some(lvb.height))
-            }
-        } yield lvb
-      }.sequence
+      keychainId <- IO.fromTry(Try(UUID.fromString(account.key)))
 
       addressesUsedByMempool <- bookkeeper
         .record[UnconfirmedTransaction](
@@ -111,13 +95,25 @@ class Worker(
         .compile
         .toList
 
-      batchResults <- bookkeeper
-        .record[ConfirmedTransaction](
-          account.coin,
-          account.id,
-          keychainId,
-          lastValidBlock.map(_.hash)
-        )
+      lastMinedBlock <- lastMinedBlock(account.coin)
+
+      batchResults <- Stream
+        .emit(previousBlockState)
+        .filter {
+          case Some(previous) => previous < lastMinedBlock.block
+          case None           => true
+        }
+        .evalTap(b => log.info(s"Syncing from cursor state: $b"))
+        .evalMap(b => b.map(rewindToLastValidBlock(account, _)).sequence)
+        .flatMap { lastValidBlock =>
+          bookkeeper
+            .record[ConfirmedTransaction](
+              account.coin,
+              account.id,
+              keychainId,
+              lastValidBlock.map(_.hash)
+            )
+        }
         .compile
         .toList
 
@@ -125,26 +121,43 @@ class Worker(
 
       txs = batchResults.flatMap(_.transactions).distinctBy(_.hash)
 
-      lastBlock =
-        if (txs.isEmpty) previousBlockState
-        else Some(txs.maxBy(_.block.time).block)
-
-      _ <- log.info(s"New cursor state: $lastBlock")
+      _ <- log.info(s"New cursor state: ${lastMinedBlock.block}")
 
       opsCount <- interpreterClient.compute(
         account.id,
         account.coin,
         (addresses ++ addressesUsedByMempool).distinct,
-        lastBlock.map(_.height)
+        Some((lastMinedBlock.block :: txs.map(_.block)).max.height)
       )
 
       _ <- log.info(s"$opsCount operations computed")
 
     } yield {
       // Create the reportable successful event.
-      workableEvent.asReportableSuccessEvent(lastBlock)
+      workableEvent.asReportableSuccessEvent(Some(lastMinedBlock.block))
     }
   }
+
+  case class LastMinedBlock(block: Block)
+
+  def lastMinedBlock(coin: Coin): IO[LastMinedBlock] =
+    explorerClient(coin).getCurrentBlock.map(LastMinedBlock)
+
+  private def rewindToLastValidBlock(account: AccountIdentifier, lastKnownBlock: Block): IO[Block] =
+    for {
+      lvb <- cursorService(account.coin).getLastValidState(AccountId(account.id), lastKnownBlock)
+      _   <- log.info(s"Last valid block : $lvb")
+      _ <-
+        if (lvb.hash == lastKnownBlock.hash)
+          // If the previous block is still valid, do not reorg
+          IO.unit
+        else {
+          // remove all transactions and operations up until last valid block
+          log.info(
+            s"${lastKnownBlock.hash} is different than ${lvb.hash}, reorg is happening"
+          ) *> interpreterClient.removeDataFromCursor(account.id, Some(lvb.height))
+        }
+    } yield lvb
 
   def deleteAccount(message: WorkerMessage[Block]): IO[ReportableEvent[Block]] =
     interpreterClient

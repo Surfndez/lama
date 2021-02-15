@@ -23,7 +23,9 @@ case class Block(
 
 object Block {
   implicit val encoder: Encoder[Block] = deriveConfiguredEncoder[Block]
-  implicit val decoder: Decoder[Block] = deriveConfiguredDecoder[Block]
+  implicit val decoder: Decoder[Block] = deriveConfiguredDecoder[Block].map(b =>
+    if (b.hash.startsWith("0x")) b.copy(hash = b.hash.substring(2)) else b
+  )
 
   def fromProto(proto: protobuf.Block): Block =
     Block(
@@ -31,4 +33,6 @@ object Block {
       proto.height,
       proto.time.map(TimestampProtoUtils.deserialize).getOrElse(Instant.now)
     )
+
+  implicit val ordering: Ordering[Block] = Ordering.by(b => (b.height, b.time))
 }

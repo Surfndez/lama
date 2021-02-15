@@ -12,22 +12,31 @@ class ExplorerClientMock(
     mempool: Map[Address, List[UnconfirmedTransaction]] = Map.empty
 ) extends ExplorerClient {
 
-  def getCurrentBlock: IO[Block] = ???
+  val blocks = blockchain.values.flatten.map(_.block).toList.sorted
 
-  def getBlock(hash: String): IO[Option[Block]] = ???
+  var getConfirmedTransactionsCount: Int   = 0
+  var getUnConfirmedTransactionsCount: Int = 0
 
-  def getBlock(height: Long): IO[Block] = ???
+  def getCurrentBlock: IO[Block] = IO.pure(blockchain.values.flatten.map(_.block).max)
+
+  def getBlock(hash: String): IO[Option[Block]] = IO.pure(blocks.find(_.hash == hash))
+
+  def getBlock(height: Long): IO[Block] = IO.pure(blocks.find(_.height == height).get)
 
   def getUnconfirmedTransactions(
       addresses: Set[Address]
-  )(implicit cs: ContextShift[IO], t: Timer[IO]): Stream[IO, UnconfirmedTransaction] =
+  )(implicit cs: ContextShift[IO], t: Timer[IO]): Stream[IO, UnconfirmedTransaction] = {
+    getUnConfirmedTransactionsCount += 1
     Stream.emits(addresses.flatMap(mempool.get).flatten.toSeq)
+  }
 
   def getConfirmedTransactions(addresses: Seq[String], blockHash: Option[String])(implicit
       cs: ContextShift[IO],
       t: Timer[IO]
-  ): fs2.Stream[IO, ConfirmedTransaction] =
+  ): fs2.Stream[IO, ConfirmedTransaction] = {
+    getConfirmedTransactionsCount += 1
     Stream.emits(addresses.flatMap(blockchain.get).flatten)
+  }
 
   def getSmartFees: IO[FeeInfo] = {
     IO(FeeInfo(500, 1000, 1500))
