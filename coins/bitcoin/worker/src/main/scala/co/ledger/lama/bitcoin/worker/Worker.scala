@@ -32,14 +32,6 @@ class Worker(
     maxConcurrent: Int
 ) extends IOLogging {
 
-  val bookkeeper = new Bookkeeper(
-    new Keychain(keychainClient),
-    explorerClient,
-    interpreterClient,
-    maxTxsToSavePerBatch,
-    maxConcurrent
-  )
-
   def run(implicit cs: ContextShift[IO], t: Timer[IO]): Stream[IO, Unit] =
     syncEventService.consumeWorkerMessages
       .evalMap { message =>
@@ -74,6 +66,15 @@ class Worker(
   def synchronizeAccount(
       workerMessage: WorkerMessage[Block]
   )(implicit cs: ContextShift[IO], t: Timer[IO]): IO[ReportableEvent[Block]] = {
+
+    val bookkeeper = Bookkeeper(
+      new Keychain(keychainClient),
+      explorerClient,
+      interpreterClient,
+      maxTxsToSavePerBatch,
+      maxConcurrent
+    )
+
     val account       = workerMessage.account
     val workableEvent = workerMessage.event
 
@@ -91,13 +92,11 @@ class Worker(
           keychainId,
           None
         )
-        .flatMap(r => Stream.emits(r.addresses))
-        .compile
-        .toList
+        .map(_.addresses)
 
       lastMinedBlock <- lastMinedBlock(account.coin)
 
-      batchResults <- Stream
+      batchResult <- Stream
         .emit(previousBlockState)
         .filter {
           case Some(previous) => previous < lastMinedBlock.block
@@ -105,7 +104,7 @@ class Worker(
         }
         .evalTap(b => log.info(s"Syncing from cursor state: $b"))
         .evalMap(b => b.map(rewindToLastValidBlock(account, _)).sequence)
-        .flatMap { lastValidBlock =>
+        .evalMap { lastValidBlock =>
           bookkeeper
             .record[ConfirmedTransaction](
               account.coin,
@@ -117,9 +116,7 @@ class Worker(
         .compile
         .toList
 
-      addresses = batchResults.flatMap(_.addresses)
-
-      txs = batchResults.flatMap(_.transactions).distinctBy(_.hash)
+      addresses = batchResult.flatMap(_.addresses)
 
       _ <- log.info(s"New cursor state: ${lastMinedBlock.block}")
 
@@ -127,7 +124,7 @@ class Worker(
         account.id,
         account.coin,
         (addresses ++ addressesUsedByMempool).distinct,
-        Some((lastMinedBlock.block :: txs.map(_.block)).max.height)
+        Some((lastMinedBlock.block :: batchResult.flatMap(_.maxBlock)).max.height)
       )
 
       _ <- log.info(s"$opsCount operations computed")

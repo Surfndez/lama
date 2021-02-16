@@ -104,6 +104,7 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
             }
             Stream.emits(confirmedTxs)
           }
+
       }
       .parJoinUnbounded
 

@@ -24,7 +24,7 @@ class InterpreterGrpcService(
   ): IO[protobuf.ResultCount] = {
     for {
       accountId  <- UuidUtils.bytesToUuidIO(request.accountId)
-      _          <- log.info(s"Saving transactions for $accountId")
+      _          <- log.info(s"Saving ${request.transactions.size} transactions for $accountId")
       txs        <- IO(request.transactions.map(ConfirmedTransaction.fromProto).toList)
       savedCount <- interpreter.saveTransactions(accountId, txs)
     } yield protobuf.ResultCount(savedCount)
@@ -36,7 +36,7 @@ class InterpreterGrpcService(
   ): IO[protobuf.ResultCount] = {
     for {
       accountId  <- UuidUtils.bytesToUuidIO(request.accountId)
-      _          <- log.info(s"Saving transactions for $accountId")
+      _          <- log.info(s"Saving ${request.transactions.size} transactions for $accountId")
       txs        <- IO(request.transactions.map(UnconfirmedTransaction.fromProto).toList)
       savedCount <- interpreter.saveUnconfirmedTransactions(accountId, txs)
     } yield protobuf.ResultCount(savedCount)
