@@ -30,11 +30,82 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
 
   implicit val cs: ContextShift[IO] = IO.contextShift(scala.concurrent.ExecutionContext.global)
 
+  def transactionsRoutes(
+      accountManagerClient: AccountManagerClient,
+      transactorClient: TransactorClient
+  ): HttpRoutes[IO] = HttpRoutes.of[IO] {
+
+    // Create transaction
+    case req @ POST -> Root / UUIDVar(
+          accountId
+        ) / "transactions" =>
+      for {
+        _                        <- log.info(s"Preparing transaction creation for account: $accountId")
+        createTransactionRequest <- req.as[CreateTransactionRequest]
+
+        account    <- accountManagerClient.getAccountInfo(accountId)
+        keychainId <- UuidUtils.stringToUuidIO(account.key)
+
+        response <- transactorClient
+          .createTransaction(
+            accountId,
+            keychainId,
+            account.coin,
+            createTransactionRequest.coinSelection,
+            createTransactionRequest.outputs,
+            createTransactionRequest.feeLevel,
+            createTransactionRequest.customFee
+          )
+          .flatMap(Ok(_))
+
+      } yield response
+
+    // Sign transaction (only for testing)
+    case req @ POST -> Root / "_internal" / "sign" =>
+      for {
+        _       <- log.info(s"Signing Transaction")
+        request <- req.as[GenerateSignaturesRequest]
+
+        response <- transactorClient
+          .generateSignature(
+            request.rawTransaction,
+            request.privKey
+          )
+          .flatMap(Ok(_))
+
+      } yield response
+
+    // Send transaction
+    case req @ POST -> Root / UUIDVar(
+          accountId
+        ) / "transactions" / "send" =>
+      for {
+        _       <- log.info(s"Broadcasting transaction for account: $accountId")
+        request <- req.as[BroadcastTransactionRequest]
+
+        account    <- accountManagerClient.getAccountInfo(accountId)
+        keychainId <- UuidUtils.stringToUuidIO(account.key)
+
+        txInfo <- transactorClient
+          .broadcastTransaction(
+            keychainId,
+            account.coin.name,
+            request.rawTransaction,
+            request.signatures
+          )
+          .flatMap(Ok(_))
+
+        syncResult <- accountManagerClient.resyncAccount(accountId, wipe = false)
+        _          <- log.info(s"Sync sent to account manager: $syncResult")
+
+      } yield txInfo
+
+  }
+
   def routes(
       keychainClient: KeychainClient,
       accountManagerClient: AccountManagerClient,
-      interpreterClient: InterpreterClient,
-      transactorClient: TransactorClient
+      interpreterClient: InterpreterClient
   ): HttpRoutes[IO] =
     HttpRoutes.of[IO] {
 
@@ -238,68 +309,6 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
               Some(preset.interval)
             )
             .flatMap(Ok(_))
-
-      // Create transaction
-      case req @ POST -> Root / UUIDVar(
-            accountId
-          ) / "transactions" =>
-        for {
-          _                        <- log.info(s"Preparing transaction creation for account: $accountId")
-          createTransactionRequest <- req.as[CreateTransactionRequest]
-
-          account    <- accountManagerClient.getAccountInfo(accountId)
-          keychainId <- UuidUtils.stringToUuidIO(account.key)
-
-          response <- transactorClient
-            .createTransaction(
-              accountId,
-              keychainId,
-              account.coin,
-              createTransactionRequest.coinSelection,
-              createTransactionRequest.outputs,
-              createTransactionRequest.feeLevel,
-              createTransactionRequest.customFee
-            )
-            .flatMap(Ok(_))
-
-        } yield response
-
-      // Sign transaction (only for testing)
-      case req @ POST -> Root / "_internal" / "sign" =>
-        for {
-          _       <- log.info(s"Signing Transaction")
-          request <- req.as[GenerateSignaturesRequest]
-
-          response <- transactorClient
-            .generateSignature(
-              request.rawTransaction,
-              request.privKey
-            )
-            .flatMap(Ok(_))
-
-        } yield response
-
-      // Send transaction
-      case req @ POST -> Root / UUIDVar(
-            accountId
-          ) / "transactions" / "send" =>
-        for {
-          _       <- log.info(s"Preparing transaction creation for account: $accountId")
-          request <- req.as[BroadcastTransactionRequest]
-
-          account    <- accountManagerClient.getAccountInfo(accountId)
-          keychainId <- UuidUtils.stringToUuidIO(account.key)
-
-          response <- transactorClient
-            .broadcastTransaction(
-              keychainId,
-              account.coin.name,
-              request.rawTransaction,
-              request.signatures
-            )
-            .flatMap(Ok(_))
-
-        } yield response
 
       // List observable account addresses
       case GET -> Root / UUIDVar(

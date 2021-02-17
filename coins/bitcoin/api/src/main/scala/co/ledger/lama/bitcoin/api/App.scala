@@ -18,6 +18,7 @@ import org.http4s.implicits.http4sKleisliResponseSyntaxOptionT
 import org.http4s.server.Router
 import org.http4s.server.blaze.BlazeServerBuilder
 import pureconfig.ConfigSource
+import cats.implicits._
 
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
@@ -58,15 +59,21 @@ object App extends IOApp {
         maxAge = 1.day.toSeconds
       )
 
+      val accountManager = new AccountManagerGrpcClient(res.accountManagerGrpcChannel)
+
       val httpRoutes = Router[IO](
         "accounts" -> CORS(
           loggingMiddleWare(
-            AccountController.routes(
-              new KeychainGrpcClient(res.keychainGrpcChannel),
-              new AccountManagerGrpcClient(res.accountManagerGrpcChannel),
-              new InterpreterGrpcClient(res.interpreterGrpcChannel),
-              new TransactorGrpcClient(res.transactorGrpcChannel)
-            )
+            AccountController
+              .routes(
+                new KeychainGrpcClient(res.keychainGrpcChannel),
+                accountManager,
+                new InterpreterGrpcClient(res.interpreterGrpcChannel)
+              ) <+> AccountController
+              .transactionsRoutes(
+                accountManager,
+                new TransactorGrpcClient(res.transactorGrpcChannel)
+              )
           ),
           methodConfig
         ),
