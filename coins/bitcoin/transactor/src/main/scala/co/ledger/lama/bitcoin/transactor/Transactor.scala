@@ -1,6 +1,7 @@
 package co.ledger.lama.bitcoin.transactor
 
 import java.util.UUID
+
 import cats.effect.IO
 import co.ledger.lama.bitcoin.common.utils.CoinImplicits._
 import co.ledger.lama.bitcoin.common.models.interpreter.{ChangeType, Utxo}
@@ -19,7 +20,7 @@ import co.ledger.lama.bitcoin.transactor.clients.grpc.BitcoinLibClient
 import co.ledger.lama.bitcoin.transactor.models.bitcoinLib.SignatureMetadata
 import co.ledger.lama.bitcoin.transactor.services.CoinSelectionService
 import co.ledger.lama.common.logging.IOLogging
-import co.ledger.lama.common.models.{Coin, Sort}
+import co.ledger.lama.common.models.{BitcoinLikeCoin, Coin, Sort}
 import fs2.{Chunk, Stream}
 import io.circe.syntax._
 
@@ -34,7 +35,7 @@ class Transactor(
       accountId: UUID,
       keychainId: UUID,
       outputs: List[PrepareTxOutput],
-      coin: Coin,
+      coin: BitcoinLikeCoin,
       coinSelection: CoinSelectionStrategy,
       feeLevel: FeeLevel,
       customFee: Option[Long]

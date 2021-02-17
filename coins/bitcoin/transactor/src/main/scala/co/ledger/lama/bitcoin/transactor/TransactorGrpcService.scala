@@ -9,7 +9,7 @@ import co.ledger.lama.bitcoin.common.models.transactor.{
   RawTransaction
 }
 import co.ledger.lama.common.logging.IOLogging
-import co.ledger.lama.common.models.Coin
+import co.ledger.lama.common.models.{BitcoinLikeCoin, Coin}
 import co.ledger.lama.common.utils.UuidUtils
 import com.google.protobuf.ByteString
 import io.grpc.{Metadata, ServerServiceDefinition}
@@ -29,7 +29,7 @@ class TransactorGrpcService(transactor: Transactor) extends TransactorService wi
 
       keychainId <- UuidUtils.bytesToUuidIO(request.keychainId)
       accountId  <- UuidUtils.bytesToUuidIO(request.accountId)
-      coin       <- Coin.fromKeyIO(request.coinId)
+      coin       <- BitcoinLikeCoin.fromKeyIO(request.coinId)
       outputs       = request.outputs.map(PrepareTxOutput.fromProto).toList
       coinSelection = CoinSelectionStrategy.fromProto(request.coinSelection)
       feeLevel      = FeeLevel.fromProto(request.feeLevel)
