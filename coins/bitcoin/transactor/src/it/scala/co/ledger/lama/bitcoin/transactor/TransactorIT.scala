@@ -83,7 +83,7 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
     )
 
     val recipients: List[PrepareTxOutput] = List(
-      PrepareTxOutput("recipientAddress", 17000)
+      PrepareTxOutput("recipientAddress", 15000)
     )
 
     for {

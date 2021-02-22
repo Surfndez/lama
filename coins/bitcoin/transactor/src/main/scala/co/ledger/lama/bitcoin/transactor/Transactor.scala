@@ -18,7 +18,7 @@ import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
 import co.ledger.lama.bitcoin.common.models.BitcoinNetwork
 import co.ledger.lama.bitcoin.transactor.clients.grpc.BitcoinLibClient
 import co.ledger.lama.bitcoin.transactor.models.bitcoinLib.SignatureMetadata
-import co.ledger.lama.bitcoin.transactor.services.CoinSelectionService
+import co.ledger.lama.bitcoin.transactor.services.{CoinSelectionService, Fees}
 import co.ledger.lama.common.logging.IOLogging
 import co.ledger.lama.common.models.{BitcoinLikeCoin, Coin, Sort}
 import fs2.{Chunk, Stream}
@@ -42,6 +42,8 @@ class Transactor(
   ): IO[RawTransactionAndUtxos] = {
 
     for {
+
+      accountInfo <- keychainClient.getKeychainInfo(keychainId)
 
       utxos <- getUTXOs(accountId, 100, Sort.Ascending).filter(!_.usedInMempool).compile.toList
       _ <- log.info(
@@ -76,6 +78,13 @@ class Transactor(
           )
         }
 
+      estimatedFeePerUtxo = Fees.estimateSingleUtxoFees(coin)(
+        accountInfo.scheme
+      ) * estimatedFeeSatPerKb / 1000
+
+      targetAmount = outputs.map(_.value).sum +
+        Fees.estimateTxFees(coin)(outputs.size) * estimatedFeeSatPerKb / 1000
+
       rawTransaction <- createRawTransactionRec(
         coin.toNetwork,
         coinSelection,
@@ -83,7 +92,8 @@ class Transactor(
         outputs,
         changeAddress.accountAddress,
         estimatedFeeSatPerKb,
-        outputs.map(_.value).sum
+        targetAmount,
+        estimatedFeePerUtxo
       )
 
     } yield rawTransaction
@@ -161,6 +171,7 @@ class Transactor(
       changeAddress: String,
       estimatedFeeSatPerKb: Long,
       amount: BigInt,
+      feesPerUtxo: BigInt,
       retryCount: Int = 5
   ): IO[RawTransactionAndUtxos] = {
 
@@ -180,7 +191,8 @@ class Transactor(
       selectedUtxos <- CoinSelectionService.coinSelection(
         strategy,
         utxos,
-        amount
+        amount,
+        feesPerUtxo
       )
       _ <- log.info(
         s"""Picked Utxos :
@@ -217,7 +229,8 @@ class Transactor(
           outputs,
           changeAddress,
           estimatedFeeSatPerKb,
-          outputs.map(_.value).sum + notEnoughUtxo.missingAmount,
+          amount + notEnoughUtxo.missingAmount,
+          feesPerUtxo,
           retryCount - 1
         )
       )

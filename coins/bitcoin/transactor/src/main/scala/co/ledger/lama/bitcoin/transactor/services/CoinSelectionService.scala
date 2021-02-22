@@ -9,35 +9,41 @@ object CoinSelectionService {
   def coinSelection(
       coinSelection: CoinSelectionStrategy,
       utxos: List[Utxo],
-      amount: BigInt
+      amount: BigInt,
+      feesPerUtxo: BigInt
   ): IO[List[Utxo]] =
     coinSelection match {
-      case CoinSelectionStrategy.OptimizeSize => optimizeSizePicking(utxos, amount)
-      case CoinSelectionStrategy.DepthFirst   => depthFirstPickingRec(utxos, amount)
+      case CoinSelectionStrategy.OptimizeSize => optimizeSizePicking(utxos, amount, feesPerUtxo)
+      case CoinSelectionStrategy.DepthFirst   => depthFirstPickingRec(utxos, amount, feesPerUtxo)
     }
 
   private def optimizeSizePicking(
       utxos: List[Utxo],
-      targetAmount: BigInt
+      targetAmount: BigInt,
+      feesPerUtxo: BigInt
   ) =
     depthFirstPickingRec(
       utxos.sortWith(_.value > _.value),
-      targetAmount
+      targetAmount,
+      feesPerUtxo
     )
 
   private def depthFirstPickingRec(
       utxos: List[Utxo],
       targetAmount: BigInt,
+      feesPerUtxo: BigInt,
       sum: BigInt = 0
   ): IO[List[Utxo]] = {
     utxos match {
-      case head :: tail =>
-        if (isDust(head.value))
-          depthFirstPickingRec(tail, targetAmount, sum)
-        else if (sum + head.value > targetAmount)
-          IO.pure(List(head))
+      case utxo :: tail =>
+        val effectiveValue = utxo.value - feesPerUtxo
+
+        if (isDust(effectiveValue))
+          depthFirstPickingRec(tail, targetAmount, sum, feesPerUtxo)
+        else if (sum + effectiveValue > targetAmount)
+          IO.pure(List(utxo))
         else
-          depthFirstPickingRec(tail, targetAmount, sum + head.value).map(head :: _)
+          depthFirstPickingRec(tail, targetAmount, feesPerUtxo, sum + effectiveValue).map(utxo :: _)
       case Nil =>
         IO.raiseError(
           new Exception(
@@ -47,8 +53,8 @@ object CoinSelectionService {
     }
   }
 
-  private def isDust(value: BigInt): Boolean = {
-    value < 1000
+  private def isDust(effectiveValue: BigInt): Boolean = {
+    effectiveValue < 0
   }
 
 }

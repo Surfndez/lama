@@ -29,11 +29,11 @@ class CoinSelectionServiceTest extends AnyFlatSpecLike with Matchers {
     )
 
     CoinSelectionService
-      .coinSelection(CoinSelectionStrategy.DepthFirst, utxos, 10000)
+      .coinSelection(CoinSelectionStrategy.DepthFirst, utxos, 10000, 100)
       .unsafeRunSync() should have size 1
 
     CoinSelectionService
-      .coinSelection(CoinSelectionStrategy.DepthFirst, utxos, 100001)
+      .coinSelection(CoinSelectionStrategy.DepthFirst, utxos, 100001, 100)
       .unsafeRunSync() should have size 2
 
   }
@@ -60,14 +60,14 @@ class CoinSelectionServiceTest extends AnyFlatSpecLike with Matchers {
     )
 
     val firstSelection = CoinSelectionService
-      .coinSelection(CoinSelectionStrategy.OptimizeSize, utxos, 10000)
+      .coinSelection(CoinSelectionStrategy.OptimizeSize, utxos, 10000, 100)
       .unsafeRunSync()
 
     firstSelection should have size 1
     firstSelection.head.value shouldBe 40000
 
     val secondSelection = CoinSelectionService
-      .coinSelection(CoinSelectionStrategy.OptimizeSize, utxos, 50000)
+      .coinSelection(CoinSelectionStrategy.OptimizeSize, utxos, 50000, 100)
       .unsafeRunSync()
 
     secondSelection should have size 2
