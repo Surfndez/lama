@@ -25,7 +25,8 @@ trait TransactorClient {
       coinSelection: CoinSelectionStrategy,
       outputs: List[PrepareTxOutput],
       feeLevel: FeeLevel,
-      customFee: Option[Long]
+      customFee: Option[Long],
+      maxUtxos: Option[Int]
   ): IO[RawTransaction]
 
   def generateSignature(
@@ -56,7 +57,8 @@ class TransactorGrpcClient(
       coinSelection: CoinSelectionStrategy,
       outputs: List[PrepareTxOutput],
       feeLevel: FeeLevel,
-      customFee: Option[Long]
+      customFee: Option[Long],
+      maxUtxos: Option[Int]
   ): IO[RawTransaction] =
     client
       .createTransaction(
@@ -67,7 +69,8 @@ class TransactorGrpcClient(
           outputs.map(_.toProto),
           coin.name,
           feeLevel.toProto,
-          customFee.getOrElse(0L)
+          customFee.getOrElse(0L),
+          maxUtxos.getOrElse(0)
         ),
         new Metadata
       )

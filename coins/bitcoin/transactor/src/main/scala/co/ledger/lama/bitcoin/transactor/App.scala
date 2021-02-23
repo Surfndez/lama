@@ -38,7 +38,8 @@ object App extends IOApp with IOLogging {
             bitcoinLib,
             explorerService,
             keychainService,
-            interpreterService
+            interpreterService,
+            conf.transactor
           )
         ).definition,
         new HealthService().definition

@@ -28,7 +28,8 @@ class Transactor(
     bitcoinLibClient: BitcoinLibClient,
     explorerClient: Coin => ExplorerClient,
     keychainClient: KeychainClient,
-    interpreterClient: InterpreterClient
+    interpreterClient: InterpreterClient,
+    conf: TransactorConfig
 ) extends IOLogging {
 
   def createTransaction(
@@ -38,7 +39,8 @@ class Transactor(
       coin: BitcoinLikeCoin,
       coinSelection: CoinSelectionStrategy,
       feeLevel: FeeLevel,
-      customFee: Option[Long]
+      customFee: Option[Long],
+      maxUtxos: Int
   ): IO[RawTransactionAndUtxos] = {
 
     for {
@@ -93,7 +95,8 @@ class Transactor(
         changeAddress.accountAddress,
         estimatedFeeSatPerKb,
         targetAmount,
-        estimatedFeePerUtxo
+        estimatedFeePerUtxo,
+        if (maxUtxos == 0) conf.maxUtxos else maxUtxos
       )
 
     } yield rawTransaction
@@ -172,6 +175,7 @@ class Transactor(
       estimatedFeeSatPerKb: Long,
       amount: BigInt,
       feesPerUtxo: BigInt,
+      maxUtxos: Int,
       retryCount: Int = 5
   ): IO[RawTransactionAndUtxos] = {
 
@@ -192,7 +196,8 @@ class Transactor(
         strategy,
         utxos,
         amount,
-        feesPerUtxo
+        feesPerUtxo,
+        maxUtxos
       )
       _ <- log.info(
         s"""Picked Utxos :
@@ -231,6 +236,7 @@ class Transactor(
           estimatedFeeSatPerKb,
           amount + notEnoughUtxo.missingAmount,
           feesPerUtxo,
+          maxUtxos,
           retryCount - 1
         )
       )

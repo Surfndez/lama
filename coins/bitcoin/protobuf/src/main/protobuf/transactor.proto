@@ -25,6 +25,7 @@ message CreateTransactionRequest {
   string coinId = 5;
   FeeLevel fee_level = 6;
   int64 custom_fee = 7;
+  int32 maxUtxos = 8;
 }
 
 message CreateTransactionResponse {

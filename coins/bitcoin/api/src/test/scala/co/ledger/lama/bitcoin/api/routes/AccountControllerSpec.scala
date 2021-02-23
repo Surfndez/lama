@@ -145,7 +145,8 @@ object AccountControllerSpec {
           coinSelection: CoinSelectionStrategy,
           outputs: List[PrepareTxOutput],
           feeLevel: FeeLevel,
-          customFee: Option[Long]
+          customFee: Option[Long],
+          maxUtxos: Option[Int]
       ): IO[RawTransaction] = ???
 
       override def generateSignature(

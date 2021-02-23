@@ -32,7 +32,8 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
         bitcoinLibService,
         _ => explorerService,
         keychainService,
-        interpreterService
+        interpreterService,
+        TransactorConfig(200)
       )
 
     val accountId = UUID.randomUUID()
@@ -109,7 +110,8 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
         Coin.Btc,
         CoinSelectionStrategy.DepthFirst,
         FeeLevel.Normal,
-        None
+        None,
+        200
       )
 
     } yield {

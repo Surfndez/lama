@@ -10,9 +10,18 @@ case class Config(
     explorer: ExplorerConfig,
     interpreter: GrpcClientConfig,
     keychain: GrpcClientConfig,
-    bitcoinLib: GrpcClientConfig
+    bitcoinLib: GrpcClientConfig,
+    transactor: TransactorConfig
 )
 
 object Config {
   implicit val configReader: ConfigReader[Config] = deriveReader[Config]
+}
+
+case class TransactorConfig(
+    maxUtxos: Int
+)
+
+object TransactorConfig {
+  implicit val configReader: ConfigReader[TransactorConfig] = deriveReader[TransactorConfig]
 }

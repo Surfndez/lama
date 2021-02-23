@@ -42,6 +42,8 @@ class TransactorGrpcService(transactor: Transactor) extends TransactorService wi
             - coin: ${coin.name}
             - feeLevel: $feeLevel
             - customFee: $optCustomFee
+            - feeLevel: $feeLevel
+            - maxUtxos: ${request.maxUtxos}
          """
       )
 
@@ -52,7 +54,8 @@ class TransactorGrpcService(transactor: Transactor) extends TransactorService wi
         coin,
         coinSelection,
         feeLevel,
-        optCustomFee
+        optCustomFee,
+        request.maxUtxos
       )
 
     } yield {

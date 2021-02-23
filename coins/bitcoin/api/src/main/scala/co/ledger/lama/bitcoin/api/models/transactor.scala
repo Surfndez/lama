@@ -16,7 +16,8 @@ object transactor {
       coinSelection: CoinSelectionStrategy,
       outputs: List[PrepareTxOutput],
       feeLevel: FeeLevel,
-      customFee: Option[Long]
+      customFee: Option[Long],
+      maxUtxos: Option[Int]
   )
 
   object CreateTransactionRequest {

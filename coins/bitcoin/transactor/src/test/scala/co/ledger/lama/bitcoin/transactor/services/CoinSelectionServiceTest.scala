@@ -29,13 +29,34 @@ class CoinSelectionServiceTest extends AnyFlatSpecLike with Matchers {
     )
 
     CoinSelectionService
-      .coinSelection(CoinSelectionStrategy.DepthFirst, utxos, 10000, 100)
+      .coinSelection(CoinSelectionStrategy.DepthFirst, utxos, 10000, 100, 200)
       .unsafeRunSync() should have size 1
 
     CoinSelectionService
-      .coinSelection(CoinSelectionStrategy.DepthFirst, utxos, 100001, 100)
+      .coinSelection(CoinSelectionStrategy.DepthFirst, utxos, 100001, 100, 200)
       .unsafeRunSync() should have size 2
 
+  }
+
+  it should "be in error if it goes beyond 10 utxos" in {
+
+    val utxo = Utxo(
+      "hash",
+      0,
+      1000,
+      "address",
+      "script",
+      Some(ChangeType.Internal),
+      NonEmptyList.of(0, 1),
+      Instant.now
+    )
+
+    val utxos = (1 to 20).toList.map(_ => utxo.copy())
+
+    an[Throwable] should be thrownBy
+      CoinSelectionService
+        .coinSelection(CoinSelectionStrategy.DepthFirst, utxos, 10000, 100, 5)
+        .unsafeRunSync()
   }
 
   "A optimizeSize Strategy" should "biggest utxos first" in {
@@ -60,14 +81,14 @@ class CoinSelectionServiceTest extends AnyFlatSpecLike with Matchers {
     )
 
     val firstSelection = CoinSelectionService
-      .coinSelection(CoinSelectionStrategy.OptimizeSize, utxos, 10000, 100)
+      .coinSelection(CoinSelectionStrategy.OptimizeSize, utxos, 10000, 100, 200)
       .unsafeRunSync()
 
     firstSelection should have size 1
     firstSelection.head.value shouldBe 40000
 
     val secondSelection = CoinSelectionService
-      .coinSelection(CoinSelectionStrategy.OptimizeSize, utxos, 50000, 100)
+      .coinSelection(CoinSelectionStrategy.OptimizeSize, utxos, 50000, 100, 200)
       .unsafeRunSync()
 
     secondSelection should have size 2

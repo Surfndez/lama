@@ -54,7 +54,8 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
             createTransactionRequest.coinSelection,
             createTransactionRequest.outputs,
             createTransactionRequest.feeLevel,
-            createTransactionRequest.customFee
+            createTransactionRequest.customFee,
+            createTransactionRequest.maxUtxos
           )
           .flatMap(Ok(_))
 
