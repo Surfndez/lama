@@ -1,7 +1,8 @@
 package co.ledger.lama.bitcoin.transactor
 
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, Validated}
 import cats.effect.{ConcurrentEffect, IO}
+import co.ledger.lama.bitcoin.common.models.{Address, InvalidAddress}
 import co.ledger.lama.bitcoin.common.models.transactor.{
   CoinSelectionStrategy,
   FeeLevel,
@@ -125,4 +126,36 @@ class TransactorGrpcService(transactor: Transactor) extends TransactorService wi
       broadcastTx.toProto
     }
 
+  override def validateAddresses(
+      request: protobuf.ValidateAddressesRequest,
+      ctx: Metadata
+  ): IO[protobuf.ValidateAddressesResponse] = {
+
+    def validAddress(address: String) =
+      protobuf.ValidateAddressesResponse.ValidationResult.Result
+        .Valid(protobuf.ValidateAddressesResponse.ValidAddress(address))
+
+    def invalidAddress(reason: String, address: String) =
+      protobuf.ValidateAddressesResponse.ValidationResult.Result
+        .Invalid(protobuf.ValidateAddressesResponse.InvalidAddress(address, reason))
+
+    for {
+      coin <- IO.fromOption(Coin.fromKey(request.coinId))(
+        new Throwable(s"Unknown coin ${request.coinId}")
+      )
+      result <- transactor.validateAddresses(coin, request.addresses.map(Address))
+    } yield {
+
+      protobuf.ValidateAddressesResponse(
+        result
+          .map {
+            case Validated
+                  .Invalid(InvalidAddress(Address(address), reason)) =>
+              invalidAddress(reason, address)
+            case Validated.Valid(Address(a)) => validAddress(a)
+          }
+          .map(protobuf.ValidateAddressesResponse.ValidationResult.of)
+      )
+    }
+  }
 }

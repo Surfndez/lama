@@ -1,21 +1,15 @@
 package co.ledger.lama.bitcoin.transactor
 
-import java.util.UUID
-
+import cats.data.Validated
 import cats.effect.IO
-import co.ledger.lama.bitcoin.common.utils.CoinImplicits._
-import co.ledger.lama.bitcoin.common.models.interpreter.{ChangeType, Utxo}
-import co.ledger.lama.bitcoin.common.models.transactor.{
-  BroadcastTransaction,
-  CoinSelectionStrategy,
-  FeeLevel,
-  PrepareTxOutput,
-  RawTransaction,
-  RawTransactionAndUtxos
-}
+import cats.implicits._
 import co.ledger.lama.bitcoin.common.clients.grpc.{InterpreterClient, KeychainClient}
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
-import co.ledger.lama.bitcoin.common.models.BitcoinNetwork
+import co.ledger.lama.bitcoin.common.models.interpreter.{ChangeType, Utxo}
+import co.ledger.lama.bitcoin.common.models.transactor._
+import co.ledger.lama.bitcoin.common.models.{Address, BitcoinNetwork, InvalidAddress}
+import co.ledger.lama.bitcoin.common.utils.CoinImplicits._
+import co.ledger.lama.bitcoin.transactor.Transactor.ValidationResult
 import co.ledger.lama.bitcoin.transactor.clients.grpc.BitcoinLibClient
 import co.ledger.lama.bitcoin.transactor.models.bitcoinLib.SignatureMetadata
 import co.ledger.lama.bitcoin.transactor.services.{CoinSelectionService, TransactionBytes}
@@ -23,6 +17,8 @@ import co.ledger.lama.common.logging.IOLogging
 import co.ledger.lama.common.models.{BitcoinLikeCoin, Coin, Sort}
 import fs2.{Chunk, Stream}
 import io.circe.syntax._
+
+import java.util.UUID
 
 class Transactor(
     bitcoinLibClient: BitcoinLibClient,
@@ -55,20 +51,21 @@ class Transactor(
          """
       )
 
-      estimatedFeeSatPerKb <-
-        customFee match {
-          case Some(custom) => log.info(s"Custom fee: $custom") *> IO.pure(custom)
-          case _            =>
-            // TODO: testnet smart fees is buggy on explorer v3
-            for {
-              smartFee <- coin match {
-                case Coin.BtcTestnet => IO.pure(25642L)
-                case Coin.BtcRegtest => IO.pure(25642L)
-                case c               => explorerClient(c).getSmartFees.map(_.getValue(feeLevel))
-              }
-              _ <- log.info(s"GetSmartFees feeLevel: $feeLevel - feeSatPerKb: $smartFee ")
-            } yield smartFee
-        }
+      estimatedFeeSatPerKb <- customFee match {
+        case Some(custom) => log.info(s"Custom fee: $custom") *> IO.pure(custom)
+        case _            =>
+          // TODO: testnet smart fees is buggy on explorer v3
+          for {
+            smartFee <- coin match {
+              case Coin.BtcTestnet => IO.pure(25642L)
+              case Coin.BtcRegtest => IO.pure(25642L)
+              case c               => explorerClient(c).getSmartFees.map(_.getValue(feeLevel))
+            }
+            _ <- log.info(
+              s"Account($accountId) GetSmartFees feeLevel: $feeLevel - feeSatPerKb: $smartFee "
+            )
+          } yield smartFee
+      }
 
       changeAddress <- keychainClient
         .getFreshAddresses(keychainId, ChangeType.Internal, 1)
@@ -164,6 +161,17 @@ class Transactor(
         signedRawTx.witnessHash
       )
     }
+  }
+
+  def validateAddresses(
+      coin: Coin,
+      addresses: Seq[Address]
+  ): IO[ValidationResult[Address]] = {
+
+    val validateAddress = bitcoinLibClient.validateAddress(_, coin.toNetwork)
+
+    addresses.toList
+      .traverse(validateAddress)
   }
 
   private def createRawTransactionRec(
@@ -273,4 +281,9 @@ class Transactor(
     else
       IO.unit
 
+}
+
+object Transactor {
+
+  type ValidationResult[A] = List[Validated[InvalidAddress, A]]
 }

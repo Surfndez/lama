@@ -1,14 +1,14 @@
 package co.ledger.lama.bitcoin.common.clients.grpc
 
-import java.util.UUID
+import cats.data.NonEmptyList
 import cats.effect.{ContextShift, IO}
-import co.ledger.lama.bitcoin.common.models.transactor.{
-  BroadcastTransaction,
-  CoinSelectionStrategy,
-  FeeLevel,
-  PrepareTxOutput,
-  RawTransaction
+import co.ledger.lama.bitcoin.common.clients.grpc.TransactorClient.{
+  Accepted,
+  Address,
+  AddressValidation,
+  Rejected
 }
+import co.ledger.lama.bitcoin.common.models.transactor._
 import co.ledger.lama.bitcoin.transactor.protobuf
 import co.ledger.lama.common.clients.grpc.GrpcClient
 import co.ledger.lama.common.models.Coin
@@ -16,7 +16,14 @@ import co.ledger.lama.common.utils.{HexUtils, UuidUtils}
 import com.google.protobuf.ByteString
 import io.grpc.{ManagedChannel, Metadata}
 
+import java.util.UUID
+
 trait TransactorClient {
+
+  def validateAddresses(
+      coin: Coin,
+      addresses: NonEmptyList[Address]
+  ): IO[List[AddressValidation]]
 
   def createTransaction(
       accountId: UUID,
@@ -40,6 +47,15 @@ trait TransactorClient {
       rawTransaction: RawTransaction,
       hexSignatures: List[String]
   ): IO[BroadcastTransaction]
+}
+
+object TransactorClient {
+
+  case class Address(value: String) extends AnyVal
+
+  sealed trait AddressValidation
+  case class Accepted(address: Address)                 extends AddressValidation
+  case class Rejected(address: Address, reason: String) extends AddressValidation
 }
 
 class TransactorGrpcClient(
@@ -110,5 +126,36 @@ class TransactorGrpcClient(
         new Metadata
       )
       .map(BroadcastTransaction.fromProto)
+  }
+
+  def validateAddresses(
+      coin: Coin,
+      addresses: NonEmptyList[Address]
+  ): IO[List[AddressValidation]] = {
+
+    client
+      .validateAddresses(
+        protobuf.ValidateAddressesRequest(coin.name, addresses.map(_.value).toList),
+        new Metadata
+      )
+      .map {
+        _.results.map {
+          case protobuf.ValidateAddressesResponse.ValidationResult(validResult, _)
+              if validResult.isValid =>
+            Accepted(Address(validResult.valid.get.address))
+          case protobuf.ValidateAddressesResponse.ValidationResult(invalidResult, _)
+              if invalidResult.isInvalid =>
+            Rejected(
+              Address(invalidResult.invalid.get.address),
+              invalidResult.invalid.get.invalidReason
+            )
+
+          case protobuf.ValidateAddressesResponse.ValidationResult(_, _) =>
+            Rejected(
+              Address("Unknown"),
+              "Lama can not validate this address"
+            )
+        }.toList
+      }
   }
 }

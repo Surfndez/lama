@@ -1,30 +1,33 @@
 package co.ledger.lama.bitcoin.api.routes
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit
-
+import cats.Monoid
+import cats.data.NonEmptyList
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import co.ledger.lama.bitcoin.api.models.BalancePreset
 import co.ledger.lama.bitcoin.api.models.accountManager._
 import co.ledger.lama.bitcoin.api.models.transactor._
-import co.ledger.lama.common.logging.IOLogging
-import co.ledger.lama.common.utils.UuidUtils
 import co.ledger.lama.bitcoin.api.utils.RouterUtils._
-import co.ledger.lama.bitcoin.common.models.interpreter.{ChangeType}
-import co.ledger.lama.bitcoin.common.utils.CoinImplicits._
 import co.ledger.lama.bitcoin.common.clients.grpc.{
   InterpreterClient,
   KeychainClient,
   TransactorClient
 }
+import co.ledger.lama.common.models.implicits.defaultCirceConfig
+import co.ledger.lama.bitcoin.common.models.interpreter.ChangeType
+import co.ledger.lama.bitcoin.common.utils.CoinImplicits._
 import co.ledger.lama.common.clients.grpc.AccountManagerClient
+import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.utils.UuidUtils
 import io.circe.Json
 import io.circe.generic.extras.auto._
+import io.circe.syntax._
 import org.http4s.HttpRoutes
 import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
-import io.circe.syntax._
+
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 object AccountController extends Http4sDsl[IO] with IOLogging {
 
@@ -101,6 +104,24 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
 
       } yield txInfo
 
+    case req @ POST -> Root / UUIDVar(
+          accountId
+        ) / "recipients" =>
+      for {
+        coin      <- accountManagerClient.getAccountInfo(accountId).map(_.coin)
+        addresses <- req.as[NonEmptyList[String]]
+        result <- transactorClient
+          .validateAddresses(coin, addresses.map(TransactorClient.Address))
+          .map(results =>
+            results.collectFold {
+              case TransactorClient.Accepted(address) => ValidationResult.valid(address)
+              case TransactorClient.Rejected(address, reason) =>
+                ValidationResult.invalid(address, reason)
+            }
+          )
+          .flatMap(Ok(_))
+
+      } yield result
   }
 
   def routes(
@@ -400,5 +421,25 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
 
         } yield res
     }
+
+}
+
+case class ValidationResult(valid: List[String], invalid: Map[String, String])
+object ValidationResult {
+
+  def valid(address: TransactorClient.Address): ValidationResult =
+    ValidationResult(valid = List(address.value), invalid = Map.empty)
+  def invalid(address: TransactorClient.Address, reason: String): ValidationResult =
+    ValidationResult(valid = List.empty, invalid = Map(address.value -> reason))
+
+  implicit val monoid: Monoid[ValidationResult] = new Monoid[ValidationResult] {
+    override def empty: ValidationResult = ValidationResult(List.empty, Map.empty)
+
+    override def combine(x: ValidationResult, y: ValidationResult): ValidationResult =
+      ValidationResult(
+        valid = x.valid ::: y.valid,
+        invalid = (x.invalid.toList ::: y.invalid.toList).toMap
+      )
+  }
 
 }

@@ -340,6 +340,35 @@ paths:
               schema:
                 $ref: '#/components/schemas/RawTransaction'
 
+  /accounts/{accountId}/recipients:
+    parameters:
+      - name: accountId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: 'uuid'
+    post:
+      summary: Validate recipients addresses according to accounts network parameters
+      operationId: validateRecipientsAddresses
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateRecipientsAddresses'
+      responses:
+        200:
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipientsAddressesValidationResult'
+        422:
+          description: No addresses to validate
+
+
+
 components:
   schemas:
     GetAccountResponse:
@@ -564,6 +593,36 @@ components:
         witness_hash:
           type: string
           example: 'c3781a66af971634002de4a4592ea5b62a7569a7d823998d1e27c1fad62837c6'
+    ValidateRecipientsAddresses:
+      description: Recipients addresses
+      type: array
+      items:
+
+        type: string
+      example:
+        - 'address1'
+        - 'address2'
+    RecipientsAddressesValidationResult:
+      description: Result of the validation containing all the input addresses
+      type: object
+      required:
+        - valid
+        - invalid
+      properties:
+        valid:
+          description: List of valid addresses
+          type: array
+          items:
+            type: string
+          example:
+            - "address1"
+        invalid:
+          description: Map of all invalid addresses with the reason
+          type: object
+          example:
+            address2: "blablabla"
+
+
     Address:
       required:
         - account_address

@@ -4,21 +4,18 @@ import cats.effect.{ContextShift, IO, Resource, Timer}
 import cats.implicits._
 import co.ledger.lama.bitcoin.api.ConfigSpec.ConfigSpec
 import co.ledger.lama.bitcoin.api.models.accountManager.{AccountWithBalance, UpdateSyncFrequency}
-import co.ledger.lama.bitcoin.common.models.interpreter.{
-  CurrentBalance,
-  GetBalanceHistoryResult,
-  GetOperationsResult,
-  GetUtxosResult,
-  Operation
-}
+import co.ledger.lama.bitcoin.api.routes.ValidationResult
+import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.common.models.Notification.BalanceUpdated
 import co.ledger.lama.common.models.Status.{Deleted, Published, Registered, Synchronized}
-import co.ledger.lama.common.models.{SyncEventResult, BalanceUpdatedNotification, Sort}
+import co.ledger.lama.common.models.{BalanceUpdatedNotification, Sort, SyncEventResult}
 import co.ledger.lama.common.utils.{IOAssertion, IOUtils, RabbitUtils}
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.{AMQPChannel, ExchangeName, QueueName, RoutingKey}
 import fs2.Stream
+import io.circe.generic.auto._
 import io.circe.parser._
+import io.circe.syntax._
 import org.http4s._
 import org.http4s.circe.CirceEntityCodec._
 import org.http4s.client.blaze.BlazeClientBuilder
@@ -100,6 +97,12 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
       method = Method.GET,
       uri = accounts / accountid.toString / "operations" / operationId.hex
     )
+
+  private def validateAddresses(accountId: UUID, addresses: List[String]) =
+    Request[IO](
+      method = Method.POST,
+      uri = accounts / accountId.toString / "recipients"
+    ).withEntity(addresses.asJson)
 
   def runTests(resourceName: String): Seq[Unit] = IOAssertion {
 
@@ -208,6 +211,13 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
               )
               .map(_.balances)
 
+            validAddresses = utxos.map(_.address)
+            invalidAddress = "invalidAddress"
+
+            recipientsAddressesValidationResult <- client.expect[ValidationResult](
+              validateAddresses(accountRegistered.accountId, invalidAddress :: validAddresses)
+            )
+
             accountUpdateStatus <- client.status(
               accountUpdateRequest(accountRegistered.accountId)
                 .withEntity(UpdateSyncFrequency(60))
@@ -285,6 +295,11 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
             it should "be updated" in {
               accountUpdateStatus.code shouldBe 200
               accountInfoAfterUpdate.syncFrequency shouldBe 60
+            }
+
+            it should "able to transfer to recipients addresses" in {
+              recipientsAddressesValidationResult.valid shouldBe validAddresses
+              recipientsAddressesValidationResult.invalid.keys should contain only invalidAddress
             }
 
             it should "be unregistered" in {

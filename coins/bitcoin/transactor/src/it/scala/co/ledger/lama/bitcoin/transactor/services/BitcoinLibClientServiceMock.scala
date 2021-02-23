@@ -1,7 +1,14 @@
 package co.ledger.lama.bitcoin.transactor.services
 
+import cats.data.Validated
 import cats.effect.IO
-import co.ledger.lama.bitcoin.common.models.{BitcoinNetwork, interpreter, transactor}
+import co.ledger.lama.bitcoin.common.models.{
+  Address,
+  BitcoinNetwork,
+  InvalidAddress,
+  interpreter,
+  transactor
+}
 import co.ledger.lama.bitcoin.transactor.clients.grpc.BitcoinLibClient
 import co.ledger.lama.bitcoin.transactor.models.bitcoinLib
 
@@ -32,4 +39,10 @@ class BitcoinLibClientServiceMock extends BitcoinLibClient {
       network: BitcoinNetwork,
       signatures: List[bitcoinLib.SignatureMetadata]
   ): IO[bitcoinLib.RawTransactionResponse] = ???
+
+  override def validateAddress(
+      address: Address,
+      network: BitcoinNetwork
+  ): IO[Validated[InvalidAddress, Address]] =
+    IO.delay(Validated.valid(address))
 }

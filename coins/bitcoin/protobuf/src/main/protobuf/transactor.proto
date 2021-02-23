@@ -7,9 +7,36 @@ package pb.v1;
 option java_package = "co.ledger.lama.bitcoin.transactor.protobuf";
 
 service BitcoinTransactorService {
+  rpc ValidateAddresses(ValidateAddressesRequest) returns (ValidateAddressesResponse) {}
   rpc CreateTransaction(CreateTransactionRequest) returns (CreateTransactionResponse) {}
   rpc GenerateSignatures(GenerateSignaturesRequest) returns (GenerateSignaturesResponse) {}
   rpc BroadcastTransaction(BroadcastTransactionRequest) returns (BroadcastTransactionResponse) {}
+}
+
+message ValidateAddressesRequest {
+  string coin_id = 1;
+  repeated string addresses = 2;
+}
+
+message ValidateAddressesResponse {
+
+  message InvalidAddress {
+    string address = 1;
+    string invalid_reason = 2;
+  }
+
+  message ValidAddress {
+    string address = 1;
+  }
+
+  message ValidationResult {
+    oneof result {
+      InvalidAddress invalid = 1;
+      ValidAddress valid = 2;
+    }
+  }
+
+  repeated ValidationResult results = 1;
 }
 
 enum CoinSelector {

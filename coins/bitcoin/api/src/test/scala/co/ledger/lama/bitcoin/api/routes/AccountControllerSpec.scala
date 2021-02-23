@@ -1,16 +1,25 @@
 package co.ledger.lama.bitcoin.api.routes
 
 import cats.Show
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, OptionT}
 import cats.effect.IO
 import cats.implicits._
 import co.ledger.lama.bitcoin.api.models.transactor.BroadcastTransactionRequest
 import co.ledger.lama.bitcoin.common.clients.grpc.TransactorClient
+import co.ledger.lama.bitcoin.common.clients.grpc.TransactorClient.{
+  Accepted,
+  Address,
+  AddressValidation,
+  Rejected
+}
 import co.ledger.lama.bitcoin.common.models.interpreter.Utxo
 import co.ledger.lama.bitcoin.common.models.transactor._
 import co.ledger.lama.common.clients.grpc.AccountManagerClient
 import co.ledger.lama.common.models._
-import io.circe.JsonObject
+import co.ledger.lama.common.utils.IOAssertion
+import io.circe.parser._
+import io.circe.{Json, JsonObject}
+import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.circe.CirceEntityEncoder._
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Method, Request}
@@ -27,7 +36,7 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
   implicit val sc = IO.contextShift(scala.concurrent.ExecutionContext.global)
 
   val accoundId = UUID.randomUUID()
-  val broadcastRequest = Request[IO](
+  val broadcastEndpoint = Request[IO](
     Method.POST,
     uri = uri"" / accoundId.toString / "transactions" / "send"
   )
@@ -54,10 +63,10 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
     List.empty
   )
 
-  broadcastRequest.show should "trigger a synchronization when the transaction has been broadcasted" in {
+  broadcastEndpoint.show should "trigger a synchronization when the transaction has been broadcasted" in {
 
     val accountManager = accountManagerClient(
-      getAccountInfoResponse = id => IO.delay(validAccount(id)),
+      getAccountInfoResponse = validAccount,
       resyncAccountResponse =
         (accountId: UUID) => IO.delay(SyncEventResult(accountId, UUID.randomUUID()))
     )
@@ -71,7 +80,7 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
       AccountController
         .transactionsRoutes(accountManager, transactor)
         .run(
-          broadcastRequest.withEntity(broadcastBody)
+          broadcastEndpoint.withEntity(broadcastBody)
         )
 
     response
@@ -88,7 +97,7 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
   it should "not trigger a synchro when the transaction has not been broadcasted" in {
 
     val accountManager = accountManagerClient(
-      getAccountInfoResponse = id => IO.delay(validAccount(id)),
+      getAccountInfoResponse = validAccount,
       resyncAccountResponse =
         (accountId: UUID) => IO.delay(SyncEventResult(accountId, UUID.randomUUID()))
     )
@@ -104,7 +113,7 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
       AccountController
         .transactionsRoutes(accountManager, transactor)
         .run(
-          broadcastRequest.withEntity(broadcastBody)
+          broadcastEndpoint.withEntity(broadcastBody)
         )
 
     a[IllegalStateException] should be thrownBy {
@@ -121,14 +130,134 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
     accountManager.resyncAccountCount shouldBe 0
   }
 
+  val validationEndpoint = Request[IO](
+    Method.POST,
+    uri = uri"" / accoundId.toString / "recipients"
+  )
+
+  validationEndpoint.show should "accept a list of addresses" in IOAssertion {
+
+    val addressesList = json("""
+        | [
+        |    "address1",
+        |    "address2",
+        |    "address3"
+        | ]
+        |
+        |""".stripMargin)
+
+    val controller = AccountController.transactionsRoutes(
+      accountManagerClient = accountManagerClient(
+        getAccountInfoResponse = validAccount,
+        resyncAccountResponse = unusedStub
+      ),
+      transactorClient = transactorClient(
+        validateAddressesResponse = allAccepted
+      )
+    )
+
+    (
+      for {
+        response <- controller.run(validationEndpoint.withEntity(addressesList))
+        body     <- OptionT.liftF(response.as[Json])
+      } yield {
+
+        response.status shouldBe org.http4s.Status.Ok
+
+        body shouldBe json(
+          """
+          | {
+          |   "valid" : [ "address1", "address2", "address3" ],
+          |   "invalid" : {}
+          | }
+          |""".stripMargin
+        )
+      }
+    ).value
+  }
+
+  it should "refuse an empty list" in {
+
+    val controller = AccountController.transactionsRoutes(
+      accountManagerClient = accountManagerClient(
+        getAccountInfoResponse = validAccount,
+        resyncAccountResponse = unusedStub
+      ),
+      transactorClient = transactorClient(
+        validateAddressesResponse = allAccepted
+      )
+    )
+
+    a[org.http4s.InvalidMessageBodyFailure] should be thrownBy {
+      controller
+        .run(validationEndpoint.withEntity(Json.arr()))
+        .value
+        .unsafeRunSync()
+    }
+  }
+
+  it should "show also the invalid addresses" in IOAssertion {
+
+    val addresses = json("""
+         | [
+         |    "address1",
+         |    "address2",
+         |    "address3"
+         | ]
+         |
+         |""".stripMargin)
+
+    val controller = AccountController.transactionsRoutes(
+      accountManagerClient = accountManagerClient(
+        getAccountInfoResponse = validAccount,
+        resyncAccountResponse = unusedStub
+      ),
+      transactorClient = transactorClient(
+        validateAddressesResponse = firstRejected
+      )
+    )
+
+    (
+      for {
+        response <- controller.run(validationEndpoint.withEntity(addresses))
+        body     <- OptionT.liftF(response.as[Json])
+      } yield {
+
+        response.status shouldBe org.http4s.Status.Ok
+
+        body shouldBe json(
+          """
+            | {
+            |   "valid" : [ "address2", "address3" ],
+            |   "invalid" : 
+            |      {   
+            |         "address1" : "rejected"
+            |      }
+            | }
+            |""".stripMargin
+        )
+      }
+    ).value
+  }
+
 }
 
 object AccountControllerSpec {
 
   implicit val showRequest: Show[Request[IO]] = Show.show(r => s"${r.method} ${r.uri}")
 
-  def validAccount(id: UUID) =
-    new AccountInfo(id, UUID.randomUUID().toString, CoinFamily.Bitcoin, Coin.Btc, 1L, None, None)
+  def json(j: String): Json = parse(j).getOrElse(Json.Null)
+
+  def unusedStub[A, B]: A => IO[B] = _ => IO.never
+  def allAccepted(addresses: List[Address]): IO[List[AddressValidation]] =
+    IO.delay(addresses.map(Accepted))
+  def firstRejected(addresses: List[Address]): IO[List[AddressValidation]] =
+    IO.delay(Rejected(addresses.head, reason = "rejected") :: addresses.tail.map(Accepted))
+
+  def validAccount(id: UUID): IO[AccountInfo] =
+    IO.delay(
+      new AccountInfo(id, UUID.randomUUID().toString, CoinFamily.Bitcoin, Coin.Btc, 1L, None, None)
+    )
 
   def broadcastTransaction(rawTransaction: RawTransaction) = new BroadcastTransaction(
     hex = rawTransaction.hex,
@@ -136,7 +265,10 @@ object AccountControllerSpec {
     witnessHash = rawTransaction.witnessHash
   )
 
-  private def transactorClient(broadcastResponse: RawTransaction => IO[BroadcastTransaction]) = {
+  private def transactorClient(
+      broadcastResponse: RawTransaction => IO[BroadcastTransaction] = unusedStub,
+      validateAddressesResponse: List[Address] => IO[List[AddressValidation]] = unusedStub
+  ) = {
     new TransactorClient {
       override def createTransaction(
           accountId: UUID,
@@ -160,6 +292,11 @@ object AccountControllerSpec {
           rawTransaction: RawTransaction,
           hexSignatures: List[String]
       ): IO[BroadcastTransaction] = broadcastResponse(rawTransaction)
+
+      override def validateAddresses(
+          coin: Coin,
+          addresses: NonEmptyList[Address]
+      ): IO[List[AddressValidation]] = validateAddressesResponse(addresses.toList)
     }
   }
 
