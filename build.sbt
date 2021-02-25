@@ -1,3 +1,4 @@
+import sbt.Compile
 // Build shared info
 ThisBuild / organization := "co.ledger"
 ThisBuild / scalaVersion := "2.13.3"
@@ -11,6 +12,11 @@ ThisBuild / dynverSeparator := "-"
 // Shared Plugins
 enablePlugins(BuildInfoPlugin)
 ThisBuild / libraryDependencies += compilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3")
+
+lazy val disableDocGeneration = Seq(
+  Compile / doc / sources := Seq.empty,
+  Compile / packageDoc / publishArtifact := false
+)
 
 lazy val ignoreFiles = List("application.conf.sample")
 
@@ -38,7 +44,7 @@ lazy val coverageSettings = Seq(
 )
 
 lazy val sharedSettings =
-  dockerSettings ++ Defaults.itSettings ++ coverageSettings
+  dockerSettings ++ Defaults.itSettings ++ coverageSettings ++ disableDocGeneration
 
 lazy val lamaProtobuf = (project in file("protobuf"))
   .enablePlugins(Fs2Grpc)
@@ -47,6 +53,7 @@ lazy val lamaProtobuf = (project in file("protobuf"))
     scalapbCodeGeneratorOptions += CodeGeneratorOption.FlatPackage,
     libraryDependencies ++= Dependencies.commonProtos
   )
+  .settings(disableDocGeneration)
 
 // Common lama library
 lazy val common = (project in file("common"))
@@ -55,6 +62,7 @@ lazy val common = (project in file("common"))
     name := "lama-common",
     libraryDependencies ++= (Dependencies.lamaCommon ++ Dependencies.test)
   )
+  .settings(disableDocGeneration)
   .dependsOn(lamaProtobuf)
 
 lazy val accountManager = (project in file("account-manager"))
@@ -77,6 +85,7 @@ lazy val bitcoinProtobuf = (project in file("coins/bitcoin/protobuf"))
       file("coins/bitcoin/keychain/pb/keychain")
     )
   )
+  .settings(disableDocGeneration)
 
 lazy val bitcoinApi = (project in file("coins/bitcoin/api"))
   .enablePlugins(BuildInfoPlugin, JavaAgent, JavaServerAppPackaging, DockerPlugin)
@@ -95,6 +104,7 @@ lazy val bitcoinCommon = (project in file("coins/bitcoin/common"))
     name := "lama-bitcoin-common",
     libraryDependencies ++= Dependencies.btcCommon
   )
+  .settings(disableDocGeneration)
   .dependsOn(common, bitcoinProtobuf)
 
 lazy val bitcoinWorker = (project in file("coins/bitcoin/worker"))
