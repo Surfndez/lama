@@ -3,26 +3,26 @@ package co.ledger.lama.bitcoin.transactor.services
 import co.ledger.lama.bitcoin.common.models.Scheme
 import co.ledger.lama.common.models.{BitcoinLikeCoin, Coin}
 
-object Fees {
+object TransactionBytes {
 
-  private def estimator(coin: BitcoinLikeCoin): FeesEstimator = coin match {
+  private def estimator(coin: BitcoinLikeCoin): TransactionBytesEstimator = coin match {
     case Coin.Btc        => btcEstimator
     case Coin.BtcTestnet => btcEstimator
     case Coin.BtcRegtest => btcEstimator
   }
 
-  def estimateTxFees(coin: BitcoinLikeCoin)(outputSize: Int): Int =
+  def estimateTxBytesSize(coin: BitcoinLikeCoin)(outputSize: Int): Int =
     estimator(coin).txFees(outputSize)
 
-  def estimateSingleUtxoFees(coin: BitcoinLikeCoin)(scheme: Scheme): Int =
+  def estimateSingleUtxoBytesSize(coin: BitcoinLikeCoin)(scheme: Scheme): Int =
     estimator(coin).singleUtxoFees(scheme)
 
-  trait FeesEstimator {
+  trait TransactionBytesEstimator {
     def txFees(outputSize: Int): Int
     def singleUtxoFees(scheme: Scheme): Int
   }
 
-  private val btcEstimator: FeesEstimator = new FeesEstimator {
+  private val btcEstimator: TransactionBytesEstimator = new TransactionBytesEstimator {
 
     private val txSkeletonFees: Int = 10
 

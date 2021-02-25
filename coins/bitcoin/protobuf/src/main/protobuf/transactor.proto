@@ -15,6 +15,7 @@ service BitcoinTransactorService {
 enum CoinSelector {
   DEPTH_FIRST = 0;
   OPTIMIZE_SIZE = 1;
+  MERGE_OUTPUTS = 2;
 }
 
 message CreateTransactionRequest {

@@ -18,7 +18,7 @@ import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
 import co.ledger.lama.bitcoin.common.models.BitcoinNetwork
 import co.ledger.lama.bitcoin.transactor.clients.grpc.BitcoinLibClient
 import co.ledger.lama.bitcoin.transactor.models.bitcoinLib.SignatureMetadata
-import co.ledger.lama.bitcoin.transactor.services.{CoinSelectionService, Fees}
+import co.ledger.lama.bitcoin.transactor.services.{CoinSelectionService, TransactionBytes}
 import co.ledger.lama.common.logging.IOLogging
 import co.ledger.lama.common.models.{BitcoinLikeCoin, Coin, Sort}
 import fs2.{Chunk, Stream}
@@ -80,12 +80,12 @@ class Transactor(
           )
         }
 
-      estimatedFeePerUtxo = Fees.estimateSingleUtxoFees(coin)(
+      estimatedFeePerUtxo = TransactionBytes.estimateSingleUtxoBytesSize(coin)(
         accountInfo.scheme
       ) * estimatedFeeSatPerKb / 1000
 
       targetAmount = outputs.map(_.value).sum +
-        Fees.estimateTxFees(coin)(outputs.size) * estimatedFeeSatPerKb / 1000
+        TransactionBytes.estimateTxBytesSize(coin)(outputs.size) * estimatedFeeSatPerKb / 1000
 
       rawTransaction <- createRawTransactionRec(
         coin.toNetwork,
@@ -192,12 +192,14 @@ class Transactor(
           )
         else IO.unit
 
-      selectedUtxos <- CoinSelectionService.coinSelection(
-        strategy,
-        utxos,
-        amount,
-        feesPerUtxo,
-        maxUtxos
+      selectedUtxos <- IO.fromEither(
+        CoinSelectionService.coinSelection(
+          strategy,
+          utxos,
+          amount,
+          feesPerUtxo,
+          maxUtxos
+        )
       )
       _ <- log.info(
         s"""Picked Utxos :

@@ -17,9 +17,14 @@ object CoinSelectionStrategy {
     def toProto: protobuf.CoinSelector = protobuf.CoinSelector.OPTIMIZE_SIZE
   }
 
+  case object MergeOutputs extends CoinSelectionStrategy("merge_outputs") {
+    def toProto: protobuf.CoinSelector = protobuf.CoinSelector.MERGE_OUTPUTS
+  }
+
   val all: Map[String, CoinSelectionStrategy] = Map(
     DepthFirst.name   -> DepthFirst,
-    OptimizeSize.name -> OptimizeSize
+    OptimizeSize.name -> OptimizeSize,
+    MergeOutputs.name -> MergeOutputs
   )
 
   def fromKey(key: String): Option[CoinSelectionStrategy] = all.get(key)
@@ -32,6 +37,7 @@ object CoinSelectionStrategy {
   def fromProto(proto: protobuf.CoinSelector): CoinSelectionStrategy =
     proto match {
       case protobuf.CoinSelector.OPTIMIZE_SIZE => OptimizeSize
+      case protobuf.CoinSelector.MERGE_OUTPUTS => MergeOutputs
       case _                                   => DepthFirst
     }
 }

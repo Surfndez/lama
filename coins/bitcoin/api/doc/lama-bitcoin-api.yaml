@@ -483,7 +483,7 @@ components:
       properties:
         coin_selection:
           type: string
-          enum: [ 'depth_first' ]
+          enum: [ 'depth_first', 'optimize_size', 'merge_outputs' ]
           example: 'depth_first'
         outputs:
           type: array
@@ -493,6 +493,10 @@ components:
           type: string
           enum: [ slow, normal, fast ]
           example: 'normal'
+        max_utxos:
+          type: number
+          format: int32
+          example: 200
         custom_fee:
           type: string
           format: bigint
@@ -509,7 +513,7 @@ components:
         value:
           type: string
           format: bigint
-          example: 300000
+          example: '300000'
     CreateTransactionResponse:
       required:
         - hex
