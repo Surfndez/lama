@@ -67,15 +67,15 @@ case class TransactionAmounts(
   def computeOperations: Chunk[OperationToSave] = {
     TransactionType.fromAmounts(inputAmount, outputAmount, changeAmount) match {
       case SendType =>
-        Chunk(makeOperationToSave(inputAmount - changeAmount, OperationType.Sent))
+        Chunk(makeOperationToSave(inputAmount - changeAmount, OperationType.Send))
       case ReceiveType =>
-        Chunk(makeOperationToSave(outputAmount + changeAmount, OperationType.Received))
+        Chunk(makeOperationToSave(outputAmount + changeAmount, OperationType.Receive))
       case ChangeOnlyType =>
-        Chunk(makeOperationToSave(changeAmount, OperationType.Received))
+        Chunk(makeOperationToSave(changeAmount, OperationType.Receive))
       case BothType =>
         Chunk(
-          makeOperationToSave(inputAmount - changeAmount, OperationType.Sent),
-          makeOperationToSave(outputAmount, OperationType.Received)
+          makeOperationToSave(inputAmount - changeAmount, OperationType.Send),
+          makeOperationToSave(outputAmount, OperationType.Receive)
         )
       case NoneType =>
         log.error(

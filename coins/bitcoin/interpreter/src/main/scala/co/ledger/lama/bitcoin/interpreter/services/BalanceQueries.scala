@@ -22,7 +22,7 @@ object BalanceQueries {
               account_id,
               block_height,
               time,
-              SUM( ( case when operation_type = 'sent' then -1 else 1 end ) * value) as balance
+              SUM( ( case when operation_type = 'send' then -1 else 1 end ) * value) as balance
             FROM operation
             WHERE account_id = $accountId
               AND block_height > $blockHeight
@@ -60,8 +60,8 @@ object BalanceQueries {
 
     val receivedAndSentQuery =
       sql"""SELECT
-              COALESCE(SUM(CASE WHEN operation_type = 'received' THEN value ELSE 0 END), 0) as received,
-              COALESCE(SUM(CASE WHEN operation_type = 'sent' THEN value ELSE 0 END), 0) as sent
+              COALESCE(SUM(CASE WHEN operation_type = 'receive' THEN value ELSE 0 END), 0) as received,
+              COALESCE(SUM(CASE WHEN operation_type = 'send' THEN value ELSE 0 END), 0) as sent
             FROM operation
             WHERE account_id = $accountId
          """

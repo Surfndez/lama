@@ -10,17 +10,17 @@ sealed trait OperationType {
 
 object OperationType {
 
-  case object Sent extends OperationType {
-    val name = "sent"
+  case object Send extends OperationType {
+    val name = "send"
     def toProto: protobuf.OperationType = {
-      protobuf.OperationType.SENT
+      protobuf.OperationType.SEND
     }
   }
 
-  case object Received extends OperationType {
-    val name = "received"
+  case object Receive extends OperationType {
+    val name = "receive"
     def toProto: protobuf.OperationType = {
-      protobuf.OperationType.RECEIVED
+      protobuf.OperationType.RECEIVE
     }
   }
 
@@ -28,14 +28,14 @@ object OperationType {
   implicit val decoder: Decoder[OperationType] =
     Decoder.decodeString.emap(fromKey(_).toRight("Could not decode as operation type"))
 
-  val all: Map[String, OperationType] = Map(Sent.name -> Sent, Received.name -> Received)
+  val all: Map[String, OperationType] = Map(Send.name -> Send, Receive.name -> Receive)
 
   def fromKey(key: String): Option[OperationType] = all.get(key)
 
   def fromProto(proto: protobuf.OperationType): OperationType = {
     proto match {
-      case protobuf.OperationType.SENT => Sent
-      case _                           => Received
+      case protobuf.OperationType.SEND => Send
+      case _                           => Receive
 
     }
   }

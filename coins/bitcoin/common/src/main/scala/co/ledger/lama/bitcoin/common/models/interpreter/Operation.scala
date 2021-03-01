@@ -5,7 +5,6 @@ import co.ledger.lama.common.models.implicits._
 import co.ledger.lama.common.utils.{TimestampProtoUtils, UuidUtils}
 import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
 import io.circe.{Decoder, Encoder}
-
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.UUID
@@ -46,8 +45,8 @@ object Operation {
     implicit val decoder: Decoder[UID] = Decoder[String].map(UID(_))
   }
 
-  implicit val encoder: Encoder[Operation] = deriveConfiguredEncoder[Operation]
   implicit val decoder: Decoder[Operation] = deriveConfiguredDecoder[Operation]
+  implicit val encoder: Encoder[Operation] = deriveConfiguredEncoder[Operation]
 
   def fromProto(proto: protobuf.Operation): Operation = {
     Operation(
@@ -66,8 +65,8 @@ object Operation {
   def uid(accountId: AccountId, txId: TxId, operationType: OperationType): UID = {
 
     val libcoreType = operationType match {
-      case OperationType.Sent     => "SEND"
-      case OperationType.Received => "RECEIVE"
+      case OperationType.Send    => "SEND"
+      case OperationType.Receive => "RECEIVE"
     }
 
     val rawUid = s"uid:${accountId.value.toString.toLowerCase}+${txId.value}+$libcoreType"

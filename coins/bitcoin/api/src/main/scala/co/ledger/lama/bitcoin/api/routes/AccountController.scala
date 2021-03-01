@@ -11,7 +11,7 @@ import co.ledger.lama.bitcoin.api.models.transactor._
 import co.ledger.lama.common.logging.IOLogging
 import co.ledger.lama.common.utils.UuidUtils
 import co.ledger.lama.bitcoin.api.utils.RouterUtils._
-import co.ledger.lama.bitcoin.common.models.interpreter.ChangeType
+import co.ledger.lama.bitcoin.common.models.interpreter.{ChangeType}
 import co.ledger.lama.bitcoin.common.utils.CoinImplicits._
 import co.ledger.lama.bitcoin.common.clients.grpc.{
   InterpreterClient,

@@ -77,14 +77,13 @@ class QueriesIT extends AnyFlatSpecLike with Matchers with TestResources {
     Operation.uid(
       Operation.AccountId(accountId),
       Operation.TxId(transactionToInsert.id),
-      OperationType.Sent
+      OperationType.Send
     ),
     accountId,
     transactionToInsert.hash,
-    OperationType.Sent,
-    transactionToInsert.inputs.collect {
-      case i: DefaultInput =>
-        i.value
+    OperationType.Send,
+    transactionToInsert.inputs.collect { case i: DefaultInput =>
+      i.value
     }.sum,
     transactionToInsert.fees,
     block.time,

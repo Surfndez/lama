@@ -5,7 +5,6 @@ import cats.data.OptionT
 import java.util.UUID
 import cats.effect.{ContextShift, IO}
 import co.ledger.lama.bitcoin.common.models.interpreter.{
-  GetOperationResult,
   GetOperationsResult,
   GetUtxosResult,
   Operation,
@@ -58,14 +57,14 @@ class OperationService(
   def getOperation(
       accountId: Operation.AccountId,
       operationId: Operation.UID
-  )(implicit cs: ContextShift[IO]): IO[GetOperationResult] = {
+  )(implicit cs: ContextShift[IO]): IO[Option[Operation]] = {
 
     val op = for {
       operation <- OptionT(OperationQueries.findOperation(accountId, operationId))
       tx        <- OptionT(OperationQueries.fetchTransaction(accountId.value, operation.hash))
     } yield operation.copy(transaction = Some(tx))
 
-    op.value.transact(db).map(GetOperationResult)
+    op.value.transact(db)
   }
 
   def deleteUnconfirmedTransactionView(accountId: UUID): IO[Int] =

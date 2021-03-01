@@ -61,7 +61,7 @@ class Interpreter(
   def getOperation(
       accountId: Operation.AccountId,
       operationId: Operation.UID
-  ): IO[GetOperationResult] =
+  ): IO[Option[Operation]] =
     operationService.getOperation(accountId, operationId)
 
   def getUtxos(
@@ -186,16 +186,23 @@ class Interpreter(
       nbSavedOps <- stream
         .through(operationService.saveOperationSink)
         .parEvalMap(maxConcurrent) { op =>
-          if (shouldNotify) {
-            publish(
-              OperationNotification(
-                accountId = accountId,
-                coinFamily = CoinFamily.Bitcoin,
-                coin = coin,
-                operation = op.asJson
+          if (shouldNotify)
+            for {
+              operationO <- operationService.getOperation(
+                Operation.AccountId(accountId),
+                op.uid
               )
-            )
-          } else
+            } yield operationO.map { operation =>
+              publish(
+                OperationNotification(
+                  accountId = accountId,
+                  coinFamily = CoinFamily.Bitcoin,
+                  coin = coin,
+                  operation = operation.asJson
+                )
+              )
+            }
+          else
             IO.unit
         }
         .compile

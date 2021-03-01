@@ -19,10 +19,9 @@ case class GetOperationsResult(
 }
 
 object GetOperationsResult {
-  implicit val decoder: Decoder[GetOperationsResult] =
-    deriveConfiguredDecoder[GetOperationsResult]
-  implicit val encoder: Encoder[GetOperationsResult] =
-    deriveConfiguredEncoder[GetOperationsResult]
+
+  implicit val decoder: Decoder[GetOperationsResult] = deriveConfiguredDecoder[GetOperationsResult]
+  implicit val encoder: Encoder[GetOperationsResult] = deriveConfiguredEncoder[GetOperationsResult]
 
   def fromProto(proto: protobuf.GetOperationsResult): GetOperationsResult =
     GetOperationsResult(

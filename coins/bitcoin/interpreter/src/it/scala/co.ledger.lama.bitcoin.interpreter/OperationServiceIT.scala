@@ -112,7 +112,7 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
 
           op.accountId shouldBe accountId
           op.hash shouldBe insertTx1.hash
-          op.operationType shouldBe OperationType.Sent
+          op.operationType shouldBe OperationType.Send
 
           tx.fees shouldBe insertTx1.fees
 
@@ -146,21 +146,21 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
               Operation.TxId(
                 insertTx1.hash // because of compute which  put tx.hash in operation.hash instead of txid
               ),
-              OperationType.Sent
+              OperationType.Send
             )
           )
 
         } yield {
 
-          foundOperation.operation should not be empty
-          val GetOperationResult(Some(op)) = foundOperation
+          foundOperation should not be None
+          val Some(op) = foundOperation
 
-          op.transaction should not be empty
+          op.transaction should not be None
           val tx = op.transaction.get
 
           op.accountId shouldBe accountId
           op.hash shouldBe insertTx1.hash
-          op.operationType shouldBe OperationType.Sent
+          op.operationType shouldBe OperationType.Send
 
           tx.fees shouldBe insertTx1.fees
 
@@ -205,7 +205,7 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
 
           op.accountId shouldBe accountId
           op.hash shouldBe insertTx2.hash
-          op.operationType shouldBe OperationType.Sent
+          op.operationType shouldBe OperationType.Send
 
           tx.fees shouldBe insertTx2.fees
 

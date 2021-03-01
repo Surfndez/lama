@@ -134,15 +134,15 @@ class InterpreterClientMock extends InterpreterClient {
       (inputAmount > 0, outputAmount > 0) match {
         // only input, consider changeAmount as deducted from spent
         case (true, false) =>
-          List(makeOperation(accountId, tx, inputAmount - changeAmount, OperationType.Sent))
+          List(makeOperation(accountId, tx, inputAmount - changeAmount, OperationType.Send))
         // only output, consider changeAmount as received
         case (false, true) =>
-          List(makeOperation(accountId, tx, outputAmount + changeAmount, OperationType.Received))
+          List(makeOperation(accountId, tx, outputAmount + changeAmount, OperationType.Receive))
         // both input and output, consider change as deducted from spend
         case (true, true) =>
           List(
-            makeOperation(accountId, tx, inputAmount - changeAmount, OperationType.Sent),
-            makeOperation(accountId, tx, outputAmount, OperationType.Received)
+            makeOperation(accountId, tx, inputAmount - changeAmount, OperationType.Send),
+            makeOperation(accountId, tx, outputAmount, OperationType.Receive)
           )
         case _ => Nil
       }

@@ -7,8 +7,8 @@ import "google/protobuf/timestamp.proto";
 package pb.v1;
 
 enum OperationType {
-  SENT = 0;
-  RECEIVED = 1;
+  SEND = 0;
+  RECEIVE = 1;
 }
 
 enum ChangeType {

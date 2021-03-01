@@ -86,7 +86,7 @@ class InterpreterGrpcService(
       accountId   <- UuidUtils.bytesToUuidIO(request.accountId).map(Operation.AccountId)
       operationId <- IO.pure(Operation.UID(request.operationUid))
       operation   <- interpreter.getOperation(accountId, operationId)
-    } yield operation.toProto
+    } yield protobuf.GetOperationResult(operation.map(_.toProto))
   }
 
   def getUtxos(request: protobuf.GetUtxosRequest, ctx: Metadata): IO[protobuf.GetUtxosResult] = {
