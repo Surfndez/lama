@@ -48,7 +48,11 @@ class KeychainGrpcClient(
     extends KeychainClient {
 
   val client: keychain.KeychainServiceFs2Grpc[IO, Metadata] =
-    GrpcClient.resolveClient(keychain.KeychainServiceFs2Grpc.stub[IO], managedChannel)
+    GrpcClient.resolveClient(
+      keychain.KeychainServiceFs2Grpc.stub[IO],
+      managedChannel,
+      "keychainClient"
+    )
 
   def create(
       accountKey: AccountKey,

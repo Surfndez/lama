@@ -48,7 +48,11 @@ class TransactorGrpcClient(
     extends TransactorClient {
 
   val client: protobuf.BitcoinTransactorServiceFs2Grpc[IO, Metadata] =
-    GrpcClient.resolveClient(protobuf.BitcoinTransactorServiceFs2Grpc.stub[IO], managedChannel)
+    GrpcClient.resolveClient(
+      protobuf.BitcoinTransactorServiceFs2Grpc.stub[IO],
+      managedChannel,
+      "TransactorClient"
+    )
 
   def createTransaction(
       accountId: UUID,

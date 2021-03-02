@@ -38,7 +38,11 @@ class BitcoinLibGrpcClient(val managedChannel: ManagedChannel)(implicit val cs: 
     with IOLogging {
 
   val client: libgrpc.CoinServiceFs2Grpc[IO, Metadata] =
-    GrpcClient.resolveClient(libgrpc.CoinServiceFs2Grpc.stub[IO], managedChannel)
+    GrpcClient.resolveClient(
+      libgrpc.CoinServiceFs2Grpc.stub[IO],
+      managedChannel,
+      "BitcoinLibClient"
+    )
 
   def createTransaction(
       network: BitcoinNetwork,

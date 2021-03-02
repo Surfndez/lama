@@ -69,7 +69,11 @@ class InterpreterGrpcClient(
     extends InterpreterClient {
 
   val client: protobuf.BitcoinInterpreterServiceFs2Grpc[IO, Metadata] =
-    GrpcClient.resolveClient(protobuf.BitcoinInterpreterServiceFs2Grpc.stub[IO], managedChannel)
+    GrpcClient.resolveClient(
+      protobuf.BitcoinInterpreterServiceFs2Grpc.stub[IO],
+      managedChannel,
+      "InterpreterClient"
+    )
 
   def saveTransactions(accountId: UUID, txs: List[ConfirmedTransaction]): IO[Int] =
     client

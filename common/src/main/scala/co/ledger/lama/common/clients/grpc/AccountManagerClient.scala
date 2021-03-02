@@ -44,7 +44,11 @@ class AccountManagerGrpcClient(
     extends AccountManagerClient {
 
   val client: protobuf.AccountManagerServiceFs2Grpc[IO, Metadata] =
-    GrpcClient.resolveClient(protobuf.AccountManagerServiceFs2Grpc.stub[IO], managedChannel)
+    GrpcClient.resolveClient(
+      protobuf.AccountManagerServiceFs2Grpc.stub[IO],
+      managedChannel,
+      "AccountManagerClient"
+    )
 
   def registerAccount(
       keychainId: UUID,

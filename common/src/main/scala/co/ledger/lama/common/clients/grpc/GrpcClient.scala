@@ -7,12 +7,15 @@ object GrpcClient {
   type Builder[Client] =
     (ManagedChannel, CallOptions, StatusRuntimeException => Option[GrpcClientException]) => Client
 
-  private def onError(e: StatusRuntimeException): Option[GrpcClientException] = {
-    Some(GrpcClientException(e))
+  private def onError(
+      clientName: String
+  )(e: StatusRuntimeException): Option[GrpcClientException] = {
+    Some(GrpcClientException(e, clientName))
   }
 
   def resolveClient[Client](
       f: Builder[Client],
-      managedChannel: ManagedChannel
-  ): Client = f(managedChannel, CallOptions.DEFAULT, onError)
+      managedChannel: ManagedChannel,
+      clientName: String
+  ): Client = f(managedChannel, CallOptions.DEFAULT, onError(clientName))
 }
