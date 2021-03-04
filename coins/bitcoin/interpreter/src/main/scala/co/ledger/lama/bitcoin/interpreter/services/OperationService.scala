@@ -1,21 +1,20 @@
 package co.ledger.lama.bitcoin.interpreter.services
 
-import cats.data.OptionT
-
-import java.util.UUID
+import cats.data.{NonEmptyList, OptionT}
 import cats.effect.{ContextShift, IO}
-import co.ledger.lama.bitcoin.common.models.interpreter.{
-  GetOperationsResult,
-  GetUtxosResult,
-  Operation,
-  Utxo
-}
+import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.interpreter.models.{OperationToSave, TransactionAmounts}
+import co.ledger.lama.bitcoin.interpreter.services.OperationQueries.{
+  OpWithoutDetails,
+  TransactionDetails
+}
 import co.ledger.lama.common.logging.IOLogging
-import co.ledger.lama.common.models.Sort
+import co.ledger.lama.common.models.{Sort, TxHash}
 import doobie._
 import doobie.implicits._
 import fs2._
+
+import java.util.UUID
 
 class OperationService(
     db: Transactor[IO],
@@ -32,13 +31,25 @@ class OperationService(
     for {
       opsWithTx <- OperationQueries
         .fetchOperations(accountId, blockHeight, sort, Some(limit + 1), Some(offset))
-        .transact(db)
-        .parEvalMap(maxConcurrent) { op =>
-          OperationQueries
-            .fetchTransaction(op.accountId, op.hash)
-            .transact(db)
-            .map(tx => op.copy(transaction = tx))
+        .groupAdjacentBy(_.op.hash) // many operations by hash (RECEIVED AND SENT)
+        .chunkN(OperationService.numberOfOperationsToBuildByQuery)
+        .flatMap { ops =>
+          val txHashes = ops.map { case (txHash, _) => txHash }.toNel
+
+          val inputsAndOutputs = Stream
+            .emits(txHashes.toList)
+            .flatMap(txHashes =>
+              OperationQueries
+                .fetchTransactionDetails(accountId, sort, txHashes)
+            )
+
+          Stream
+            .chunk(ops)
+            .covary[ConnectionIO]
+            .zip(inputsAndOutputs)
         }
+        .transact(db)
+        .through(makeOperation)
         .compile
         .toList
 
@@ -48,8 +59,29 @@ class OperationService(
       truncated = opsWithTx.size > limit
 
     } yield {
-      val operations = opsWithTx.slice(0, limit)
+      val operations = opsWithTx.take(limit)
       GetOperationsResult(operations, total, truncated)
+    }
+
+  private lazy val makeOperation: Pipe[
+    IO,
+    (
+        (TxHash, Chunk[OpWithoutDetails]),
+        OperationQueries.TransactionDetails
+    ),
+    Operation
+  ] =
+    _.flatMap {
+      case (
+            (txHash, sentAndReceivedOperations),
+            inputsWithOutputsByTxHash
+          ) =>
+        Stream
+          .chunk(sentAndReceivedOperations)
+          .takeWhile(_ => txHash == inputsWithOutputsByTxHash.txHash)
+          .map { op =>
+            operation(op, inputsWithOutputsByTxHash)
+          }
     }
 
   def getOperation(
@@ -57,13 +89,52 @@ class OperationService(
       operationId: Operation.UID
   )(implicit cs: ContextShift[IO]): IO[Option[Operation]] = {
 
-    val op = for {
-      operation <- OptionT(OperationQueries.findOperation(accountId, operationId))
-      tx        <- OptionT(OperationQueries.fetchTransaction(accountId.value, operation.hash))
-    } yield operation.copy(transaction = Some(tx))
+    val o = for {
+      opWithTx <- OptionT(OperationQueries.findOperation(accountId, operationId))
+      inputsWithOutputsWithTxHash <- OptionT(
+        OperationQueries
+          .fetchTransactionDetails(
+            accountId.value,
+            Sort.Ascending,
+            NonEmptyList.one(opWithTx.op.hash)
+          )
+          .compile
+          .last
+      )
+      if inputsWithOutputsWithTxHash.txHash == opWithTx.op.hash
+    } yield operation(
+      opWithTx,
+      inputsWithOutputsWithTxHash
+    )
 
-    op.value.transact(db)
+    o.value.transact(db)
   }
+
+  private def operation(
+      emptyOperation: OpWithoutDetails,
+      inputsWithOutputsByTxHash: TransactionDetails
+  ) =
+    Operation(
+      uid = emptyOperation.op.uid,
+      accountId = emptyOperation.op.accountId,
+      hash = emptyOperation.op.hash.hex,
+      transaction = TransactionView(
+        id = emptyOperation.tx.id,
+        hash = emptyOperation.tx.hash.hex,
+        receivedAt = emptyOperation.tx.receivedAt,
+        lockTime = emptyOperation.tx.lockTime,
+        fees = emptyOperation.tx.fees,
+        inputs = inputsWithOutputsByTxHash.inputs,
+        outputs = inputsWithOutputsByTxHash.outputs,
+        block = emptyOperation.tx.block,
+        confirmations = emptyOperation.tx.confirmations
+      ),
+      operationType = emptyOperation.op.operationType,
+      amount = emptyOperation.op.amount,
+      fees = emptyOperation.op.fees,
+      time = emptyOperation.op.time,
+      blockHeight = emptyOperation.op.blockHeight
+    )
 
   def deleteUnconfirmedOperations(accountId: UUID): IO[Int] =
     OperationQueries
@@ -118,4 +189,8 @@ class OperationService(
         }
         .flatMap(Stream.chunk)
 
+}
+
+object OperationService {
+  val numberOfOperationsToBuildByQuery = 5
 }
