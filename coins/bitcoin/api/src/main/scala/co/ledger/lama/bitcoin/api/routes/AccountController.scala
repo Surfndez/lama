@@ -157,7 +157,11 @@ object AccountController extends Http4sDsl[IO] with IOLogging {
           _ <- log.info(
             s"Account registered with id: ${account.accountId}"
           )
-        } yield account
+        } yield RegisterAccountResponse(
+          account.accountId,
+          account.syncId,
+          createdKeychain.extendedPublicKey
+        )
 
         ra.flatMap(Ok(_))
 

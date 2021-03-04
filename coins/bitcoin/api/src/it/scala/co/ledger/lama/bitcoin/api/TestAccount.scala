@@ -16,6 +16,7 @@ object TestAccount {
 }
 
 case class AccountExpectedResult(
+    extendedPublicKey: String,
     opsSize: Int,
     utxosSize: Int,
     lastTxHash: String,

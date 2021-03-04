@@ -1,6 +1,7 @@
 package co.ledger.lama.bitcoin.api.models
 
 import java.util.UUID
+
 import cats.syntax.functor._
 import co.ledger.lama.bitcoin.common.models.Scheme
 import co.ledger.lama.bitcoin.common.models.keychain.AccountKey
@@ -64,4 +65,12 @@ object accountManager {
     implicit val encoder: Encoder[CreationRequest] = deriveConfiguredEncoder[CreationRequest]
   }
 
+  case class RegisterAccountResponse(accountId: UUID, syncId: UUID, extendedPublicKey: String)
+
+  object RegisterAccountResponse {
+    implicit val decoder: Decoder[RegisterAccountResponse] =
+      deriveConfiguredDecoder[RegisterAccountResponse]
+    implicit val encoder: Encoder[RegisterAccountResponse] =
+      deriveConfiguredEncoder[RegisterAccountResponse]
+  }
 }

@@ -3,12 +3,12 @@ package co.ledger.lama.bitcoin.api
 import cats.effect.{ContextShift, IO, Resource, Timer}
 import cats.implicits._
 import co.ledger.lama.bitcoin.api.ConfigSpec.ConfigSpec
-import co.ledger.lama.bitcoin.api.models.accountManager.{AccountWithBalance, UpdateSyncFrequency}
+import co.ledger.lama.bitcoin.api.models.accountManager._
 import co.ledger.lama.bitcoin.api.routes.ValidationResult
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.common.models.Notification.BalanceUpdated
 import co.ledger.lama.common.models.Status.{Deleted, Published, Registered, Synchronized}
-import co.ledger.lama.common.models.{BalanceUpdatedNotification, Sort, SyncEventResult}
+import co.ledger.lama.common.models.{BalanceUpdatedNotification, Sort}
 import co.ledger.lama.common.utils.{IOAssertion, IOUtils, RabbitUtils}
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.{AMQPChannel, ExchangeName, QueueName, RoutingKey}
@@ -24,6 +24,7 @@ import org.scalatest.matchers.should.Matchers
 import pureconfig.ConfigSource
 
 import java.util.UUID
+
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
@@ -124,8 +125,8 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
           for {
 
             // This is retried because sometimes, the keychain service isn't ready when the tests start
-            accountRegistered <- IOUtils.retry[SyncEventResult](
-              client.expect[SyncEventResult](
+            accountRegistered <- IOUtils.retry[RegisterAccountResponse](
+              client.expect[RegisterAccountResponse](
                 accountRegisteringRequest.withEntity(account.registerRequest)
               )
             )
@@ -244,6 +245,8 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
               accountInfoAfterRegister.lastSyncEvent
                 .map(_.status) should (contain(Registered) or contain(Published))
               accountInfoAfterRegister.label shouldBe account.registerRequest.label
+
+              accountRegistered.extendedPublicKey shouldBe account.expected.extendedPublicKey
             }
 
             it should "emit a balance notification" in {
