@@ -673,7 +673,7 @@ components:
         - accountId
         - hash
         - operation_type
-        - value
+        - amount
         - fees
         - time
       type: object
@@ -693,7 +693,7 @@ components:
           type: string
           enum: [send, receive]
           example: 'send'
-        value:
+        amount:
           type: string
           format: bigint
           example: 302641

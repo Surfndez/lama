@@ -109,7 +109,7 @@ object OperationQueries extends IOLogging {
   def saveOperations(operation: Chunk[OperationToSave]): ConnectionIO[Int] = {
     val query =
       """INSERT INTO operation (
-         uid, account_id, hash, operation_type, value, fees, time, block_hash, block_height
+         uid, account_id, hash, operation_type, amount, fees, time, block_hash, block_height
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT ON CONSTRAINT operation_pkey DO NOTHING
     """
@@ -218,7 +218,7 @@ object OperationQueries extends IOLogging {
     val offsetF = offset.map(o => fr"OFFSET $o").getOrElse(Fragment.empty)
 
     val query =
-      sql"""SELECT uid, account_id, hash, operation_type, value, fees, time, block_height
+      sql"""SELECT uid, account_id, hash, operation_type, amount, fees, time, block_height
               FROM operation
              WHERE account_id = $accountId
                AND (block_height >= $blockHeight
@@ -232,7 +232,7 @@ object OperationQueries extends IOLogging {
       operationId: Operation.UID
   ): ConnectionIO[Option[Operation]] = {
 
-    sql"""SELECT uid, account_id, hash, operation_type, value, fees, time, block_height
+    sql"""SELECT uid, account_id, hash, operation_type, amount, fees, time, block_height
               FROM operation
              WHERE account_id = ${accountId.value}
                AND uid = ${operationId.hex}

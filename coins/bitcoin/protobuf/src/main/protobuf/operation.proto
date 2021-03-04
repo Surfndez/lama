@@ -21,7 +21,7 @@ message Operation {
   string hash = 2;
   TransactionView transaction = 3;
   OperationType operation_type = 4;
-  string value = 5;
+  string amount = 5;
   string fees = 6;
   google.protobuf.Timestamp time = 7;
   int64 block_height = 8;

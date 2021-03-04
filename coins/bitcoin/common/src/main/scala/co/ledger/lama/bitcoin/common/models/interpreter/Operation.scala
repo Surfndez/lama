@@ -15,7 +15,7 @@ case class Operation(
     hash: String,
     transaction: Option[TransactionView],
     operationType: OperationType,
-    value: BigInt,
+    amount: BigInt,
     fees: BigInt,
     time: Instant,
     blockHeight: Option[Long]
@@ -26,7 +26,7 @@ case class Operation(
       hash,
       transaction.map(_.toProto),
       operationType.toProto,
-      value.toString,
+      amount.toString,
       fees.toString,
       Some(TimestampProtoUtils.serialize(time)),
       blockHeight.getOrElse(-1L),
@@ -55,7 +55,7 @@ object Operation {
       proto.hash,
       proto.transaction.map(TransactionView.fromProto),
       OperationType.fromProto(proto.operationType),
-      BigInt(proto.value),
+      BigInt(proto.amount),
       BigInt(proto.fees),
       proto.time.map(TimestampProtoUtils.deserialize).getOrElse(Instant.now),
       if (proto.blockHeight >= 0) Some(proto.blockHeight) else None
