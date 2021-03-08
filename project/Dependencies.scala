@@ -31,7 +31,7 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
     "org.tpolecat"  %% "doobie-h2"       % doobieVersion
   )
 
-  val pureconfigVersion   = "0.14.0"
+  val pureconfigVersion   = "0.14.1"
   val logbackVersion      = "1.2.3"
   val fs2Version          = "2.5.3"
   val fs2GrpcVersion      = "0.7.3"
