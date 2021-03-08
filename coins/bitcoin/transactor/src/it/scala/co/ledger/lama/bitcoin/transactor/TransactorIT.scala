@@ -2,14 +2,20 @@ package co.ledger.lama.bitcoin.transactor
 
 import java.time.Instant
 import java.util.UUID
+
 import cats.data.NonEmptyList
-import co.ledger.lama.bitcoin.common.models.interpreter.{AccountAddress, ChangeType}
+import co.ledger.lama.bitcoin.common.models.interpreter.{
+  AccountAddress,
+  BlockView,
+  ChangeType,
+  OutputView,
+  TransactionView
+}
 import co.ledger.lama.bitcoin.common.models.transactor.{
   CoinSelectionStrategy,
   FeeLevel,
   PrepareTxOutput
 }
-import co.ledger.lama.bitcoin.common.models.explorer.{Block, ConfirmedTransaction, Output}
 import co.ledger.lama.bitcoin.common.clients.grpc.mocks.{InterpreterClientMock, KeychainClientMock}
 import co.ledger.lama.bitcoin.common.clients.http.mocks.ExplorerClientMock
 import co.ledger.lama.bitcoin.transactor.services.BitcoinLibClientServiceMock
@@ -57,12 +63,12 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
     )
 
     val outputs = List(
-      Output(0, 10000, outputAddress1.accountAddress, "script"),
-      Output(1, 5000, outputAddress2.accountAddress, "script"),
-      Output(2, 5000, outputAddress3.accountAddress, "script")
+      OutputView(0, 10000, outputAddress1.accountAddress, "script", None, None),
+      OutputView(1, 5000, outputAddress2.accountAddress, "script", None, None),
+      OutputView(2, 5000, outputAddress3.accountAddress, "script", None, None)
     )
 
-    val block = Block(
+    val block = BlockView(
       "blockHash",
       1L,
       Instant.parse("2019-04-04T10:03:22Z")
@@ -70,7 +76,7 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
 
     // We need to create some utxos
     val transactions = List(
-      ConfirmedTransaction(
+      TransactionView(
         transactionHash,
         transactionHash,
         Instant.parse("2019-04-04T10:03:22Z"),
@@ -78,7 +84,7 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
         20566,
         Nil,
         outputs,
-        block,
+        Some(block),
         1
       )
     )

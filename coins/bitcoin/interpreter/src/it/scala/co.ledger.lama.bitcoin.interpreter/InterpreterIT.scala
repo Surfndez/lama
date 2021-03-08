@@ -6,7 +6,6 @@ import java.util.UUID
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.implicits._
-import co.ledger.lama.bitcoin.common.models.explorer._
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.common.models.{Coin, Sort}
 import co.ledger.lama.common.utils.IOAssertion
@@ -26,18 +25,18 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
   private val time: Instant = Instant.parse("2019-04-04T10:03:22Z")
 
-  val block: Block = Block(
+  val block: BlockView = BlockView(
     "00000000000000000008c76a28e115319fb747eb29a7e0794526d0fe47608379",
     570153,
     time
   )
 
   val outputs = List(
-    Output(0, 50000, outputAddress1.accountAddress, "script"),
-    Output(1, 9434, outputAddress2.accountAddress, "script")
+    OutputView(0, 50000, outputAddress1.accountAddress, "script", None, None),
+    OutputView(1, 9434, outputAddress2.accountAddress, "script", None, None)
   )
   val inputs = List(
-    DefaultInput(
+    InputView(
       "0f38e5f1b12078495a9e80c6e0d77af3d674cfe6096bb6e7909993a53b6e8386",
       0,
       0,
@@ -45,11 +44,12 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
       inputAddress.accountAddress,
       "script",
       List(),
-      4294967295L
+      4294967295L,
+      None
     )
   )
-  val insertTx: ConfirmedTransaction =
-    ConfirmedTransaction(
+  val insertTx: TransactionView =
+    TransactionView(
       "txId",
       "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1f",
       time,
@@ -57,7 +57,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
       20566,
       inputs,
       outputs,
-      block,
+      Some(block),
       1
     )
 
@@ -66,12 +66,12 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
       appResources.use { db =>
         val interpreter = new Interpreter(_ => IO.unit, db, 1)
 
-        val block2 = Block(
+        val block2 = BlockView(
           "0000000000000000000cc9cc204cf3b314d106e69afbea68f2ae7f9e5047ba74",
           block.height + 1,
           time
         )
-        val block3 = Block(
+        val block3 = BlockView(
           "0000000000000000000bf68b57eacbff287ceafecb54a30dc3fd19630c9a3883",
           block.height + 2,
           time
@@ -85,8 +85,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
           _ <- interpreter.saveTransactions(
             accountId,
             List(
-              insertTx.copy(hash = "toto", block = block2),
-              insertTx.copy(hash = "tata", block = block3)
+              insertTx.copy(hash = "toto", block = Some(block2)),
+              insertTx.copy(hash = "tata", block = Some(block3))
             )
           )
 
@@ -179,7 +179,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
       appResources.use { db =>
         val interpreter = new Interpreter(_ => IO.unit, db, 1)
 
-        val uTx = UnconfirmedTransaction(
+        val uTx = TransactionView(
           "txId",
           "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1f",
           time,
@@ -187,6 +187,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
           20566,
           inputs,
           outputs,
+          None,
           1
         )
         val uTx2 = uTx.copy(
@@ -225,7 +226,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
       appResources.use { db =>
         val interpreter = new Interpreter(_ => IO.unit, db, 1)
 
-        val uTx = UnconfirmedTransaction(
+        val uTx = TransactionView(
           "txId",
           "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1f",
           time,
@@ -233,10 +234,11 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
           20566,
           inputs,
           outputs,
+          None,
           1
         )
 
-        val tx = ConfirmedTransaction(
+        val tx = TransactionView(
           "txId",
           "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1f",
           time,
@@ -244,7 +246,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
           20566,
           inputs,
           outputs,
-          block,
+          Some(block),
           1
         )
 

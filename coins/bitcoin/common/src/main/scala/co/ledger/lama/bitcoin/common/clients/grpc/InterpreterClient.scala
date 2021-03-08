@@ -3,7 +3,6 @@ package co.ledger.lama.bitcoin.common.clients.grpc
 import java.time.Instant
 import java.util.UUID
 import cats.effect.{ContextShift, IO}
-import co.ledger.lama.bitcoin.common.models.explorer.{ConfirmedTransaction, UnconfirmedTransaction}
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.common.utils.BtcProtoUtils._
 import co.ledger.lama.bitcoin.interpreter.protobuf
@@ -13,13 +12,13 @@ import co.ledger.lama.common.utils.{TimestampProtoUtils, UuidUtils}
 import io.grpc.{ManagedChannel, Metadata}
 
 trait InterpreterClient {
-  def saveTransactions(accountId: UUID, txs: List[ConfirmedTransaction]): IO[Int]
+  def saveTransactions(accountId: UUID, txs: List[TransactionView]): IO[Int]
 
-  def saveUnconfirmedTransactions(accountId: UUID, txs: List[UnconfirmedTransaction]): IO[Int]
+  def saveUnconfirmedTransactions(accountId: UUID, txs: List[TransactionView]): IO[Int]
 
   def removeDataFromCursor(accountId: UUID, blockHeightCursor: Option[Long]): IO[Int]
 
-  def getLastBlocks(accountId: UUID): IO[GetLastBlocksResult]
+  def getLastBlocks(accountId: UUID): IO[List[BlockView]]
 
   def compute(
       accountId: UUID,
@@ -75,7 +74,7 @@ class InterpreterGrpcClient(
       "InterpreterClient"
     )
 
-  def saveTransactions(accountId: UUID, txs: List[ConfirmedTransaction]): IO[Int] =
+  def saveTransactions(accountId: UUID, txs: List[TransactionView]): IO[Int] =
     client
       .saveTransactions(
         protobuf.SaveTransactionsRequest(
@@ -86,8 +85,16 @@ class InterpreterGrpcClient(
       )
       .map(_.count)
 
-  def saveUnconfirmedTransactions(accountId: UUID, txs: List[UnconfirmedTransaction]): IO[Int] =
-    IO.pure(txs.size)
+  def saveUnconfirmedTransactions(accountId: UUID, txs: List[TransactionView]): IO[Int] =
+    client
+      .saveUnconfirmedTransactions(
+        protobuf.SaveTransactionsRequest(
+          accountId = UuidUtils uuidToBytes accountId,
+          transactions = txs.map(_.toProto)
+        ),
+        new Metadata()
+      )
+      .map(_.count)
 
   def removeDataFromCursor(accountId: UUID, blockHeightCursor: Option[Long]): IO[Int] =
     client
@@ -100,7 +107,7 @@ class InterpreterGrpcClient(
       )
       .map(_.count)
 
-  def getLastBlocks(accountId: UUID): IO[GetLastBlocksResult] =
+  def getLastBlocks(accountId: UUID): IO[List[BlockView]] =
     client
       .getLastBlocks(
         protobuf.GetLastBlocksRequest(
@@ -108,7 +115,7 @@ class InterpreterGrpcClient(
         ),
         new Metadata()
       )
-      .map(GetLastBlocksResult.fromProto)
+      .map(_.blocks.map(BlockView.fromProto).toList)
 
   def compute(
       accountId: UUID,

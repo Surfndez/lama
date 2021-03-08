@@ -3,7 +3,6 @@ package co.ledger.lama.bitcoin.interpreter
 import java.util.UUID
 
 import cats.effect.IO
-import co.ledger.lama.bitcoin.common.models.explorer.{ConfirmedTransaction, UnconfirmedTransaction}
 import co.ledger.lama.bitcoin.common.models.interpreter.{Operation, TransactionView}
 import co.ledger.lama.bitcoin.interpreter.models.OperationToSave
 import co.ledger.lama.bitcoin.interpreter.services.{OperationQueries, TransactionQueries}
@@ -19,7 +18,7 @@ object QueryUtils {
       .transact(db)
   }
 
-  def saveTx(db: Transactor[IO], transaction: ConfirmedTransaction, accountId: UUID): IO[Unit] = {
+  def saveTx(db: Transactor[IO], transaction: TransactionView, accountId: UUID): IO[Unit] = {
     TransactionQueries
       .saveTransaction(transaction, accountId)
       .transact(db)
@@ -29,7 +28,7 @@ object QueryUtils {
   def saveUnconfirmedTxs(
       db: Transactor[IO],
       accountId: UUID,
-      transactions: List[UnconfirmedTransaction]
+      transactions: List[TransactionView]
   ): IO[Unit] = {
     TransactionQueries
       .saveUnconfirmedTransactions(accountId, transactions)

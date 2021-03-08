@@ -1,7 +1,6 @@
 package co.ledger.lama.bitcoin.interpreter
 
 import cats.effect.{ConcurrentEffect, IO}
-import co.ledger.lama.bitcoin.common.models.explorer._
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.common.logging.IOLogging
 import co.ledger.lama.common.models._
@@ -25,7 +24,7 @@ class InterpreterGrpcService(
     for {
       accountId  <- UuidUtils.bytesToUuidIO(request.accountId)
       _          <- log.info(s"Saving ${request.transactions.size} transactions for $accountId")
-      txs        <- IO(request.transactions.map(ConfirmedTransaction.fromProto).toList)
+      txs        <- IO(request.transactions.map(TransactionView.fromProto).toList)
       savedCount <- interpreter.saveTransactions(accountId, txs)
     } yield protobuf.ResultCount(savedCount)
   }
@@ -37,7 +36,7 @@ class InterpreterGrpcService(
     for {
       accountId  <- UuidUtils.bytesToUuidIO(request.accountId)
       _          <- log.info(s"Saving ${request.transactions.size} transactions for $accountId")
-      txs        <- IO(request.transactions.map(UnconfirmedTransaction.fromProto).toList)
+      txs        <- IO(request.transactions.map(TransactionView.fromProto).toList)
       savedCount <- interpreter.saveUnconfirmedTransactions(accountId, txs)
     } yield protobuf.ResultCount(savedCount)
   }

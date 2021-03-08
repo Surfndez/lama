@@ -2,10 +2,12 @@ package co.ledger.lama.bitcoin.worker
 
 import java.time.Instant
 import java.util.UUID
+
 import cats.effect.{ContextShift, IO, Resource, Timer}
-import co.ledger.lama.bitcoin.common.models.explorer.{Block, ConfirmedTransaction}
+import co.ledger.lama.bitcoin.common.models.explorer.Block
 import co.ledger.lama.bitcoin.common.clients.grpc.mocks.InterpreterClientMock
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerHttpClient
+import co.ledger.lama.bitcoin.common.models.interpreter.{BlockView, TransactionView}
 import co.ledger.lama.bitcoin.worker.config.Config
 import co.ledger.lama.bitcoin.worker.services.CursorStateService
 import co.ledger.lama.bitcoin.worker.services.CursorStateService.AccountId
@@ -82,7 +84,7 @@ class CursorStateServiceIT extends AnyFlatSpecLike with Matchers with IOLogging 
   }
 
   private def createTx(blockHash: String, height: Long) =
-    ConfirmedTransaction(
+    TransactionView(
       "id",
       "hash",
       Instant.now(),
@@ -90,7 +92,7 @@ class CursorStateServiceIT extends AnyFlatSpecLike with Matchers with IOLogging 
       1,
       Nil,
       Nil,
-      Block(blockHash, height, Instant.now()),
+      Some(BlockView(blockHash, height, Instant.now())),
       0
     )
 

@@ -4,7 +4,6 @@ import java.time.Instant
 import java.util.UUID
 
 import cats.data.NonEmptyList
-import co.ledger.lama.bitcoin.common.models.explorer._
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.interpreter.services.{FlaggingService, OperationService}
 import co.ledger.lama.common.models.Sort
@@ -23,25 +22,25 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
   private val inputAddress =
     AccountAddress("1LD1pARePgXXyZA1J3EyvRtB82vxENs5wQ", ChangeType.External, NonEmptyList.of(1, 1))
 
-  val block1: Block = Block(
+  val block1: BlockView = BlockView(
     "00000000000000000008c76a28e115319fb747eb29a7e0794526d0fe47608379",
     570153,
     Instant.parse("2019-04-04T10:03:22Z")
   )
 
-  val block2: Block = Block(
+  val block2: BlockView = BlockView(
     "00000000000000000003d16980a4ec530adf4bcefc74ca149a2b1788444e9c3a",
     650909,
     Instant.parse("2020-10-02T11:17:48Z")
   )
 
   val outputs = List(
-    Output(0, 50000, outputAddress1.accountAddress, "script"),
-    Output(1, 9434, outputAddress2.accountAddress, "script")
+    OutputView(0, 50000, outputAddress1.accountAddress, "script", None, None),
+    OutputView(1, 9434, outputAddress2.accountAddress, "script", None, None)
   )
 
   val inputs = List(
-    DefaultInput(
+    InputView(
       "0f38e5f1b12078495a9e80c6e0d77af3d674cfe6096bb6e7909993a53b6e8386",
       0,
       0,
@@ -49,12 +48,13 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
       inputAddress.accountAddress,
       "script",
       List(),
-      4294967295L
+      4294967295L,
+      None
     )
   )
 
-  val insertTx1: ConfirmedTransaction =
-    ConfirmedTransaction(
+  val insertTx1: TransactionView =
+    TransactionView(
       "txId1",
       "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1f",
       Instant.parse("2019-04-04T10:03:22Z"),
@@ -62,12 +62,12 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
       20566,
       inputs,
       outputs,
-      block1,
+      Some(block1),
       1
     )
 
-  val insertTx2: ConfirmedTransaction =
-    ConfirmedTransaction(
+  val insertTx2: TransactionView =
+    TransactionView(
       "txId2",
       "b0c0dc176eaf463a5cecf15f1f55af99a41edfd6e01685068c0db3cc779861c8",
       Instant.parse("2019-04-04T10:03:22Z"),
@@ -75,7 +75,7 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
       30566,
       inputs,
       outputs,
-      block2,
+      Some(block2),
       1
     )
 

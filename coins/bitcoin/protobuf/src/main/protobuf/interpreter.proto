@@ -31,7 +31,7 @@ enum SortingOrder {
 
 message SaveTransactionsRequest {
   bytes account_id = 1;
-  repeated Transaction transactions = 2;
+  repeated TransactionView transactions = 2;
 }
 
 message GetLastBlocksRequest {
@@ -39,7 +39,7 @@ message GetLastBlocksRequest {
 }
 
 message GetLastBlocksResult {
-  repeated Block blocks = 1;
+  repeated BlockView blocks = 1;
 }
 
 message ComputeRequest {

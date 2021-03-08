@@ -3,7 +3,7 @@ package co.ledger.lama.bitcoin.common.models.explorer
 import java.time.Instant
 
 import co.ledger.lama.bitcoin.common.models.interpreter.{
-  AccountAddress,
+  BlockView,
   InputView,
   OutputView,
   TransactionView
@@ -24,6 +24,8 @@ sealed trait Transaction {
   val inputs: Seq[Input]
   val outputs: Seq[Output]
   val confirmations: Int
+
+  def toTransactionView: TransactionView
 }
 
 object Transaction {
@@ -59,6 +61,46 @@ case class ConfirmedTransaction(
       inputs.map(_.toProto),
       outputs.map(_.toProto),
       Some(block.toProto),
+      confirmations
+    )
+
+  def toTransactionView: TransactionView =
+    TransactionView(
+      id,
+      hash,
+      receivedAt,
+      lockTime,
+      fees,
+      inputs.collect { case i: DefaultInput =>
+        InputView(
+          i.outputHash,
+          i.outputIndex,
+          i.inputIndex,
+          i.value,
+          i.address,
+          i.scriptSignature,
+          i.txinwitness,
+          i.sequence,
+          None
+        )
+      },
+      outputs.map { o =>
+        OutputView(
+          o.outputIndex,
+          o.value,
+          o.address,
+          o.scriptHex,
+          None,
+          None
+        )
+      },
+      Some(
+        BlockView(
+          block.hash,
+          block.height,
+          block.time
+        )
+      ),
       confirmations
     )
 }
@@ -97,9 +139,7 @@ case class UnconfirmedTransaction(
     confirmations: Int
 ) extends Transaction {
 
-  def toTransactionView(
-      addresses: List[AccountAddress]
-  ): TransactionView = {
+  def toTransactionView: TransactionView =
     TransactionView(
       id,
       hash,
@@ -116,25 +156,22 @@ case class UnconfirmedTransaction(
           i.scriptSignature,
           i.txinwitness,
           i.sequence,
-          addresses.find(_.accountAddress == i.address).map(_.derivation)
+          None
         )
       },
       outputs.map { o =>
-        val addressO = addresses.find(_.accountAddress == o.address)
         OutputView(
           o.outputIndex,
           o.value,
           o.address,
           o.scriptHex,
-          addressO.map(_.changeType),
-          addressO.map(_.derivation)
+          None,
+          None
         )
       },
       None,
       confirmations
     )
-  }
-
 }
 
 object UnconfirmedTransaction {

@@ -1,6 +1,7 @@
 package co.ledger.lama.bitcoin.worker.services
 
 import java.util.UUID
+
 import cats.effect.IO
 import co.ledger.lama.bitcoin.common.models.explorer.Block
 import co.ledger.lama.bitcoin.common.clients.grpc.InterpreterClient
@@ -53,8 +54,9 @@ object CursorStateService {
         _ <- log.info(
           s"Block [hash: '${block.hash}', height: ${block.height}] has been invalidated, searching last known valid block."
         )
-        getblocksResult <- interpreterClient.getLastBlocks(accountId.id)
-        lastValidBlock  <- getlastValidBlockRec(getblocksResult.blocks)
+        blockViews <- interpreterClient.getLastBlocks(accountId.id)
+        blocks = blockViews.map(Block.fromBlockView)
+        lastValidBlock <- getlastValidBlockRec(blocks)
         _ <- log.info(
           s"block [hash: '${lastValidBlock.hash}', height: ${lastValidBlock.height}] is valid !"
         )

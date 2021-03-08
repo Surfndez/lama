@@ -3,7 +3,6 @@ package co.ledger.lama.bitcoin.interpreter
 import java.time.Instant
 import java.util.UUID
 
-import co.ledger.lama.bitcoin.common.models.explorer._
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.interpreter.models.OperationToSave
 import co.ledger.lama.common.utils.IOAssertion
@@ -12,7 +11,7 @@ import org.scalatest.matchers.should.Matchers
 
 class QueriesIT extends AnyFlatSpecLike with Matchers with TestResources {
 
-  val block: Block = Block(
+  val block: BlockView = BlockView(
     "00000000000000000008c76a28e115319fb747eb29a7e0794526d0fe47608379",
     570153,
     Instant.parse("2019-04-04T10:03:22Z")
@@ -21,11 +20,11 @@ class QueriesIT extends AnyFlatSpecLike with Matchers with TestResources {
   val accountId: UUID = UUID.fromString("b723c553-3a9a-4130-8883-ee2f6c2f9201")
 
   val outputs = List(
-    Output(0, 50000, "1DtwACvd338XtHBFYJRVKRLxviD7YtYADa", "script"),
-    Output(1, 9434, "1LK8UbiRwUzC8KFEbMKvgbvriM9zLMce3C", "script")
+    OutputView(0, 50000, "1DtwACvd338XtHBFYJRVKRLxviD7YtYADa", "script", None, None),
+    OutputView(1, 9434, "1LK8UbiRwUzC8KFEbMKvgbvriM9zLMce3C", "script", None, None)
   )
   val inputs = List(
-    DefaultInput(
+    InputView(
       "0f38e5f1b12078495a9e80c6e0d77af3d674cfe6096bb6e7909993a53b6e8386",
       0,
       0,
@@ -33,11 +32,12 @@ class QueriesIT extends AnyFlatSpecLike with Matchers with TestResources {
       "1LD1pARePgXXyZA1J3EyvRtB82vxENs5wQ",
       "script",
       List(),
-      4294967295L
+      4294967295L,
+      None
     )
   )
-  val transactionToInsert: ConfirmedTransaction =
-    ConfirmedTransaction(
+  val transactionToInsert: TransactionView =
+    TransactionView(
       "txId",
       "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1f",
       Instant.parse("2019-04-04T10:03:22Z"),
@@ -45,7 +45,7 @@ class QueriesIT extends AnyFlatSpecLike with Matchers with TestResources {
       20566,
       inputs,
       outputs,
-      block,
+      Some(block),
       1
     )
 
@@ -82,7 +82,7 @@ class QueriesIT extends AnyFlatSpecLike with Matchers with TestResources {
     accountId,
     transactionToInsert.hash,
     OperationType.Send,
-    transactionToInsert.inputs.collect { case i: DefaultInput =>
+    transactionToInsert.inputs.collect { case i: InputView =>
       i.value
     }.sum,
     transactionToInsert.fees,

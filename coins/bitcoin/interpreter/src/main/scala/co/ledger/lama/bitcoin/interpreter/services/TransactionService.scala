@@ -3,11 +3,7 @@ package co.ledger.lama.bitcoin.interpreter.services
 import java.util.UUID
 
 import cats.effect.{ContextShift, IO}
-import co.ledger.lama.bitcoin.common.models.explorer.{
-  Block,
-  ConfirmedTransaction,
-  UnconfirmedTransaction
-}
+import co.ledger.lama.bitcoin.common.models.interpreter.{BlockView, TransactionView}
 import doobie.Transactor
 import doobie.implicits._
 import fs2._
@@ -19,10 +15,10 @@ class TransactionService(
 
   def saveTransactions(
       accountId: UUID,
-      transactions: List[ConfirmedTransaction]
+      transactions: List[TransactionView]
   )(implicit cs: ContextShift[IO]): IO[Int] = {
     Stream
-      .emits[IO, ConfirmedTransaction](transactions)
+      .emits[IO, TransactionView](transactions)
       .parEvalMapUnordered(maxConcurrent) { tx =>
         TransactionQueries
           .saveTransaction(tx, accountId)
@@ -34,7 +30,7 @@ class TransactionService(
 
   def fetchUnconfirmedTransactions(
       accountId: UUID
-  )(implicit cs: ContextShift[IO]): IO[List[UnconfirmedTransaction]] =
+  )(implicit cs: ContextShift[IO]): IO[List[TransactionView]] =
     TransactionQueries
       .fetchUnconfirmedTransactions(accountId)
       .transact(db)
@@ -49,7 +45,7 @@ class TransactionService(
 
   def saveUnconfirmedTransactions(
       accountId: UUID,
-      transactions: List[UnconfirmedTransaction]
+      transactions: List[TransactionView]
   )(implicit cs: ContextShift[IO]): IO[Int] = {
     if (transactions.nonEmpty)
       TransactionQueries
@@ -61,7 +57,7 @@ class TransactionService(
   def removeFromCursor(accountId: UUID, blockHeight: Long): IO[Int] =
     TransactionQueries.removeFromCursor(accountId, blockHeight).transact(db)
 
-  def getLastBlocks(accountId: UUID): Stream[IO, Block] =
+  def getLastBlocks(accountId: UUID): Stream[IO, BlockView] =
     TransactionQueries
       .fetchMostRecentBlocks(accountId)
       .transact(db)

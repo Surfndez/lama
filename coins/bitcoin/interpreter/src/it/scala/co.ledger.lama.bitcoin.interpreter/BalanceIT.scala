@@ -5,7 +5,6 @@ import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 import cats.data.NonEmptyList
-import co.ledger.lama.bitcoin.common.models.explorer._
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.common.utils.IOAssertion
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -20,9 +19,9 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
 
   private val time: Instant = Instant.parse("2019-04-04T10:03:22Z")
 
-  val block1: Block = Block("block1", 500153, time)
-  val block2: Block = Block("block2", 570154, time.plus(1, ChronoUnit.SECONDS))
-  val block3: Block = Block("block3", 570155, time.plus(2, ChronoUnit.SECONDS))
+  val block1: BlockView = BlockView("block1", 500153, time)
+  val block2: BlockView = BlockView("block2", 570154, time.plus(1, ChronoUnit.SECONDS))
+  val block3: BlockView = BlockView("block3", 570155, time.plus(2, ChronoUnit.SECONDS))
 
   val accountId: UUID = UUID.fromString("b723c553-3a9a-4130-8883-ee2f6c2f9201")
 
@@ -35,32 +34,32 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
 
   val notBelongingAddress: String = "notBelongingAddress"
 
-  val tx1: ConfirmedTransaction =
-    ConfirmedTransaction(
+  val tx1: TransactionView =
+    TransactionView(
       "txId1",
       "txId1",
       time,
       0,
       0,
       List(
-        DefaultInput("txId0", 0, 0, 60000, notBelongingAddress, "script", List(), 1L)
+        InputView("txId0", 0, 0, 60000, notBelongingAddress, "script", List(), 1L, None)
       ),
       List(
-        Output(0, 60000, address1.accountAddress, "script")
+        OutputView(0, 60000, address1.accountAddress, "script", None, None)
       ),
-      block1,
+      Some(block1),
       1
     )
 
-  val tx2: ConfirmedTransaction =
-    ConfirmedTransaction(
+  val tx2: TransactionView =
+    TransactionView(
       "txId2",
       "txId2",
       time,
       0,
       566,
       List(
-        DefaultInput(
+        InputView(
           "txId1",
           0,
           0,
@@ -68,27 +67,28 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
           address1.accountAddress,
           "script",
           List(),
-          4294967295L
+          4294967295L,
+          None
         )
       ),
       List(
-        Output(0, 30000, address2.accountAddress, "script"),
-        Output(1, 20000, notBelongingAddress, "script"),
-        Output(2, 9434, address3.accountAddress, "script")
+        OutputView(0, 30000, address2.accountAddress, "script", None, None),
+        OutputView(1, 20000, notBelongingAddress, "script", None, None),
+        OutputView(2, 9434, address3.accountAddress, "script", None, None)
       ),
-      block2,
+      Some(block2),
       1
     )
 
-  val tx3: ConfirmedTransaction =
-    ConfirmedTransaction(
+  val tx3: TransactionView =
+    TransactionView(
       "txId3",
       "txId3",
       time,
       0,
       500,
       List(
-        DefaultInput(
+        InputView(
           "txId2",
           0,
           0,
@@ -96,14 +96,15 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
           address2.accountAddress,
           "script",
           List(),
-          4294967295L
+          4294967295L,
+          None
         )
       ),
       List(
-        Output(0, 15000, address1.accountAddress, "script"),
-        Output(1, 14500, notBelongingAddress, "script")
+        OutputView(0, 15000, address1.accountAddress, "script", None, None),
+        OutputView(1, 14500, notBelongingAddress, "script", None, None)
       ),
-      block3,
+      Some(block3),
       1
     )
 

@@ -17,7 +17,6 @@ import co.ledger.lama.bitcoin.worker.services.Bookkeeper.BatchResult
 import co.ledger.lama.bitcoin.worker.services.Keychain.KeychainId
 import co.ledger.lama.common.models.Coin
 import fs2.{Pipe, Stream}
-
 import java.util.UUID
 
 trait Bookkeeper[F[_]] {
@@ -162,7 +161,7 @@ object Bookkeeper {
           interpreter: InterpreterClient
       )(accountId: AccountId, txs: List[ConfirmedTransaction]): IO[String] =
         for {
-          savedTxsCount <- interpreter.saveTransactions(accountId, txs)
+          savedTxsCount <- interpreter.saveTransactions(accountId, txs.map(_.toTransactionView))
         } yield s"$savedTxsCount new transactions saved from blockchain"
     }
 
@@ -180,7 +179,10 @@ object Bookkeeper {
           interpreter: InterpreterClient
       )(accountId: AccountId, txs: List[UnconfirmedTransaction]): IO[String] =
         for {
-          savedTxsCount <- interpreter.saveUnconfirmedTransactions(accountId, txs)
+          savedTxsCount <- interpreter.saveUnconfirmedTransactions(
+            accountId,
+            txs.map(_.toTransactionView)
+          )
         } yield s"$savedTxsCount new transactions saved from mempool"
 
     }

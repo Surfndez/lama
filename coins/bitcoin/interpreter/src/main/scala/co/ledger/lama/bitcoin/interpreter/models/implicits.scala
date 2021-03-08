@@ -5,7 +5,6 @@ import java.time.Instant
 import java.util.UUID
 
 import cats.data.NonEmptyList
-import co.ledger.lama.bitcoin.common.models.explorer.Output
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import doobie._
 import doobie.postgres.implicits._
@@ -34,11 +33,6 @@ object implicits {
 
   implicit val changeTypeMeta: Meta[ChangeType] =
     pgEnumStringOpt("change_type", ChangeType.fromKey, _.toString.toLowerCase())
-
-  implicit val writeOutput: Write[Output] =
-    Write[(BigInt, BigInt, String, String)].contramap { o =>
-      (o.outputIndex, o.value, o.address, o.scriptHex)
-    }
 
   implicit lazy val readTransactionView: Read[TransactionView] =
     Read[

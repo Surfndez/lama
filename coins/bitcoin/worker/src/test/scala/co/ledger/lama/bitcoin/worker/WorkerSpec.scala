@@ -5,7 +5,7 @@ import co.ledger.lama.bitcoin.common.clients.grpc.InterpreterClient
 import co.ledger.lama.bitcoin.common.clients.grpc.mocks.InterpreterClientMock
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
 import co.ledger.lama.bitcoin.common.clients.http.mocks.ExplorerClientMock
-import co.ledger.lama.bitcoin.common.models.explorer.{Block, ConfirmedTransaction}
+import co.ledger.lama.bitcoin.common.models.explorer.Block
 import co.ledger.lama.bitcoin.worker.SyncEventServiceFixture.{End, QueueInputOps, registered}
 import co.ledger.lama.bitcoin.worker.services.{CursorStateService, SyncEventService}
 import co.ledger.lama.common.models.Status.Registered
@@ -15,9 +15,11 @@ import co.ledger.lama.common.utils.IOAssertion
 import fs2.concurrent.Queue
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
 import java.time.Instant
 import java.util.UUID
+
+import co.ledger.lama.bitcoin.common.models.interpreter.TransactionView
+
 import scala.concurrent.ExecutionContext
 
 class WorkerSpec extends AnyFlatSpec with Matchers {
@@ -101,7 +103,7 @@ class WorkerSpec extends AnyFlatSpec with Matchers {
 
     } yield {
 
-      val txs: List[ConfirmedTransaction] = interpreter.savedTransactions(accountIdentifier.id)
+      val txs: List[TransactionView] = interpreter.savedTransactions(accountIdentifier.id)
       txs should have size 4
     }
   }

@@ -157,7 +157,7 @@ class BookkeeperSpec extends AnyFlatSpec with Matchers {
       )
       .unsafeRunSync()
 
-    val expectedSavedTransactions = transactions.values.flatten
+    val expectedSavedTransactions = transactions.values.flatten.map(_.toTransactionView)
 
     interpreter.savedUnconfirmedTransactions should have size 1
     interpreter.savedUnconfirmedTransactions.head._1 shouldBe accountId

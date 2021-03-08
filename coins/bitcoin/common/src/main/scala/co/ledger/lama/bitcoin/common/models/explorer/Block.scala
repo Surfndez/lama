@@ -2,6 +2,7 @@ package co.ledger.lama.bitcoin.common.models.explorer
 
 import java.time.Instant
 
+import co.ledger.lama.bitcoin.common.models.interpreter.BlockView
 import co.ledger.lama.bitcoin.interpreter.protobuf
 import co.ledger.lama.common.models.implicits._
 import co.ledger.lama.common.utils.TimestampProtoUtils
@@ -25,6 +26,12 @@ object Block {
   implicit val encoder: Encoder[Block] = deriveConfiguredEncoder[Block]
   implicit val decoder: Decoder[Block] = deriveConfiguredDecoder[Block].map(b =>
     if (b.hash.startsWith("0x")) b.copy(hash = b.hash.substring(2)) else b
+  )
+
+  def fromBlockView(b: BlockView) = Block(
+    b.hash,
+    b.height,
+    b.time
   )
 
   def fromProto(proto: protobuf.Block): Block =

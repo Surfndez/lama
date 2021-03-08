@@ -2,28 +2,22 @@ package co.ledger.lama.bitcoin.common.clients.grpc.mocks
 
 import cats.effect.IO
 import co.ledger.lama.bitcoin.common.clients.grpc.InterpreterClient
-import co.ledger.lama.bitcoin.common.models.explorer.{
-  Block,
-  ConfirmedTransaction,
-  DefaultInput,
-  UnconfirmedTransaction
-}
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.common.models.{Coin, Sort}
-
 import java.time.Instant
 import java.util.UUID
+
 import scala.collection.mutable
 
 class InterpreterClientMock extends InterpreterClient {
 
-  var savedTransactions: mutable.Map[UUID, List[ConfirmedTransaction]] = mutable.Map.empty
-  var savedUnconfirmedTransactions: mutable.ArrayDeque[(UUID, List[UnconfirmedTransaction])] =
+  var savedTransactions: mutable.Map[UUID, List[TransactionView]] = mutable.Map.empty
+  var savedUnconfirmedTransactions: mutable.ArrayDeque[(UUID, List[TransactionView])] =
     mutable.ArrayDeque.empty
   var transactions: mutable.Map[UUID, List[TransactionView]] = mutable.Map.empty
   var operations: mutable.Map[UUID, List[Operation]]         = mutable.Map.empty
 
-  def saveUnconfirmedTransactions(accountId: UUID, txs: List[UnconfirmedTransaction]): IO[Int] =
+  def saveUnconfirmedTransactions(accountId: UUID, txs: List[TransactionView]): IO[Int] =
     IO.delay {
       savedUnconfirmedTransactions += accountId -> txs
       txs.size
@@ -31,7 +25,7 @@ class InterpreterClientMock extends InterpreterClient {
 
   def saveTransactions(
       accountId: UUID,
-      txs: List[ConfirmedTransaction]
+      txs: List[TransactionView]
   ): IO[Int] = {
     savedTransactions.update(
       accountId,
@@ -45,7 +39,7 @@ class InterpreterClientMock extends InterpreterClient {
     savedTransactions.update(
       accountId,
       savedTransactions(accountId)
-        .filter(tx => tx.block.height < blockHeightCursor.getOrElse(0L))
+        .filter(tx => tx.block.map(_.height).getOrElse(0L) < blockHeightCursor.getOrElse(0L))
     )
 
     transactions.update(
@@ -63,14 +57,19 @@ class InterpreterClientMock extends InterpreterClient {
     IO.pure(0)
   }
 
-  def getLastBlocks(accountId: UUID): IO[GetLastBlocksResult] = {
-    val lastBlocks: List[Block] = savedTransactions(accountId)
-      .map(_.block)
+  def getLastBlocks(accountId: UUID): IO[List[BlockView]] = {
+    val lastBlocks: List[BlockView] = savedTransactions(accountId)
+      .collect { case TransactionView(_, _, _, _, _, _, _, Some(block), _) =>
+        BlockView(
+          block.hash,
+          block.height,
+          block.time
+        )
+      }
       .distinct
-      .sortBy(_.height)
-      .reverse
+      .sortBy(_.height)(Ordering[Long].reverse)
 
-    IO(GetLastBlocksResult(lastBlocks))
+    IO(lastBlocks)
   }
 
   def compute(
@@ -82,46 +81,32 @@ class InterpreterClientMock extends InterpreterClient {
 
     val txViews = savedTransactions
       .getOrElse(accountId, List.empty)
-      .map(tx =>
-        TransactionView(
-          tx.id,
-          tx.hash,
-          tx.receivedAt,
-          tx.lockTime,
-          tx.fees,
-          tx.inputs.collect { case i: DefaultInput =>
-            InputView(
-              i.outputHash,
-              i.outputIndex,
-              i.inputIndex,
-              i.value,
-              i.address,
-              i.scriptSignature,
-              i.txinwitness,
-              i.sequence,
-              addresses.find(_.accountAddress == i.address).map(_.derivation)
-            )
 
-          },
-          tx.outputs.map(o =>
-            OutputView(
-              o.outputIndex,
-              o.value,
-              o.address,
-              o.scriptHex,
-              addresses.find(a => a.accountAddress == o.address).map(a => a.changeType),
-              addresses.find(_.accountAddress == o.address).map(_.derivation)
-            )
-          ),
-          Some(BlockView(tx.block.hash, tx.block.height, tx.block.time)),
-          tx.confirmations
-        )
+    val computedTxViews = txViews.map { tx =>
+      tx.copy(
+        outputs = tx.outputs.map { o =>
+          val addressO = addresses.find(_.accountAddress == o.address)
+          o.copy(
+            changeType = addressO.map(_.changeType),
+            derivation = addressO.map(_.derivation)
+          )
+        },
+        inputs = tx.inputs.map { i =>
+          i.copy(
+            derivation = addresses.find(_.accountAddress == i.address).map(_.derivation)
+          )
+        }
       )
+    }
 
-    transactions.update(accountId, txViews)
+    transactions.update(
+      accountId,
+      computedTxViews
+    )
 
     val operationToSave = transactions(accountId).flatMap { tx =>
-      val inputAmount = tx.inputs.filter(_.belongs).map(_.value).sum
+      val inputAmount =
+        tx.inputs.filter(i => addresses.exists(_.accountAddress == i.address)).map(_.value).sum
       val outputAmount = tx.outputs
         .filter(o => o.belongs && o.changeType.contains(ChangeType.External))
         .map(_.value)

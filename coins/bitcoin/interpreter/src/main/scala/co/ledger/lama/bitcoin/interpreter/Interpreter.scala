@@ -1,7 +1,6 @@
 package co.ledger.lama.bitcoin.interpreter
 
 import cats.effect.{ContextShift, IO}
-import co.ledger.lama.bitcoin.common.models.explorer._
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.interpreter.services._
 import co.ledger.lama.common.logging.IOLogging
@@ -28,19 +27,19 @@ class Interpreter(
 
   def saveTransactions(
       accountId: UUID,
-      transactions: List[ConfirmedTransaction]
+      transactions: List[TransactionView]
   ): IO[Int] =
     transactionService.saveTransactions(accountId, transactions)
 
   def saveUnconfirmedTransactions(
       accountId: UUID,
-      transactions: List[UnconfirmedTransaction]
+      transactions: List[TransactionView]
   ): IO[Int] =
     transactionService.saveUnconfirmedTransactions(accountId, transactions)
 
   def getLastBlocks(
       accountId: UUID
-  ): IO[List[Block]] =
+  ): IO[List[BlockView]] =
     transactionService
       .getLastBlocks(accountId)
       .compile
@@ -150,7 +149,24 @@ class Interpreter(
   ): IO[List[TransactionView]] =
     for {
       unconfirmedTransactions <- transactionService.fetchUnconfirmedTransactions(accountId)
-      unconfirmedTransactionsViews = unconfirmedTransactions.map(_.toTransactionView(addresses))
+
+      // This is temporary... Will disappear in the next PR
+      unconfirmedTransactionsViews = unconfirmedTransactions.map { tx =>
+        tx.copy(
+          outputs = tx.outputs.map { o =>
+            val addressO = addresses.find(_.accountAddress == o.address)
+            o.copy(
+              changeType = addressO.map(_.changeType),
+              derivation = addressO.map(_.derivation)
+            )
+          },
+          inputs = tx.inputs.map { i =>
+            i.copy(
+              derivation = addresses.find(_.accountAddress == i.address).map(_.derivation)
+            )
+          }
+        )
+      }
 
       //remove tx mined in between
       minedTxs <- operationService.getOperations(

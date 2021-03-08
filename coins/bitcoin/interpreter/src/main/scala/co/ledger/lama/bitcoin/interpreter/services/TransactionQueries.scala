@@ -2,12 +2,11 @@ package co.ledger.lama.bitcoin.interpreter.services
 
 import java.util.UUID
 
-import co.ledger.lama.bitcoin.common.models.explorer.{
-  Block,
-  ConfirmedTransaction,
-  DefaultInput,
-  Output,
-  UnconfirmedTransaction
+import co.ledger.lama.bitcoin.common.models.interpreter.{
+  BlockView,
+  InputView,
+  OutputView,
+  TransactionView
 }
 import co.ledger.lama.common.models.implicits._
 import co.ledger.lama.bitcoin.interpreter.models.implicits._
@@ -20,16 +19,16 @@ import io.circe.syntax._
 
 object TransactionQueries {
 
-  def fetchMostRecentBlocks(accountId: UUID): Stream[ConnectionIO, Block] = {
+  def fetchMostRecentBlocks(accountId: UUID): Stream[ConnectionIO, BlockView] = {
     sql"""SELECT DISTINCT block_hash, block_height, block_time
           FROM transaction
           WHERE account_id = $accountId
           ORDER BY block_height DESC
           LIMIT 200 -- the biggest reorg that happened on bitcoin was 53 blocks long
-       """.query[Block].stream
+       """.query[BlockView].stream
   }
 
-  def saveTransaction(tx: ConfirmedTransaction, accountId: UUID): ConnectionIO[Int] =
+  def saveTransaction(tx: TransactionView, accountId: UUID): ConnectionIO[Int] =
     for {
 
       txStatement <- insertTx(accountId, tx)
@@ -37,9 +36,7 @@ object TransactionQueries {
       _ <- insertInputs(
         accountId,
         tx.hash,
-        tx.inputs.toList.collect { case input: DefaultInput =>
-          input
-        }
+        tx.inputs.toList
       )
 
       _ <- insertOutputs(accountId, tx.hash, tx.outputs.toList)
@@ -50,14 +47,14 @@ object TransactionQueries {
 
   def fetchUnconfirmedTransactions(
       accountId: UUID
-  ): Stream[doobie.ConnectionIO, List[UnconfirmedTransaction]] = {
+  ): Stream[doobie.ConnectionIO, List[TransactionView]] = {
     sql"""SELECT transactions
           FROM unconfirmed_transaction_cache
           WHERE account_id = $accountId
        """
       .query[Json]
       .stream
-      .map(_.as[List[UnconfirmedTransaction]])
+      .map(_.as[List[TransactionView]])
       .rethrow
   }
 
@@ -69,7 +66,7 @@ object TransactionQueries {
 
   def saveUnconfirmedTransactions(
       accountId: UUID,
-      txs: List[UnconfirmedTransaction]
+      txs: List[TransactionView]
   ): ConnectionIO[Int] = {
     sql"""INSERT INTO unconfirmed_transaction_cache (
             account_id, transactions
@@ -81,7 +78,7 @@ object TransactionQueries {
 
   private def insertTx(
       accountId: UUID,
-      tx: ConfirmedTransaction
+      tx: TransactionView
   ) =
     sql"""INSERT INTO transaction (
             account_id, id, hash, block_hash, block_height, block_time, received_at, lock_time, fees, confirmations
@@ -89,9 +86,9 @@ object TransactionQueries {
             $accountId,
             ${tx.id},
             ${tx.hash},
-            ${tx.block.hash},
-            ${tx.block.height},
-            ${tx.block.time},
+            ${tx.block.map(_.hash)},
+            ${tx.block.map(_.height)},
+            ${tx.block.map(_.time)},
             ${tx.receivedAt},
             ${tx.lockTime},
             ${tx.fees},
@@ -102,35 +99,31 @@ object TransactionQueries {
   private def insertInputs(
       accountId: UUID,
       txHash: String,
-      inputs: List[DefaultInput]
+      inputs: List[InputView]
   ) = {
     val query =
       s"""INSERT INTO input (
-            account_id, hash, output_hash, output_index, input_index, value, address, script_signature, txinwitness, sequence
-          ) VALUES ('$accountId', '$txHash', ?, ?, ?, ?, ?, ?, ?, ?)
+            account_id, hash, output_hash, output_index, input_index, value, address, script_signature, txinwitness, sequence, derivation
+          ) VALUES (
+            '$accountId', '$txHash', ?, ?, ?, ?, ?, ?, ?, ?, ?
+          )
           ON CONFLICT ON CONSTRAINT input_pkey DO NOTHING
        """
-    Update[DefaultInput](query).updateMany(inputs)
+    Update[InputView](query).updateMany(inputs)
   }
 
   private def insertOutputs(
       accountId: UUID,
       txHash: String,
-      outputs: List[Output]
+      outputs: List[OutputView]
   ) = {
     val query = s"""INSERT INTO output (
-            account_id, hash, output_index, value, address, script_hex, change_type
+            account_id, hash, output_index, value, address, script_hex, change_type, derivation
           ) VALUES (
-            '$accountId',
-            '$txHash',
-            ?,
-            ?,
-            ?,
-            ?,
-            NULL   -- and so there is no changeType
+            '$accountId', '$txHash', ?, ?, ?, ?, ?, ?
           ) ON CONFLICT ON CONSTRAINT output_pkey DO NOTHING
         """
-    Update[Output](query).updateMany(outputs)
+    Update[OutputView](query).updateMany(outputs)
   }
 
   def removeFromCursor(accountId: UUID, blockHeight: Long): ConnectionIO[Int] =
