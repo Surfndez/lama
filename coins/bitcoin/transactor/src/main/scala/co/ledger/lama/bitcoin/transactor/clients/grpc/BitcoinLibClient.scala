@@ -3,7 +3,7 @@ package co.ledger.lama.bitcoin.transactor.clients.grpc
 import cats.data.Validated
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
-import co.ledger.lama.bitcoin.common.models.{Address, BitcoinNetwork, InvalidAddress}
+import co.ledger.lama.bitcoin.common.models.{Address, BitcoinLikeNetwork, InvalidAddress}
 import co.ledger.lama.bitcoin.common.models.interpreter.Utxo
 import co.ledger.lama.bitcoin.common.models.transactor.{PrepareTxOutput, RawTransaction}
 import co.ledger.lama.bitcoin.transactor.models.bitcoinLib._
@@ -11,18 +11,17 @@ import co.ledger.lama.bitcoin.transactor.models.implicits._
 import co.ledger.lama.common.clients.grpc.GrpcClient
 import co.ledger.lama.common.logging.IOLogging
 import co.ledger.protobuf.bitcoin.libgrpc
-import co.ledger.protobuf.bitcoin.libgrpc.{ChainParams, ValidateAddressRequest}
 import io.grpc.{ManagedChannel, Metadata}
 
 trait BitcoinLibClient {
 
   def validateAddress(
       address: Address,
-      network: BitcoinNetwork
+      network: BitcoinLikeNetwork
   ): IO[Validated[InvalidAddress, Address]]
 
   def createTransaction(
-      network: BitcoinNetwork,
+      network: BitcoinLikeNetwork,
       selectedUtxos: List[Utxo],
       outputs: List[PrepareTxOutput],
       changeAddress: String,
@@ -37,7 +36,7 @@ trait BitcoinLibClient {
 
   def signTransaction(
       rawTransaction: RawTransaction,
-      network: BitcoinNetwork,
+      network: BitcoinLikeNetwork,
       signatures: List[SignatureMetadata]
   ): IO[RawTransactionResponse]
 }
@@ -55,15 +54,14 @@ class BitcoinLibGrpcClient(val managedChannel: ManagedChannel)(implicit val cs: 
 
   override def validateAddress(
       address: Address,
-      network: BitcoinNetwork
+      network: BitcoinLikeNetwork
   ): IO[Validated[InvalidAddress, Address]] = {
 
     client
       .validateAddress(
-        ValidateAddressRequest(
+        libgrpc.ValidateAddressRequest(
           address = address.value,
-          chainParams =
-            Some(ChainParams(ChainParams.Network.BitcoinNetwork(network.toLibGrpcProto)))
+          chainParams = Some(network.toLibGrpcProto)
         ),
         new Metadata
       )
@@ -74,7 +72,7 @@ class BitcoinLibGrpcClient(val managedChannel: ManagedChannel)(implicit val cs: 
   }
 
   def createTransaction(
-      network: BitcoinNetwork,
+      network: BitcoinLikeNetwork,
       selectedUtxos: List[Utxo],
       outputs: List[PrepareTxOutput],
       changeAddress: String,
@@ -132,7 +130,7 @@ class BitcoinLibGrpcClient(val managedChannel: ManagedChannel)(implicit val cs: 
 
   def signTransaction(
       rawTransaction: RawTransaction,
-      network: BitcoinNetwork,
+      network: BitcoinLikeNetwork,
       signatures: List[SignatureMetadata]
   ): IO[RawTransactionResponse] =
     client
@@ -146,7 +144,7 @@ class BitcoinLibGrpcClient(val managedChannel: ManagedChannel)(implicit val cs: 
               None
             )
           ),
-          network.toLibGrpcProto,
+          Some(network.toLibGrpcProto),
           signatures.map(_.toProto)
         ),
         new Metadata

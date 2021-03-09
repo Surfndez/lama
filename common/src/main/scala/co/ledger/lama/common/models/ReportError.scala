@@ -8,10 +8,11 @@ import co.ledger.lama.common.models.implicits._
 case class ReportError(code: String, message: Option[String])
 
 object ReportError {
-  def fromThrowable(t: Throwable) = t match {
-    case e: GrpcClientException => ReportError(e.clientName, Option(e.getMessage))
-    case unknown                => ReportError("UnknownError", Option(unknown.getMessage))
-  }
+  def fromThrowable(t: Throwable): ReportError =
+    t match {
+      case e: GrpcClientException => ReportError(e.clientName, Option(e.getMessage))
+      case unknown                => ReportError("unknown_error", Option(unknown.getMessage))
+    }
 
   implicit val encoder: Encoder[ReportError] = deriveConfiguredEncoder[ReportError]
   implicit val decoder: Decoder[ReportError] = deriveConfiguredDecoder[ReportError]

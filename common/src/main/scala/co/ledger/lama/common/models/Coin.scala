@@ -39,24 +39,31 @@ object Coin {
     def toProto: protobuf.Coin = protobuf.Coin.btc_regtest
   }
 
+  case object Ltc extends BitcoinLikeCoin("ltc") {
+    def toProto: protobuf.Coin = protobuf.Coin.ltc
+  }
+
   val all: Map[String, Coin] = Map(
     Btc.name        -> Btc,
     BtcTestnet.name -> BtcTestnet,
-    BtcRegtest.name -> BtcRegtest
+    BtcRegtest.name -> BtcRegtest,
+    Ltc.name        -> Ltc
   )
 
   def fromKey(key: String): Option[Coin] = all.get(key)
 
   def fromKeyIO(key: String): IO[Coin] = IO.fromOption(fromKey(key))(
     new IllegalArgumentException(
-      s"Unknown coin type ${key}) in CreateTransactionRequest"
+      s"Unknown coin type $key) in CreateTransactionRequest"
     )
   )
 
   def fromProto(proto: protobuf.Coin): Coin = proto match {
-    case protobuf.Coin.btc_testnet => Coin.BtcTestnet
-    case protobuf.Coin.btc_regtest => Coin.BtcRegtest
-    case _                         => Coin.Btc
+    case protobuf.Coin.btc             => Coin.Btc
+    case protobuf.Coin.btc_testnet     => Coin.BtcTestnet
+    case protobuf.Coin.btc_regtest     => Coin.BtcRegtest
+    case protobuf.Coin.ltc             => Coin.Ltc
+    case protobuf.Coin.Unrecognized(_) => Coin.Btc
   }
 
   implicit val encoder: Encoder[Coin] =

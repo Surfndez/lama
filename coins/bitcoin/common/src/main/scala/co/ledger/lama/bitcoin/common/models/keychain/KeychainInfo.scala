@@ -1,8 +1,7 @@
 package co.ledger.lama.bitcoin.common.models.keychain
 
 import java.util.UUID
-
-import co.ledger.lama.bitcoin.common.models.{BitcoinNetwork, Scheme}
+import co.ledger.lama.bitcoin.common.models.{BitcoinLikeNetwork, BitcoinNetwork, Scheme}
 import co.ledger.lama.common.models.implicits._
 import co.ledger.lama.common.utils.UuidUtils
 import co.ledger.protobuf.bitcoin.keychain
@@ -17,7 +16,7 @@ case class KeychainInfo(
     slip32ExtendedPublicKey: String,
     lookaheadSize: Int,
     scheme: Scheme,
-    network: BitcoinNetwork
+    network: BitcoinLikeNetwork
 ) {
   def toProto: keychain.KeychainInfo =
     keychain.KeychainInfo(
@@ -28,7 +27,7 @@ case class KeychainInfo(
       slip32ExtendedPublicKey,
       lookaheadSize,
       scheme.toProto,
-      network.toKeychainProto
+      Some(network.toKeychainChainParamsProto)
     )
 }
 
@@ -46,6 +45,6 @@ object KeychainInfo {
       proto.slip32ExtendedPublicKey,
       proto.lookaheadSize,
       Scheme.fromProto(proto.scheme),
-      BitcoinNetwork.fromKeychainProto(proto.network)
+      proto.chainParams.map(BitcoinLikeNetwork.fromProto).getOrElse(BitcoinNetwork.Unspecified)
     )
 }

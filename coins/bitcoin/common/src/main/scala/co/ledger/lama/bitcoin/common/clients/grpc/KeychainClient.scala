@@ -5,7 +5,7 @@ import cats.data.NonEmptyList
 import cats.effect.{ContextShift, IO}
 import co.ledger.lama.bitcoin.common.models.interpreter.{AccountAddress, ChangeType}
 import co.ledger.lama.bitcoin.common.models.keychain.{AccountKey, KeychainInfo}
-import co.ledger.lama.bitcoin.common.models.{BitcoinNetwork, Scheme}
+import co.ledger.lama.bitcoin.common.models.{BitcoinLikeNetwork, Scheme}
 import co.ledger.lama.common.clients.grpc.GrpcClient
 import co.ledger.lama.common.utils.UuidUtils
 import co.ledger.protobuf.bitcoin.keychain
@@ -16,7 +16,7 @@ trait KeychainClient {
       accountKey: AccountKey,
       scheme: Scheme,
       lookaheadSize: Int,
-      network: BitcoinNetwork
+      network: BitcoinLikeNetwork
   ): IO[KeychainInfo]
 
   def getKeychainInfo(keychainId: UUID): IO[KeychainInfo]
@@ -58,7 +58,7 @@ class KeychainGrpcClient(
       accountKey: AccountKey,
       scheme: Scheme,
       lookaheadSize: Int,
-      network: BitcoinNetwork
+      network: BitcoinLikeNetwork
   ): IO[KeychainInfo] =
     client
       .createKeychain(
@@ -66,7 +66,7 @@ class KeychainGrpcClient(
           accountKey.toProto,
           scheme.toProto,
           lookaheadSize,
-          network.toKeychainProto
+          Some(network.toKeychainChainParamsProto)
         ),
         new Metadata
       )

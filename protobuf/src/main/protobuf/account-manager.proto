@@ -118,4 +118,5 @@ enum Coin {
     btc = 0;
     btc_testnet = 1;
     btc_regtest = 2;
+    ltc = 3;
 }

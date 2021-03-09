@@ -36,6 +36,10 @@ class AccountControllerIT_BtcTestnet extends AccountControllerIT {
   runTests("/test-accounts-btc_testnet.json")
 }
 
+class AccountControllerIT_Ltc extends AccountControllerIT {
+  runTests("/test-accounts-ltc.json")
+}
+
 trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)

@@ -1,6 +1,6 @@
 package co.ledger.lama.bitcoin.transactor.models
 
-import co.ledger.lama.bitcoin.common.models.BitcoinNetwork
+import co.ledger.lama.bitcoin.common.models.BitcoinLikeNetwork
 import co.ledger.lama.bitcoin.transactor.models.implicits._
 import co.ledger.protobuf.bitcoin.libgrpc
 import com.google.protobuf.ByteString
@@ -11,7 +11,7 @@ object bitcoinLib {
       lockTime: Long,
       inputs: Seq[Input],
       outputs: Seq[Output],
-      network: BitcoinNetwork,
+      network: BitcoinLikeNetwork,
       changeAddress: String,
       feeSatPerKb: Long
   ) {
@@ -20,7 +20,7 @@ object bitcoinLib {
         lockTime.toInt, // We use toInt because, even though we have Long (for
         inputs.map(_.toProto),
         outputs.map(_.toProto),
-        network.toLibGrpcProto,
+        Some(network.toLibGrpcProto),
         changeAddress,
         feeSatPerKb
       )

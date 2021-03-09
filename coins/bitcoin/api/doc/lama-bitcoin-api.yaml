@@ -1,7 +1,7 @@
 openapi: 3.0.1
 info:
-  title: Lama Bitcoin API
-  description: A collection of endpoints exposed by the Lama Bitcoin API
+  title: Lama Bitcoin Like API
+  description: A collection of endpoints exposed by the Lama Bitcoin Family API
   version: 0.5.0
 servers:
   - url: http://localhost:8080
@@ -23,9 +23,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RegisterAccountResponse'
-  /accounts/{accountId}:
+  /accounts/{account_id}:
     parameters:
-      - name: accountId
+      - name: account_id
         in: path
         required: true
         schema:
@@ -61,11 +61,11 @@ paths:
       responses:
         200:
           description: OK
-  /accounts/{accountId}/resync:
+  /accounts/{account_id}/resync:
     get:
       summary: Resync account
       parameters:
-        - name: accountId
+        - name: account_id
           in: path
           required: true
           schema:
@@ -80,11 +80,11 @@ paths:
       responses:
         200:
           description: OK
-  /accounts/{accountId}/utxos:
+  /accounts/{account_id}/utxos:
     get:
       summary: Get account utxos
       parameters:
-        - name: accountId
+        - name: account_id
           in: path
           required: true
           schema:
@@ -116,11 +116,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetUtxosResult'
-  /accounts/{accountId}/operations:
+  /accounts/{account_id}/operations:
     get:
       summary: Get account operations
       parameters:
-        - name: accountId
+        - name: account_id
           in: path
           required: true
           schema:
@@ -152,11 +152,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetOperationsResult'
-  /accounts/{accountId}/balances:
+  /accounts/{account_id}/balances:
     get:
       summary: Get balances history for an account
       parameters:
-        - name: accountId
+        - name: account_id
           in: path
           required: true
           schema:
@@ -188,11 +188,11 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/BalanceHistory'
-  /accounts/{accountId}/balances/daily:
+  /accounts/{account_id}/balances/daily:
     get:
       summary: Get daily balances history for an account
       parameters:
-        - name: accountId
+        - name: account_id
           in: path
           required: true
           schema:
@@ -207,11 +207,11 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/BalanceHistory'
-  /accounts/{accountId}/balances/monthly:
+  /accounts/{account_id}/balances/monthly:
     get:
       summary: Get monthly balances history for an account
       parameters:
-        - name: accountId
+        - name: account_id
           in: path
           required: true
           schema:
@@ -226,11 +226,11 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/BalanceHistory'
-  /accounts/{accountId}/balances/yearly:
+  /accounts/{account_id}/balances/yearly:
     get:
       summary: Get yearly balances history for an account
       parameters:
-        - name: accountId
+        - name: account_id
           in: path
           required: true
           schema:
@@ -245,11 +245,11 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/BalanceHistory'
-  /accounts/{accountId}/addresses:
+  /accounts/{account_id}/addresses:
     get:
       summary: Get account observable addresses
       parameters:
-        - name: accountId
+        - name: account_id
           in: path
           required: true
           schema:
@@ -268,11 +268,11 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Address'
-  /accounts/{accountId}/addresses/fresh:
+  /accounts/{account_id}/addresses/fresh:
     get:
       summary: Get account fresh addresses
       parameters:
-        - name: accountId
+        - name: account_id
           in: path
           required: true
           schema:
@@ -291,9 +291,9 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Address'
-  /accounts/{accountId}/transactions:
+  /accounts/{account_id}/transactions:
     parameters:
-      - name: accountId
+      - name: account_id
         in: path
         required: true
         schema:
@@ -315,9 +315,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CreateTransactionResponse'
-  /accounts/{accountId}/transactions/send:
+  /accounts/{account_id}/transactions/send:
     parameters:
-      - name: accountId
+      - name: account_id
         in: path
         required: true
         schema:
@@ -387,9 +387,7 @@ components:
           format: 'uuid'
           example: '013260eb-7624-40d2-8327-97177a69d8f3'
         coin:
-          type: string
-          enum: [btc, btc_testnet, btc_regtest]
-          example: 'btc'
+          $ref: '#/components/schemas/Coin'
         sync_frequency:
           type: number
           format: seconds
@@ -455,9 +453,7 @@ components:
           type: number
           example: 20
         coin:
-          type: string
-          enum: [btc, btc_testnet, btc_regtest]
-          example: 'btc_testnet'
+          $ref: '#/components/schemas/Coin'
         label:
           type: string
           example: 'testnet account'
@@ -621,8 +617,10 @@ components:
           type: object
           example:
             address2: "blablabla"
-
-
+    Coin:
+      type: string
+      enum: [ btc, btc_testnet, btc_regtest, ltc ]
+      example: 'btc_testnet'
     Address:
       required:
         - account_address
@@ -670,7 +668,7 @@ components:
     Operation:
       required:
         - uid
-        - accountId
+        - account_id
         - hash
         - operation_type
         - amount
@@ -682,7 +680,7 @@ components:
           type: string
           format: hex
           example: "0f839db5e49731cf76e9e3edec3adcbc3ca649087472d4ef321832742ca9cf8f"
-        accountId:
+        account_id:
           type: string
           format: uuid
         hash:

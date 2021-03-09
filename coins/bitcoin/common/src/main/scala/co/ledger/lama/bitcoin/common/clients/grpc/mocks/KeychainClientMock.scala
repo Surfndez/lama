@@ -5,7 +5,7 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import co.ledger.lama.bitcoin.common.models.interpreter.{AccountAddress, ChangeType}
 import co.ledger.lama.bitcoin.common.models.keychain.{AccountKey, KeychainInfo}
-import co.ledger.lama.bitcoin.common.models.{BitcoinNetwork, Scheme}
+import co.ledger.lama.bitcoin.common.models.{BitcoinLikeNetwork, BitcoinNetwork, Scheme}
 import co.ledger.lama.bitcoin.common.clients.grpc.KeychainClient
 import co.ledger.lama.common.logging.IOLogging
 
@@ -60,7 +60,7 @@ class KeychainClientMock extends KeychainClient with IOLogging {
       accountKey: AccountKey,
       scheme: Scheme,
       lookaheadSize: Int,
-      network: BitcoinNetwork
+      network: BitcoinLikeNetwork
   ): IO[KeychainInfo] =
     IO.delay(
       KeychainInfo(

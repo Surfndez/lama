@@ -6,7 +6,7 @@ import co.ledger.lama.bitcoin.common.clients.grpc.KeychainClient
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient.Address
 import co.ledger.lama.bitcoin.common.models.interpreter.{AccountAddress, ChangeType}
 import co.ledger.lama.bitcoin.common.models.keychain.{AccountKey, KeychainInfo}
-import co.ledger.lama.bitcoin.common.models.{BitcoinNetwork, Scheme}
+import co.ledger.lama.bitcoin.common.models.{BitcoinLikeNetwork, BitcoinNetwork, Scheme}
 
 import java.util.UUID
 import scala.collection.mutable
@@ -27,7 +27,7 @@ object KeychainFixture {
           accountKey: AccountKey,
           scheme: Scheme,
           lookaheadSize: Int,
-          network: BitcoinNetwork
+          network: BitcoinLikeNetwork
       ): IO[KeychainInfo] = ???
 
       override def getKeychainInfo(keychainId: UUID): IO[KeychainInfo] =

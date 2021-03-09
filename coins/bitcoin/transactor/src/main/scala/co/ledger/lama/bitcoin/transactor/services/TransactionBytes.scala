@@ -9,6 +9,7 @@ object TransactionBytes {
     case Coin.Btc        => btcEstimator
     case Coin.BtcTestnet => btcEstimator
     case Coin.BtcRegtest => btcEstimator
+    case _               => ???
   }
 
   def estimateTxBytesSize(coin: BitcoinLikeCoin)(outputSize: Int): Int =

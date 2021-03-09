@@ -7,7 +7,7 @@ import co.ledger.lama.bitcoin.common.clients.grpc.{InterpreterClient, KeychainCl
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
 import co.ledger.lama.bitcoin.common.models.interpreter.{ChangeType, Utxo}
 import co.ledger.lama.bitcoin.common.models.transactor._
-import co.ledger.lama.bitcoin.common.models.{Address, BitcoinNetwork, InvalidAddress}
+import co.ledger.lama.bitcoin.common.models.{Address, BitcoinLikeNetwork, InvalidAddress}
 import co.ledger.lama.bitcoin.common.utils.CoinImplicits._
 import co.ledger.lama.bitcoin.transactor.Transactor.ValidationResult
 import co.ledger.lama.bitcoin.transactor.clients.grpc.BitcoinLibClient
@@ -175,7 +175,7 @@ class Transactor(
   }
 
   private def createRawTransactionRec(
-      network: BitcoinNetwork,
+      network: BitcoinLikeNetwork,
       strategy: CoinSelectionStrategy,
       utxos: List[Utxo],
       outputs: List[PrepareTxOutput],
