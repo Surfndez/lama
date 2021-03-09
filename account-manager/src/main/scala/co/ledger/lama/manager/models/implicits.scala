@@ -120,8 +120,17 @@ object implicits {
         )
     }
 
-  implicit val doobieRead: Read[AccountSyncStatus] =
-    Read[(AccountInfo, UUID, Status, Option[JsonObject], Option[ReportError], Instant)].map {
+  implicit val accountSyncStatusRead: Read[AccountSyncStatus] =
+    Read[
+      (
+          AccountInfo,
+          UUID,
+          Status,
+          Option[JsonObject],
+          Option[JsonObject],
+          Instant
+      )
+    ].map {
       case (
             accountInfo,
             syncId,
@@ -140,7 +149,7 @@ object implicits {
           syncId,
           status,
           cursor,
-          error,
+          error.flatMap(_.asJson.as[ReportError].toOption),
           updated
         )
     }

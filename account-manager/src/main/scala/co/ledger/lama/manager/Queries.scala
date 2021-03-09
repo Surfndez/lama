@@ -64,7 +64,7 @@ object Queries {
   def getAccounts(offset: Int, limit: Int): Stream[ConnectionIO, AccountSyncStatus] =
     sql"""SELECT account_id, "key", coin_family, coin,
             extract(epoch FROM sync_frequency) / 60 * 60, label,
-            sync_id, status, "cursor", error, updated
+            sync_id, status, "cursor", "error", updated
           FROM account_sync_status
           LIMIT $limit
           OFFSET $offset
