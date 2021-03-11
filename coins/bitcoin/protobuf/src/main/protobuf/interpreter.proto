@@ -2,7 +2,6 @@ syntax = "proto3";
 
 import "google/protobuf/timestamp.proto";
 
-import "explorer.proto";
 import "operation.proto";
 
 package pb.v1;
