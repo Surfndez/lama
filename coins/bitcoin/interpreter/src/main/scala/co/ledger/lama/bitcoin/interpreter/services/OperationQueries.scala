@@ -3,9 +3,7 @@ package co.ledger.lama.bitcoin.interpreter.services
 import java.util.UUID
 
 import cats.data.NonEmptyList
-import cats.implicits._
 import co.ledger.lama.bitcoin.common.models.interpreter._
-import co.ledger.lama.common.models.implicits._
 import co.ledger.lama.bitcoin.interpreter.models.{OperationToSave, TransactionAmounts}
 import co.ledger.lama.bitcoin.interpreter.models.implicits._
 import co.ledger.lama.common.logging.IOLogging
@@ -13,9 +11,7 @@ import co.ledger.lama.common.models.Sort
 import doobie._
 import doobie.implicits._
 import doobie.postgres.implicits._
-import io.circe.syntax._
 import fs2.{Chunk, Stream}
-import io.circe.Json
 
 object OperationQueries extends IOLogging {
 
@@ -66,17 +62,21 @@ object OperationQueries extends IOLogging {
   def countUTXOs(accountId: UUID): ConnectionIO[Int] =
     sql"""SELECT COUNT(*)
           FROM output o
-           LEFT JOIN input i
-             ON o.account_id = i.account_id
-             AND o.address = i.address
-             AND o.output_index = i.output_index
-             AND o.hash = i.output_hash
-           INNER JOIN transaction tx
-            ON o.account_id = tx.account_id
-            AND o.hash = tx.hash
+            LEFT JOIN input i
+              ON o.account_id = i.account_id
+              AND o.address = i.address
+              AND o.output_index = i.output_index
+              AND o.hash = i.output_hash
+            INNER JOIN transaction tx
+              ON o.account_id = tx.account_id
+              AND o.hash = tx.hash
           WHERE o.account_id = $accountId
             AND o.derivation IS NOT NULL
-            AND i.address IS NULL""".query[Int].unique
+            AND i.address IS NULL
+            AND tx.block_hash IS NOT NULL
+       """
+      .query[Int]
+      .unique
 
   def fetchUTXOs(
       accountId: UUID,
@@ -99,12 +99,32 @@ object OperationQueries extends IOLogging {
               INNER JOIN transaction tx
                 ON o.account_id = tx.account_id
                 AND o.hash = tx.hash
+                AND tx.block_hash IS NOT NULL
             WHERE o.account_id = $accountId
               AND o.derivation IS NOT NULL
               AND i.address IS NULL
          """ ++ orderF ++ limitF ++ offsetF
     query.query[Utxo].stream
   }
+
+  def fetchUnconfirmedUTXOs(
+      accountId: UUID
+  ): Stream[ConnectionIO, Utxo] =
+    sql"""SELECT tx.hash, o.output_index, o.value, o.address, o.script_hex, o.change_type, o.derivation, tx.received_at
+            FROM output o
+              LEFT JOIN input i
+                ON o.account_id = i.account_id
+                AND o.address = i.address
+                AND o.output_index = i.output_index
+			          AND o.hash = i.output_hash
+              INNER JOIN transaction tx
+                ON o.account_id = tx.account_id
+                AND o.hash = tx.hash
+                AND tx.block_hash IS NULL
+            WHERE o.account_id = $accountId
+              AND o.derivation IS NOT NULL
+              AND i.address IS NULL
+         """.query[Utxo].stream
 
   def saveOperations(operation: Chunk[OperationToSave]): ConnectionIO[Int] = {
     val query =
@@ -116,51 +136,10 @@ object OperationQueries extends IOLogging {
     Update[OperationToSave](query).updateMany(operation)
   }
 
-  def fetchUnconfirmedTransactionsViews(
-      accountId: UUID
-  ): ConnectionIO[List[TransactionView]] = {
-    log.logger.debug(s"Fetching transactions for accountId $accountId")
-    sql"""SELECT transaction_views
-          FROM unconfirmed_transaction_view
-          WHERE account_id = $accountId
-       """
-      .query[Json]
-      .option
-      .map { t =>
-        t.map(_.as[List[TransactionView]]) match {
-          case Some(result) =>
-            result.leftMap { error =>
-              log.error("Could not parse TansactionView list json : ", error)
-              error
-            }
-          case None => Right(List.empty[TransactionView])
-        }
-      }
-      .rethrow
-  }
-
-  def deleteUnconfirmedTransactionsViews(accountId: UUID): doobie.ConnectionIO[Int] = {
-    sql"""DELETE FROM unconfirmed_transaction_view
-         WHERE account_id = $accountId
-       """.update.run
-  }
-
   def deleteUnconfirmedOperations(accountId: UUID): doobie.ConnectionIO[Int] = {
     sql"""DELETE FROM operation
          WHERE account_id = $accountId
          AND block_height IS NULL
-       """.update.run
-  }
-
-  def saveUnconfirmedTransactionView(
-      accountId: UUID,
-      txs: List[TransactionView]
-  ): ConnectionIO[Int] = {
-    sql"""INSERT INTO unconfirmed_transaction_view(
-            account_id, transaction_views
-          ) VALUES (
-            $accountId, ${txs.asJson}
-          )
        """.update.run
   }
 
