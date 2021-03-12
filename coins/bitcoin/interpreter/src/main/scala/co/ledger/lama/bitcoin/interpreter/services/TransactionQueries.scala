@@ -9,12 +9,13 @@ import co.ledger.lama.bitcoin.common.models.interpreter.{
   TransactionView
 }
 import co.ledger.lama.bitcoin.interpreter.models.implicits._
+import co.ledger.lama.common.logging.DoobieLogHandler
 import doobie._
 import doobie.implicits._
 import doobie.postgres.implicits._
 import fs2.Stream
 
-object TransactionQueries {
+object TransactionQueries extends DoobieLogHandler {
 
   def fetchMostRecentBlocks(accountId: UUID): Stream[ConnectionIO, BlockView] = {
     sql"""SELECT DISTINCT block_hash, block_height, block_time

@@ -5,17 +5,16 @@ import cats.implicits._
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.interpreter.models.{OperationToSave, TransactionAmounts}
 import co.ledger.lama.bitcoin.interpreter.models.implicits._
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DoobieLogHandler
 import co.ledger.lama.common.models.{Sort, TxHash}
 import doobie._
 import doobie.implicits._
 import doobie.postgres.implicits._
 import fs2.{Chunk, Pipe, Stream}
-
 import java.time.Instant
 import java.util.UUID
 
-object OperationQueries extends IOLogging {
+object OperationQueries extends DoobieLogHandler {
 
   implicit val txHashRead: Read[TxHash]   = Read[String].map(TxHash.apply)
   implicit val txHashWrite: Write[TxHash] = Write[String].contramap(_.hex)

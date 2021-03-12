@@ -5,12 +5,13 @@ import java.util.UUID
 
 import co.ledger.lama.bitcoin.common.models.interpreter.{BalanceHistory, BlockchainBalance}
 import co.ledger.lama.bitcoin.interpreter.models.implicits._
+import co.ledger.lama.common.logging.DoobieLogHandler
 import doobie._
 import doobie.implicits._
 import doobie.postgres.implicits._
 import fs2.Stream
 
-object BalanceQueries {
+object BalanceQueries extends DoobieLogHandler {
 
   def getUncomputedBalanceHistories(
       accountId: UUID,
