@@ -147,7 +147,7 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
     setup() *>
       appResources.use { db =>
         val operationService = new OperationService(db, conf.maxConcurrent)
-        val balanceService   = new BalanceService(db)
+        val balanceService   = new BalanceService(db, conf.db.batchConcurrency)
         val flaggingService  = new FlaggingService(db)
 
         val start = time.minusSeconds(86400)
@@ -210,7 +210,7 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
     setup() *>
       appResources.use { db =>
         val operationService = new OperationService(db, conf.maxConcurrent)
-        val balanceService   = new BalanceService(db)
+        val balanceService   = new BalanceService(db, conf.db.batchConcurrency)
         val flaggingService  = new FlaggingService(db)
 
         val start = time.minusSeconds(86400)
@@ -247,7 +247,7 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
     setup() *>
       appResources.use { db =>
         val operationService = new OperationService(db, conf.maxConcurrent)
-        val balanceService   = new BalanceService(db)
+        val balanceService   = new BalanceService(db, conf.db.batchConcurrency)
         val flaggingService  = new FlaggingService(db)
 
         val start = time.plusSeconds(20000)
@@ -284,7 +284,7 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
     setup() *>
       appResources.use { db =>
         val operationService = new OperationService(db, conf.maxConcurrent)
-        val balanceService   = new BalanceService(db)
+        val balanceService   = new BalanceService(db, conf.db.batchConcurrency)
         val flaggingService  = new FlaggingService(db)
 
         for {

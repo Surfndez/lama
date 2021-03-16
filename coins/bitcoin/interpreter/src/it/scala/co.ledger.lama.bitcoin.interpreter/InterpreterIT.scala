@@ -3,11 +3,11 @@ package co.ledger.lama.bitcoin.interpreter
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
-
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.implicits._
 import co.ledger.lama.bitcoin.common.models.interpreter._
+import co.ledger.lama.bitcoin.interpreter.Config.Db
 import co.ledger.lama.common.models.{Coin, Sort}
 import co.ledger.lama.common.utils.IOAssertion
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -65,7 +65,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
   "a transaction" should "have a full lifecycle" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val interpreter = new Interpreter(_ => IO.unit, db, 1)
+        val interpreter = new Interpreter(_ => IO.unit, db, 1, Db.BatchConcurrency(1))
 
         val block2 = BlockView(
           "0000000000000000000cc9cc204cf3b314d106e69afbea68f2ae7f9e5047ba74",
@@ -177,7 +177,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
   "an unconfirmed transaction" should "have a full lifecycle" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val interpreter = new Interpreter(_ => IO.unit, db, 1)
+        val interpreter = new Interpreter(_ => IO.unit, db, 1, Db.BatchConcurrency(1))
 
         val uTx = TransactionView(
           "txId",
@@ -223,7 +223,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
   "an unconfirmed transaction" should "be updated if it's been mined" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val interpreter = new Interpreter(_ => IO.unit, db, 1)
+        val interpreter = new Interpreter(_ => IO.unit, db, 1, Db.BatchConcurrency(1))
 
         val uTx = TransactionView(
           "txId",
@@ -269,7 +269,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
   "an account" should "go through multiple cycles" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val interpreter = new Interpreter(_ => IO.unit, db, 1)
+        val interpreter = new Interpreter(_ => IO.unit, db, 1, Db.BatchConcurrency(1))
 
         val uTx1 = TransactionView(
           "tx1",

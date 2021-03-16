@@ -2,28 +2,30 @@ package co.ledger.lama.bitcoin.interpreter
 
 import cats.effect.{ContextShift, IO}
 import co.ledger.lama.bitcoin.common.models.interpreter._
+import co.ledger.lama.bitcoin.interpreter.Config.Db
 import co.ledger.lama.bitcoin.interpreter.services._
 import co.ledger.lama.common.logging.IOLogging
 import co.ledger.lama.common.models._
 import io.circe.syntax._
 import fs2.Stream
 import doobie.Transactor
+
 import java.time.Instant
 import java.util.UUID
-
 import co.ledger.lama.bitcoin.interpreter.models.OperationToSave
 
 class Interpreter(
     publish: Notification => IO[Unit],
     db: Transactor[IO],
-    maxConcurrent: Int
+    maxConcurrent: Int,
+    batchConcurrency: Db.BatchConcurrency
 )(implicit cs: ContextShift[IO])
     extends IOLogging {
 
   val transactionService = new TransactionService(db, maxConcurrent)
   val operationService   = new OperationService(db, maxConcurrent)
   val flaggingService    = new FlaggingService(db)
-  val balanceService     = new BalanceService(db)
+  val balanceService     = new BalanceService(db, batchConcurrency)
 
   def saveTransactions(
       accountId: UUID,

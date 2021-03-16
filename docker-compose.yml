@@ -168,8 +168,10 @@ services:
       RABBIT_USERNAME: ${RABBIT_USERNAME}
       RABBIT_PASSWORD: ${RABBIT_PASSWORD}
       DD_TRACE_ENABLED: "false"
+
     depends_on:
       - postgres
+      - rabbitmq
     ports:
       - ${BITCOIN_INTERPRETER_PORT}:${BITCOIN_INTERPRETER_PORT}
 
