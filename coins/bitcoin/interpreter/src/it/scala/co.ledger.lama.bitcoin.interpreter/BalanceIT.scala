@@ -146,7 +146,7 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
   it should "have the correct balance" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.maxConcurrent)
+        val operationService = new OperationService(db, conf.db.batchConcurrency)
         val balanceService   = new BalanceService(db, conf.db.batchConcurrency)
         val flaggingService  = new FlaggingService(db)
 
@@ -163,7 +163,6 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
           )
           _ <- operationService
             .compute(accountId)
-            .through(operationService.saveOperationSink)
             .compile
             .toList
           _ <- balanceService.computeNewBalanceHistory(accountId)
@@ -179,7 +178,6 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
           )
           _ <- operationService
             .compute(accountId)
-            .through(operationService.saveOperationSink)
             .compile
             .toList
           _ <- balanceService.computeNewBalanceHistory(accountId)
@@ -209,7 +207,7 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
   it should "be able to give intervals of balance" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.maxConcurrent)
+        val operationService = new OperationService(db, conf.db.batchConcurrency)
         val balanceService   = new BalanceService(db, conf.db.batchConcurrency)
         val flaggingService  = new FlaggingService(db)
 
@@ -227,7 +225,6 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
           )
           _ <- operationService
             .compute(accountId)
-            .through(operationService.saveOperationSink)
             .compile
             .toList
           _ <- balanceService.computeNewBalanceHistory(accountId)
@@ -246,7 +243,7 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
   it should "give last balance before time range no balance exists in time range" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.maxConcurrent)
+        val operationService = new OperationService(db, conf.db.batchConcurrency)
         val balanceService   = new BalanceService(db, conf.db.batchConcurrency)
         val flaggingService  = new FlaggingService(db)
 
@@ -264,7 +261,6 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
           )
           _ <- operationService
             .compute(accountId)
-            .through(operationService.saveOperationSink)
             .compile
             .toList
           _ <- balanceService.computeNewBalanceHistory(accountId)
@@ -283,7 +279,7 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
   it should "have unconfirmed transactions balance" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.maxConcurrent)
+        val operationService = new OperationService(db, conf.db.batchConcurrency)
         val balanceService   = new BalanceService(db, conf.db.batchConcurrency)
         val flaggingService  = new FlaggingService(db)
 
@@ -299,7 +295,6 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
           )
           _ <- operationService
             .compute(accountId)
-            .through(operationService.saveOperationSink)
             .compile
             .toList
           _ <- balanceService.computeNewBalanceHistory(accountId)
