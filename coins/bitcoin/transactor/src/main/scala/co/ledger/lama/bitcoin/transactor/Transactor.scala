@@ -14,7 +14,7 @@ import co.ledger.lama.bitcoin.transactor.clients.grpc.BitcoinLibClient
 import co.ledger.lama.bitcoin.transactor.models.RawTxWithChangeFeesAndUtxos
 import co.ledger.lama.bitcoin.transactor.models.bitcoinLib.SignatureMetadata
 import co.ledger.lama.bitcoin.transactor.services.{CoinSelectionService, TransactionBytes}
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.{BitcoinLikeCoin, Coin, Sort}
 import fs2.{Chunk, Stream}
 import io.circe.syntax._
@@ -27,7 +27,7 @@ class Transactor(
     keychainClient: KeychainClient,
     interpreterClient: InterpreterClient,
     conf: TransactorConfig
-) extends IOLogging {
+) extends DefaultContextLogging {
 
   def createTransaction(
       accountId: UUID,

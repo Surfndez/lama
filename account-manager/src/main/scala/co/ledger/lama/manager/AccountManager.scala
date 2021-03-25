@@ -4,7 +4,7 @@ import java.time.Instant
 
 import cats.effect.IO
 import cats.implicits._
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.manager.config.CoinConfig
 import doobie.implicits._
 import doobie.util.transactor.Transactor
@@ -14,7 +14,8 @@ import co.ledger.lama.common.models._
 import co.ledger.lama.manager.Exceptions._
 import io.circe.JsonObject
 
-class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig]) extends IOLogging {
+class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
+    extends DefaultContextLogging {
 
   def updateAccount(
       accountId: UUID,

@@ -1,7 +1,7 @@
 package co.ledger.lama.manager
 
 import cats.effect.{ConcurrentEffect, IO}
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.{AccountGroup, Coin, CoinFamily, Sort}
 import co.ledger.lama.common.utils.UuidUtils
 import co.ledger.lama.manager.protobuf.{ResyncAccountRequest, SyncEventResult}
@@ -17,7 +17,7 @@ trait AccountManagerService extends protobuf.AccountManagerServiceFs2Grpc[IO, Me
 
 class AccountManagerGrpcService(accountManager: AccountManager)
     extends AccountManagerService
-    with IOLogging {
+    with DefaultContextLogging {
 
   def updateAccount(request: protobuf.UpdateAccountRequest, ctx: Metadata): IO[Empty] = {
     for {

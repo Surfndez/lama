@@ -6,7 +6,7 @@ import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient.Address
 import co.ledger.lama.bitcoin.common.config.ExplorerConfig
 import co.ledger.lama.bitcoin.common.models.explorer._
 import co.ledger.lama.bitcoin.common.models.transactor.FeeInfo
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.Coin
 import co.ledger.lama.common.models.Coin.{Btc, BtcRegtest, BtcTestnet, Ltc}
 import co.ledger.lama.common.utils
@@ -48,7 +48,7 @@ object ExplorerClient {
 
 class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coin)
     extends ExplorerClient
-    with IOLogging {
+    with DefaultContextLogging {
 
   private val coinBasePath = coin match {
     case Btc        => "/blockchain/v3/btc"

@@ -2,7 +2,7 @@ package co.ledger.lama.bitcoin.interpreter
 
 import cats.effect.{ConcurrentEffect, IO}
 import co.ledger.lama.bitcoin.common.models.interpreter._
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models._
 import co.ledger.lama.common.utils.{TimestampProtoUtils, UuidUtils}
 import io.grpc.{Metadata, ServerServiceDefinition}
@@ -15,7 +15,7 @@ trait InterpreterService extends protobuf.BitcoinInterpreterServiceFs2Grpc[IO, M
 class InterpreterGrpcService(
     interpreter: Interpreter
 ) extends InterpreterService
-    with IOLogging {
+    with DefaultContextLogging {
 
   def saveTransactions(
       request: protobuf.SaveTransactionsRequest,

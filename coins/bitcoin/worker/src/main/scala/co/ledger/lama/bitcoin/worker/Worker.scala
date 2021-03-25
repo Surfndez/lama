@@ -11,7 +11,7 @@ import co.ledger.lama.bitcoin.common.models.explorer.{
 }
 import co.ledger.lama.bitcoin.worker.services.CursorStateService.AccountId
 import co.ledger.lama.bitcoin.worker.services._
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.Status.{Registered, Unregistered}
 import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
 import co.ledger.lama.common.models.{AccountIdentifier, Coin, ReportError, ReportableEvent}
@@ -30,7 +30,7 @@ class Worker(
     cursorService: Coin => CursorStateService[IO],
     maxTxsToSavePerBatch: Int,
     maxConcurrent: Int
-) extends IOLogging {
+) extends DefaultContextLogging {
 
   def run(implicit cs: ContextShift[IO], t: Timer[IO]): Stream[IO, Unit] =
     syncEventService.consumeWorkerMessages

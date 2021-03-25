@@ -6,13 +6,14 @@ import cats.effect.{Concurrent, IO}
 import cats.implicits._
 import co.ledger.lama.bitcoin.common.models.interpreter.{BalanceHistory, CurrentBalance}
 import co.ledger.lama.bitcoin.interpreter.Config.Db
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import doobie.Transactor
 import doobie.implicits._
 
 import scala.annotation.tailrec
 
-class BalanceService(db: Transactor[IO], batchConcurrency: Db.BatchConcurrency) extends IOLogging {
+class BalanceService(db: Transactor[IO], batchConcurrency: Db.BatchConcurrency)
+    extends DefaultContextLogging {
 
   def computeNewBalanceHistory(accountId: UUID)(implicit concurrent: Concurrent[IO]): IO[Int] =
     for {

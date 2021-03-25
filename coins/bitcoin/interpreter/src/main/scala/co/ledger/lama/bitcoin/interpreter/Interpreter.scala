@@ -5,7 +5,7 @@ import cats.effect.{Clock, ContextShift, IO}
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.interpreter.Config.Db
 import co.ledger.lama.bitcoin.interpreter.services._
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models._
 import io.circe.syntax._
 import fs2.Pipe
@@ -21,7 +21,7 @@ class Interpreter(
     maxConcurrent: Int,
     batchConcurrency: Db.BatchConcurrency
 )(implicit cs: ContextShift[IO], clock: Clock[IO])
-    extends IOLogging {
+    extends DefaultContextLogging {
 
   val transactionService = new TransactionService(db, maxConcurrent)
   val operationService   = new OperationService(db, batchConcurrency)

@@ -9,7 +9,7 @@ import co.ledger.lama.bitcoin.interpreter.services.OperationQueries.{
   OpWithoutDetails,
   TransactionDetails
 }
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.{Sort, TxHash}
 import doobie._
 import doobie.implicits._
@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit
 class OperationService(
     db: Transactor[IO],
     batchConcurrency: Db.BatchConcurrency
-) extends IOLogging {
+) extends DefaultContextLogging {
 
   def getOperations(
       accountId: UUID,

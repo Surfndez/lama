@@ -3,7 +3,7 @@ package co.ledger.lama.bitcoin.interpreter.models
 import cats.effect.IO
 import co.ledger.lama.common.models.implicits._
 import co.ledger.lama.bitcoin.common.models.interpreter.{Operation, OperationType}
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import io.circe.generic.extras.semiauto._
 import io.circe.{Decoder, Encoder}
 import fs2.Stream
@@ -40,7 +40,7 @@ case class TransactionAmounts(
     inputAmount: BigInt,
     outputAmount: BigInt,
     changeAmount: BigInt
-) extends IOLogging {
+) extends DefaultContextLogging {
 
   def computeOperations: fs2.Stream[IO, OperationToSave] = {
     TransactionType.fromAmounts(inputAmount, outputAmount, changeAmount) match {

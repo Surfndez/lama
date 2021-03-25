@@ -11,7 +11,7 @@ import co.ledger.lama.bitcoin.common.models.interpreter.{BlockView, TransactionV
 import co.ledger.lama.bitcoin.worker.config.Config
 import co.ledger.lama.bitcoin.worker.services.CursorStateService
 import co.ledger.lama.bitcoin.worker.services.CursorStateService.AccountId
-import co.ledger.lama.common.logging.IOLogging
+import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.services.Clients
 import co.ledger.lama.common.models.Coin.Btc
 import co.ledger.lama.common.utils.IOAssertion
@@ -22,7 +22,7 @@ import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext
 
-class CursorStateServiceIT extends AnyFlatSpecLike with Matchers with IOLogging {
+class CursorStateServiceIT extends AnyFlatSpecLike with Matchers with DefaultContextLogging {
 
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)
