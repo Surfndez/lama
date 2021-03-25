@@ -8,12 +8,13 @@ import co.ledger.lama.bitcoin.interpreter.services._
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models._
 import io.circe.syntax._
-import fs2.Pipe
+import fs2._
 import doobie.Transactor
 
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import co.ledger.lama.bitcoin.interpreter.models.AccountTxView
 
 class Interpreter(
     publish: Notification => IO[Unit],
@@ -28,11 +29,8 @@ class Interpreter(
   val flaggingService    = new FlaggingService(db)
   val balanceService     = new BalanceService(db, batchConcurrency)
 
-  def saveTransactions(
-      accountId: UUID,
-      transactions: List[TransactionView]
-  ): IO[Int] =
-    transactionService.saveTransactions(accountId, transactions)
+  def saveTransactions: Pipe[IO, AccountTxView, Int] =
+    transactionService.saveTransactions
 
   def getLastBlocks(
       accountId: UUID

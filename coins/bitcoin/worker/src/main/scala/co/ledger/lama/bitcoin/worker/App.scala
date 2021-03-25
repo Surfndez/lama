@@ -68,9 +68,7 @@ object App extends IOApp with DefaultContextLogging {
         keychainClient,
         explorerClient,
         interpreterClient,
-        cursorStateService,
-        conf.maxTxsToSavePerBatch,
-        conf.maxConcurrent
+        cursorStateService
       )
 
       for {

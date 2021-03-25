@@ -24,6 +24,7 @@ import co.ledger.lama.common.models.Coin.Btc
 import co.ledger.lama.common.utils.IOAssertion
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
+import fs2._
 
 class TransactorIT extends AnyFlatSpecLike with Matchers {
 
@@ -99,17 +100,17 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
 
     for {
       // save the transactions with the futures utxos
-      _ <- interpreterService.saveTransactions(
-        accountId,
-        transactions
-      )
+      _ <- Stream
+        .emits(transactions)
+        .through(interpreterService.saveTransactions(accountId))
+        .compile
+        .drain
 
       // compute to flag utxos as belonging
       _ <- interpreterService.compute(
         accountId,
         Btc,
-        List(outputAddress1, outputAddress2, outputAddress3),
-        Some(block.height)
+        List(outputAddress1, outputAddress2, outputAddress3)
       )
 
       // create a transaction using prevously saved utxoq
