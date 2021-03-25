@@ -36,7 +36,7 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
   val fs2Version          = "2.5.3"
   val fs2GrpcVersion      = "0.9.0"
   val protobufJava        = "3.15.6"
-  val scalaLoggingVersion = "3.9.2"
+  val scalaLoggingVersion = "3.9.3"
 
   val utilities: Seq[ModuleID] = Seq(
     "com.typesafe.scala-logging" %% "scala-logging"   % scalaLoggingVersion,
