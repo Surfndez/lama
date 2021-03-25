@@ -112,6 +112,8 @@ class BitcoinLibGrpcClient(val managedChannel: ManagedChannel)(implicit val cs: 
               rawTransaction.hex,
               rawTransaction.hash,
               rawTransaction.witnessHash,
+              0L,
+              0L,
               None
             )
           ),
@@ -142,6 +144,8 @@ class BitcoinLibGrpcClient(val managedChannel: ManagedChannel)(implicit val cs: 
               rawTransaction.hex,
               rawTransaction.hash,
               rawTransaction.witnessHash,
+              0L,
+              0L,
               None
             )
           ),

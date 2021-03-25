@@ -89,8 +89,12 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
       )
     )
 
+    val recAddr = "recipientAddress"
+    // Check co.ledger.lama.bitcoin.common.clients.grpc.mocks.KeychainClientMock.derivationsInternal
+    val mockKeychainDerivation = List(1, 1)
+    val changeAddr             = "changeAddr1"
     val recipients: List[PrepareTxOutput] = List(
-      PrepareTxOutput("recipientAddress", 15000)
+      PrepareTxOutput(recAddr, 15000)
     )
 
     for {
@@ -123,6 +127,19 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
     } yield {
       response.hex should have size 3
       response.hex should be("hex")
+
+      // Checking that the response has the extra output for the
+      // change Address (so recipients.size + 1)
+      recipients should have size 1
+      response.outputs should have size 2
+      response.outputs.map(_.address) should contain(recAddr)
+      response.outputs.map(_.address) should contain(changeAddr)
+
+      // Checking the change fields
+      response.outputs.filter(_.address == changeAddr).head.change should be(
+        Some(mockKeychainDerivation)
+      )
+      response.outputs.filter(_.address == recAddr).head.change should be(None)
     }
   }
 

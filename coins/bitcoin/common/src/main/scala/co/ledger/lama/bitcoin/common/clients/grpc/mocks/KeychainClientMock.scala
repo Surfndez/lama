@@ -56,6 +56,11 @@ class KeychainClientMock extends KeychainClient with IOLogging {
     AccountAddress("1Aj3Gi1j5UsvZh4ccjaqdnogPMWy54Z5ii", change, derivations)
   ) ++ (1 to 20).map(i => AccountAddress(s"unused$i", change, derivations))
 
+  private val derivationsInternal: NonEmptyList[Int]   = NonEmptyList(1, List(1))
+  private val changeInternal: ChangeType.Internal.type = ChangeType.Internal
+  val derivedAddressesInternal: List[AccountAddress] =
+    (1 to 20).map(i => AccountAddress(s"changeAddr$i", changeInternal, derivationsInternal)).toList
+
   def create(
       accountKey: AccountKey,
       scheme: Scheme,
@@ -100,14 +105,22 @@ class KeychainClientMock extends KeychainClient with IOLogging {
       toIndex: Int,
       changeType: Option[ChangeType]
   ): IO[List[AccountAddress]] =
-    IO.delay(derivedAddresses.slice(fromIndex, toIndex))
+    if (changeType.getOrElse(ChangeType.External) == ChangeType.External) {
+      IO.delay(derivedAddresses.slice(fromIndex, toIndex))
+    } else {
+      IO.delay(derivedAddressesInternal.slice(fromIndex, toIndex))
+    }
 
   def getFreshAddresses(
       keychainId: UUID,
       change: ChangeType,
       size: Int
   ): IO[List[AccountAddress]] =
-    IO(derivedAddresses)
+    if (change == ChangeType.External) {
+      IO(derivedAddresses)
+    } else {
+      IO(derivedAddressesInternal)
+    }
 
   override def getAddressesPublicKeys(
       keychainId: UUID,
