@@ -1,12 +1,17 @@
 package co.ledger.lama.bitcoin.api.utils
 
+import cats.data.ValidatedNel
+import cats.effect.IO
+
 import java.time.Instant
 import java.time.format.DateTimeFormatter
-
 import co.ledger.lama.bitcoin.common.models.interpreter.ChangeType
 import co.ledger.lama.common.models.Sort
 import org.http4s.{ParseFailure, QueryParamCodec, QueryParamDecoder}
-import org.http4s.dsl.impl.OptionalQueryParamDecoderMatcher
+import org.http4s.dsl.io.{
+  OptionalQueryParamDecoderMatcher,
+  OptionalValidatingQueryParamDecoderMatcher
+}
 
 object RouterUtils {
   implicit val sortQueryParamDecoder: QueryParamDecoder[Sort] =
@@ -15,7 +20,31 @@ object RouterUtils {
   object OptionalBlockHeightQueryParamMatcher
       extends OptionalQueryParamDecoderMatcher[Long]("blockHeight")
 
-  object OptionalLimitQueryParamMatcher  extends OptionalQueryParamDecoderMatcher[Int]("limit")
+  private val maxLimit: Int = 1000
+
+  class BoundedLimit(val value: Int) extends AnyVal
+
+  implicit val boundedLimitQueryParamMatcher: QueryParamDecoder[BoundedLimit] =
+    QueryParamDecoder[Int].emap { limit =>
+      Either.cond(
+        limit <= maxLimit,
+        new BoundedLimit(limit),
+        ParseFailure(s"limit param should be <= $maxLimit", limit.toString)
+      )
+    }
+
+  object OptionalBoundedLimitQueryParamMatcher
+      extends OptionalValidatingQueryParamDecoderMatcher[BoundedLimit]("limit")
+
+  def parseBoundedLimit(
+      queryParam: Option[ValidatedNel[ParseFailure, BoundedLimit]]
+  ): IO[BoundedLimit] = {
+    queryParam match {
+      case None               => IO.pure(new BoundedLimit(maxLimit))
+      case Some(boundedLimit) => boundedLimit.fold(e => IO.raiseError(e.head), IO.pure)
+    }
+  }
+
   object OptionalOffsetQueryParamMatcher extends OptionalQueryParamDecoderMatcher[Int]("offset")
   object OptionalSortQueryParamMatcher   extends OptionalQueryParamDecoderMatcher[Sort]("sort")
 

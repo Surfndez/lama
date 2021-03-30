@@ -30,10 +30,14 @@ trait AccountManagerClient {
   def unregisterAccount(accountId: UUID): IO[SyncEventResult]
 
   def getAccountInfo(accountId: UUID): IO[AccountInfo]
-  def getAccounts(groupLabel: Option[String], limit: Option[Int], offset: Option[Int]): IO[AccountsResult]
+  def getAccounts(
+      groupLabel: Option[String],
+      limit: Int,
+      offset: Option[Int]
+  ): IO[AccountsResult]
   def getSyncEvents(
       accountId: UUID,
-      limit: Option[Int],
+      limit: Int,
       offset: Option[Int],
       sort: Option[Sort]
   ): IO[SyncEventsResult[JsonObject]]
@@ -129,14 +133,14 @@ class AccountManagerGrpcClient(
 
   def getAccounts(
       groupLabel: Option[String],
-      limit: Option[Int] = None,
+      limit: Int,
       offset: Option[Int] = None
   ): IO[AccountsResult] =
     client
       .getAccounts(
         protobuf.GetAccountsRequest(
           groupLabel.map(protobuf.GroupLabel(_)),
-          limit.getOrElse(0), // if 0, accountManager will default on correct value
+          limit,
           offset.getOrElse(0)
         ),
         new Metadata
@@ -145,7 +149,7 @@ class AccountManagerGrpcClient(
 
   def getSyncEvents(
       accountId: UUID,
-      limit: Option[Int],
+      limit: Int,
       offset: Option[Int],
       sort: Option[Sort]
   ): IO[SyncEventsResult[JsonObject]] =
@@ -153,7 +157,7 @@ class AccountManagerGrpcClient(
       .getSyncEvents(
         protobuf.GetSyncEventsRequest(
           accountId = UuidUtils.uuidToBytes(accountId),
-          limit = limit.getOrElse(20),
+          limit = limit,
           offset = offset.getOrElse(0),
           sort = sort.getOrElse(Sort.Descending) match { //TODO: do better
             case Sort.Ascending  => protobuf.SortingOrder.ASC

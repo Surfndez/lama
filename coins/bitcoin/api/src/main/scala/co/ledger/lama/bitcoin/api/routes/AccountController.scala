@@ -202,12 +202,15 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
 
       // Get account events
       case GET -> Root / UUIDVar(accountId) / "events"
-          :? OptionalLimitQueryParamMatcher(limit)
+          :? OptionalBoundedLimitQueryParamMatcher(limit)
           +& OptionalOffsetQueryParamMatcher(offset)
           +& OptionalSortQueryParamMatcher(sort) =>
-        accountManagerClient
-          .getSyncEvents(accountId, limit, offset, sort)
-          .flatMap(Ok(_))
+        for {
+          boundedLimit <- parseBoundedLimit(limit)
+          res <- accountManagerClient
+            .getSyncEvents(accountId, boundedLimit.value, offset, sort)
+            .flatMap(Ok(_))
+        } yield res
 
       // Update account
       case req @ PUT -> Root / UUIDVar(accountId) =>
@@ -230,12 +233,13 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
 
       // List accounts
       case GET -> Root
-          :? OptionalLimitQueryParamMatcher(limit)
+          :? OptionalBoundedLimitQueryParamMatcher(limit)
           +& OptionalOffsetQueryParamMatcher(offset) =>
         val t = for {
+          boundedLimit <- parseBoundedLimit(limit)
 
           // Get Account Info
-          accountsResult <- accountManagerClient.getAccounts(None, limit, offset)
+          accountsResult <- accountManagerClient.getAccounts(None, boundedLimit.value, offset)
           accountsWithIds = accountsResult.accounts.map(account => account.id -> account)
 
           // Get Balance
@@ -273,19 +277,22 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
       case GET -> Root / UUIDVar(
             accountId
           ) / "operations" :? OptionalBlockHeightQueryParamMatcher(blockHeight)
-          +& OptionalLimitQueryParamMatcher(limit)
+          +& OptionalBoundedLimitQueryParamMatcher(limit)
           +& OptionalOffsetQueryParamMatcher(offset)
           +& OptionalSortQueryParamMatcher(sort) =>
-        log.info(s"Fetching operations for account: $accountId") *>
-          interpreterClient
+        for {
+          boundedLimit <- parseBoundedLimit(limit)
+          _            <- log.info(s"Fetching operations for account: $accountId")
+          res <- interpreterClient
             .getOperations(
               accountId = accountId,
               blockHeight = blockHeight.getOrElse(0L),
-              limit = limit.getOrElse(0),
+              limit = boundedLimit.value,
               offset = offset.getOrElse(0),
               sort = sort
             )
             .flatMap(Ok(_))
+        } yield res
 
       // Get operation info
       case GET -> Root / UUIDVar(
@@ -305,15 +312,18 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
       // List account UTXOs
       case GET -> Root / UUIDVar(
             accountId
-          ) / "utxos" :? OptionalLimitQueryParamMatcher(limit)
+          ) / "utxos" :? OptionalBoundedLimitQueryParamMatcher(limit)
           +& OptionalOffsetQueryParamMatcher(offset)
           +& OptionalSortQueryParamMatcher(sort) =>
         (for {
+          boundedLimit <- parseBoundedLimit(limit)
+
           _ <- log.info(s"Fetching UTXOs for account: $accountId")
+
           internalUtxos <- interpreterClient // List[common.Utxo]
             .getUtxos(
               accountId = accountId,
-              limit = limit.getOrElse(0),
+              limit = boundedLimit.value,
               offset = offset.getOrElse(0),
               sort = sort
             )

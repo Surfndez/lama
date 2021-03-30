@@ -336,13 +336,13 @@ object AccountControllerSpec {
 
       override def getAccounts(
           group: Option[String],
-          limit: Option[Int],
+          limit: Int,
           offset: Option[Int]
       ): IO[AccountsResult] = ???
 
       override def getSyncEvents(
           accountId: UUID,
-          limit: Option[Int],
+          limit: Int,
           offset: Option[Int],
           sort: Option[Sort]
       ): IO[SyncEventsResult[JsonObject]] = ???
