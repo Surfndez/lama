@@ -1,13 +1,13 @@
 package co.ledger.lama.bitcoin.common.models.transactor
 
-import co.ledger.lama.bitcoin.common.models.interpreter.Utxo
+import co.ledger.lama.bitcoin.common.models.interpreter.{SpendableTxo, Utxo}
 import co.ledger.lama.bitcoin.transactor.protobuf
 
 case class CreateTransactionResponse(
     hex: String,
     hash: String,
     witnessHash: String,
-    utxos: List[Utxo],
+    utxos: List[SpendableTxo],
     outputs: List[PrepareTxOutput],
     fee: Long,
     feePerKb: Long
@@ -17,7 +17,7 @@ case class CreateTransactionResponse(
       hex,
       hash,
       witnessHash,
-      utxos.map(_.toProto),
+      utxos.map(_.toCommon.toProto),
       outputs.map(_.toProto),
       fee,
       feePerKb
@@ -30,7 +30,9 @@ object CreateTransactionResponse {
       proto.hex,
       proto.hash,
       proto.witnessHash,
-      proto.utxos.map(Utxo.fromProto).toList,
+      proto.utxos
+        .map(protoUtxo => SpendableTxo.fromCommon(Utxo.fromProto(protoUtxo), "UNKNOWN"))
+        .toList,
       proto.outputs.map(PrepareTxOutput.fromProto).toList,
       proto.fee,
       proto.feePerKb

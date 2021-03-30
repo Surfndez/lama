@@ -44,4 +44,5 @@ class ExplorerClientMock(
 
   override def broadcastTransaction(tx: String): IO[String] = ???
 
+  override def getRawTransactionHex(transactionHash: String): IO[String] = IO.pure("raw hex for " ++ transactionHash)
 }

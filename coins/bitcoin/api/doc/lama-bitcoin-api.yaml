@@ -584,7 +584,7 @@ components:
         utxos:
           type: array
           items:
-            $ref: '#/components/schemas/Utxo'
+            $ref: '#/components/schemas/SpendableTxo'
         fee:
           type: string
           format: bigint
@@ -891,12 +891,14 @@ components:
           type: boolean
           example: false
         utxos:
-          $ref: '#/components/schemas/Utxo'
+          $ref: '#/components/schemas/PickableUtxo'
         total:
           type: number
           example: 1
-    Utxo:
+    PickableUtxo:
       required:
+        - height
+        - confirmations
         - transaction_hash
         - output_index
         - value
@@ -907,9 +909,59 @@ components:
         - used_in_mempool
       type: object
       properties:
+        height:
+          type: number
+          example: 794512
+        confirmations:
+          type: number
+          example: 324
         transaction_hash:
           type: string
           example: '18471605b534d27fb4feaf158369cec6d5170bc062bf3ff9fdc4a6be96376068'
+        output_index:
+          type: number
+          example: 1
+        value:
+          type: string
+          format: bigint
+          example: '897359'
+        address:
+          type: string
+          example: 'tb1qv8v7s8q7rf0h2raa3w94v4tlh6t2qrjfwffsfl'
+        script_hex:
+          type: string
+          example: '001461d9e81c1e1a5f750fbd8b8b56557fbe96a00e49'
+        derivation:
+          $ref: '#/components/schemas/Derivation'
+        change_type:
+          $ref: '#/components/schemas/ChangeType'
+        used_in_mempool:
+          type: boolean
+          example: false
+        time:
+          type: string
+          format: timestamp
+          example: '2020-12-04T15:29:30Z'
+    SpendableTxo:
+      required:
+        - transaction_hash
+        - transaction_raw_hex
+        - output_index
+        - value
+        - address
+        - script_hex
+        - derivation
+        - public_key
+        - time
+        - used_in_mempool
+      type: object
+      properties:
+        transaction_hash:
+          type: string
+          example: '18471605b534d27fb4feaf158369cec6d5170bc062bf3ff9fdc4a6be96376068'
+        transaction_raw_hex:
+          type: string
+          example: '02000000000103477e413019599ee977bf44fc4c5c1a3fae55dbb35db27f501b2c01f78fe33a550100000000fdfffffff324241b023d712d891493a0cce2400dc1b6d5c6525712f169dd6fed637635da0100000000fdffffff7ef250642df67b21ba0caab4926df40c2151a977101860572623d7f8e580acec0000000000fdffffff02fa0dbe0c00000000160014fc9bde97348e9b90cd44c2d1070980955e03cb1a70c5f23b000000001976a914cb5db4e8afc47220c82528ab77c50f774f71c41088ac02473044022053fd393e4ea497bc5750eeab32f30b6c48ce0738fe701f18c986004a19efcf0b02200f477efeb12deaabc05118aea6028f5232d534a20c83ac09908a592640afd7de01210214647bb3238017860815a9f1500db1a6975b05b30d837989e94c21972cb3568f02473044022001d4e61815a02fe3e6184920d779f1f7a1138557d836a1c5a82b69881120951b02207790b6bf0ec8f60156e087529b0fdb46f9fe6e799be7c20e72ee2b551ea756df012102b34f6e2e9c5101f623619b9591e6bc7a6771424cdcf281fc3ffc1619d558fac60247304402203d893c818c04f7d9a0f1debca3f35180b3a9d2f3e8331ede93787e20ab7839e202203144fe56dff60a2a1fd0b26e9b2ea66bd8ae7e5f4e7f4e4eab93e522432ba2b70121033511f874c8100246002e797a2a6f7458716b0d8c43036a5f6fefbfbed9d6a164cb030a00'
         output_index:
           type: number
           example: 1

@@ -67,7 +67,9 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
         apiUtxosPublicKeys <- keychainClient.getAddressesPublicKeys(keychainId, apiUtxosDerivations)
         apiUtxos = internalResponse.utxos
           .zip(apiUtxosPublicKeys)
-          .map{case (commonUtxo, pubKey) => apiModels.SpendableTxo.fromCommon(commonUtxo, pubKey)}
+          .map { case (commonUtxo, pubKey) =>
+            apiModels.SpendableTxo.fromCommon(commonUtxo, pubKey)
+          }
         response = CreateTransactionResponse.fromCommon(internalResponse, apiUtxos)
       } yield response).flatMap(Ok(_))
 
@@ -307,7 +309,7 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
           +& OptionalOffsetQueryParamMatcher(offset)
           +& OptionalSortQueryParamMatcher(sort) =>
         (for {
-          _          <- log.info(s"Fetching UTXOs for account: $accountId")
+          _ <- log.info(s"Fetching UTXOs for account: $accountId")
           internalUtxos <- interpreterClient // List[common.Utxo]
             .getUtxos(
               accountId = accountId,

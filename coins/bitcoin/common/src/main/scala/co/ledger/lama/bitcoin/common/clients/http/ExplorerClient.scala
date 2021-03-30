@@ -9,16 +9,25 @@ import co.ledger.lama.bitcoin.common.models.transactor.FeeInfo
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.Coin
 import co.ledger.lama.common.models.Coin.{Btc, BtcRegtest, BtcTestnet, Ltc}
+import co.ledger.lama.common.models.implicits._
 import co.ledger.lama.common.utils
 import co.ledger.lama.common.utils.IOUtils
 import fs2.{Chunk, Pull, Stream}
-import io.circe.{Decoder, Json}
+import io.circe.{Decoder, Encoder, Json}
+import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
 import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.circe.CirceEntityEncoder._
 import org.http4s.client.Client
 import org.http4s.{EntityDecoder, Method, Request, Uri}
 
 import scala.concurrent.duration._
+
+case class TransactionHex(transactionHash: String, hex: String)
+
+object TransactionHex {
+  implicit val encoder: Encoder[TransactionHex] = deriveConfiguredEncoder[TransactionHex]
+  implicit val decoder: Decoder[TransactionHex] = deriveConfiguredDecoder[TransactionHex]
+}
 
 trait ExplorerClient {
 
@@ -40,6 +49,8 @@ trait ExplorerClient {
   def getSmartFees: IO[FeeInfo]
 
   def broadcastTransaction(tx: String): IO[String]
+
+  def getRawTransactionHex(transactionHash: String): IO[String]
 }
 
 object ExplorerClient {
@@ -138,6 +149,14 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
       .evalMap(request => callExpectWithRetry[List[UnconfirmedTransaction]](request))
       .flatMap(Stream.emits(_))
   }
+
+  def getRawTransactionHex(transactionHash: String): IO[String] =
+    for {
+      rawResponse <- callExpect[List[TransactionHex]](
+        conf.uri.withPath(s"$coinBasePath/transactions/$transactionHash/hex")
+      )
+      hex <- IO.fromOption(rawResponse.headOption.map(_.hex))(new Exception(""))
+    } yield hex
 
   def getSmartFees: IO[FeeInfo] = {
     val feeUri = conf.uri.withPath(s"$coinBasePath/fees")

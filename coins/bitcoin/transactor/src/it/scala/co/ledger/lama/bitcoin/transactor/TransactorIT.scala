@@ -125,6 +125,9 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
         200
       )
 
+      // Coming from ExplorerClientMock.getRawTransactionHex
+      expectedRawHexes = response.utxos.map("raw hex for " ++ _.transactionHash)
+
     } yield {
       response.hex should have size 3
       response.hex should be("hex")
@@ -141,6 +144,9 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
         Some(mockKeychainDerivation)
       )
       response.outputs.filter(_.address == recAddr).head.change should be(None)
+
+      // Checking the rawHex fields
+      response.utxos.map(_.transactionRawHex) should be(expectedRawHexes)
     }
   }
 

@@ -5,7 +5,7 @@ import cats.effect.IO
 import cats.implicits._
 import co.ledger.lama.bitcoin.common.clients.grpc.{InterpreterClient, KeychainClient}
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
-import co.ledger.lama.bitcoin.common.models.interpreter.{ChangeType, Utxo}
+import co.ledger.lama.bitcoin.common.models.interpreter.{ChangeType, Utxo, SpendableTxo}
 import co.ledger.lama.bitcoin.common.models.transactor._
 import co.ledger.lama.bitcoin.common.models.{Address, BitcoinLikeNetwork, InvalidAddress}
 import co.ledger.lama.bitcoin.common.utils.CoinImplicits._
@@ -101,13 +101,28 @@ class Transactor(
         if (maxUtxos == 0) conf.maxUtxos else maxUtxos
       )
 
-      changeOutput = PrepareTxOutput(changeAddress.accountAddress, response.change, Some(changeAddress.derivation.toList))
+      changeOutput = PrepareTxOutput(
+        changeAddress.accountAddress,
+        response.change,
+        Some(changeAddress.derivation.toList)
+      )
+
+      utxosTransactionHashes = response.utxos.map(_.transactionHash)
+      utxosTransactionHexes <- utxosTransactionHashes
+        .map(explorerClient(coin).getRawTransactionHex(_))
+        .sequence
+      filledUtxos =
+        response.utxos
+          .zip(utxosTransactionHexes)
+          .map { case (commonUtxo, hex) =>
+            SpendableTxo.fromCommon(commonUtxo, hex)
+          }
     } yield {
       CreateTransactionResponse(
         response.rawTx.hex,
         response.rawTx.hash,
         response.rawTx.witnessHash,
-        response.utxos,
+        filledUtxos,
         outputs.appended(changeOutput),
         estimatedFee,
         estimatedFeePerKb

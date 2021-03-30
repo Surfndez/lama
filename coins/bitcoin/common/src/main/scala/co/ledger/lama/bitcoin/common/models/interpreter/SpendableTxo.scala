@@ -1,12 +1,9 @@
-package co.ledger.lama.bitcoin.api.models
+package co.ledger.lama.bitcoin.common.models.interpreter
 
 import java.time.Instant
 
 import cats.data.NonEmptyList
-import co.ledger.lama.common.models.implicits._
 import co.ledger.lama.bitcoin.common.models.interpreter
-import io.circe.{Decoder, Encoder}
-import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
 
 case class SpendableTxo(
     transactionHash: String,
@@ -17,10 +14,9 @@ case class SpendableTxo(
     scriptHex: String,
     changeType: Option[interpreter.ChangeType],
     derivation: NonEmptyList[Int],
-    publicKey: String,
     time: Instant
 ) {
-  def toCommon: interpreter.Utxo =
+  def toCommon: Utxo =
     interpreter.Utxo(
       transactionHash,
       outputIndex,
@@ -34,20 +30,16 @@ case class SpendableTxo(
 }
 
 object SpendableTxo {
-  implicit val encoder: Encoder[SpendableTxo] = deriveConfiguredEncoder[SpendableTxo]
-  implicit val decoder: Decoder[SpendableTxo] = deriveConfiguredDecoder[SpendableTxo]
-
-  def fromCommon(utxo: interpreter.SpendableTxo, pubKey: String): SpendableTxo =  {
+  def fromCommon(utxo: interpreter.Utxo, rawHex: String): SpendableTxo =  {
     SpendableTxo(
       utxo.transactionHash,
-      utxo.transactionRawHex,
+      rawHex,
       utxo.outputIndex,
       utxo.value,
       utxo.address,
       utxo.scriptHex,
       utxo.changeType,
       utxo.derivation,
-      pubKey,
       utxo.time
     )
   }
