@@ -18,8 +18,17 @@ message HealthCheckResponse {
   ServingStatus status = 1;
 }
 
+message Empty {}
+
+message VersionResponse {
+  string version = 1;
+  string sha1 = 2;
+}
+
 service Health {
   rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
 
   rpc Watch(HealthCheckRequest) returns (stream HealthCheckResponse);
+
+  rpc Version(Empty) returns (VersionResponse);
 }

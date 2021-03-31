@@ -57,12 +57,13 @@ lazy val lamaProtobuf = (project in file("protobuf"))
 
 // Common lama library
 lazy val common = (project in file("common"))
+  .enablePlugins(BuildInfoPlugin)
   .configs(IntegrationTest)
   .settings(
     name := "lama-common",
     libraryDependencies ++= (Dependencies.lamaCommon ++ Dependencies.test)
   )
-  .settings(disableDocGeneration)
+  .settings(disableDocGeneration, buildInfoSettings)
   .dependsOn(lamaProtobuf)
 
 lazy val accountManager = (project in file("account-manager"))
@@ -88,13 +89,12 @@ lazy val bitcoinProtobuf = (project in file("coins/bitcoin/protobuf"))
   .settings(disableDocGeneration)
 
 lazy val bitcoinApi = (project in file("coins/bitcoin/api"))
-  .enablePlugins(BuildInfoPlugin, JavaAgent, JavaServerAppPackaging, DockerPlugin)
+  .enablePlugins(JavaAgent, JavaServerAppPackaging, DockerPlugin)
   .configs(IntegrationTest)
   .settings(
     name := "lama-bitcoin-api",
     libraryDependencies ++= (Dependencies.btcApi ++ Dependencies.test),
-    sharedSettings,
-    buildInfoSettings
+    sharedSettings
   )
   .dependsOn(accountManager, bitcoinCommon, common, bitcoinProtobuf)
 

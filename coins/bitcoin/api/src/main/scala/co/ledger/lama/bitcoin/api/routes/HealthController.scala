@@ -6,6 +6,7 @@ import co.ledger.protobuf.lama.common.HealthCheckResponse.ServingStatus
 import co.ledger.protobuf.lama.common.HealthFs2Grpc
 import co.ledger.protobuf.lama.common._
 import io.circe.{Encoder, Json}
+import io.circe.syntax._
 import io.grpc.Metadata
 import org.http4s.HttpRoutes
 import org.http4s.dsl.Http4sDsl
@@ -14,6 +15,7 @@ import cats.syntax.all._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
+import io.circe.JsonObject
 
 object HealthController extends Http4sDsl[IO] with DefaultContextLogging {
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
@@ -21,8 +23,25 @@ object HealthController extends Http4sDsl[IO] with DefaultContextLogging {
 
   case class HealthStatus(service: String, status: ServingStatus)
 
+  case class ComponentInfo(status: ServingStatus, version: VersionResponse) {}
+
   implicit val statusEncoder: Encoder[ServingStatus] =
     (s: ServingStatus) => Json.fromString(s.name)
+
+  implicit val versionEncoder: Encoder[VersionResponse] =
+    (versionData: VersionResponse) =>
+      Json.fromJsonObject(
+        JsonObject(
+          "version" -> Json.fromString(versionData.version),
+          "sha1"    -> Json.fromString(versionData.sha1)
+        )
+      )
+
+  implicit val componentInfoEncoder: Encoder[ComponentInfo] =
+    (info: ComponentInfo) =>
+      Json.fromJsonObject(
+        JsonObject("version" -> info.version.asJson, "status" -> info.status.asJson)
+      )
 
   private def getServingStatus(client: HealthFs2Grpc[IO, Metadata]): IO[ServingStatus] =
     client
@@ -30,6 +49,23 @@ object HealthController extends Http4sDsl[IO] with DefaultContextLogging {
       .timeout(5.seconds)
       .handleErrorWith(_ => IO.pure(HealthCheckResponse(ServingStatus.NOT_SERVING)))
       .map(_.status)
+
+  // Components might not answer getVersion correctly
+  // (keychain for example uses a google-provided proto)
+  // Having the correct status but no version MUST NOT be an error,
+  // so the error is dealt with
+  private def getVersion(client: HealthFs2Grpc[IO, Metadata]): IO[VersionResponse] =
+    client
+      .version(new Empty(), new Metadata)
+      .timeout(5.seconds)
+      .handleErrorWith(_ => IO.pure(VersionResponse("n/a", "n/a")))
+
+  private def getComponentInfo(client: HealthFs2Grpc[IO, Metadata]): IO[ComponentInfo] = {
+    for {
+      status  <- getServingStatus(client)
+      version <- getVersion(client)
+    } yield ComponentInfo(status, version)
+  }
 
   def routes(
       accountManagerHealthClient: HealthFs2Grpc[IO, Metadata],
@@ -40,17 +76,17 @@ object HealthController extends Http4sDsl[IO] with DefaultContextLogging {
   ): HttpRoutes[IO] =
     HttpRoutes.of[IO] { case GET -> Root =>
       Map(
-        "interpreter"     -> getServingStatus(interpreterHealthClient),
-        "account_manager" -> getServingStatus(accountManagerHealthClient),
-        "transactor"      -> getServingStatus(transactorHealthClient),
-        "worker"          -> getServingStatus(workerHealthClient),
-        "keychain"        -> getServingStatus(keychainHealthClient)
+        "interpreter"     -> getComponentInfo(interpreterHealthClient),
+        "account_manager" -> getComponentInfo(accountManagerHealthClient),
+        "transactor"      -> getComponentInfo(transactorHealthClient),
+        "worker"          -> getComponentInfo(workerHealthClient),
+        "keychain"        -> getComponentInfo(keychainHealthClient)
       ).parUnorderedSequence
-        .flatMap { statuses =>
-          if (statuses.values.exists(_ != ServingStatus.SERVING))
-            InternalServerError(statuses)
+        .flatMap { componentInfos =>
+          if (componentInfos.values.exists(_.status != ServingStatus.SERVING))
+            InternalServerError(componentInfos)
           else
-            Ok(statuses)
+            Ok(componentInfos)
         }
     }
 }
