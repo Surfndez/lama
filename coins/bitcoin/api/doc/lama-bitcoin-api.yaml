@@ -556,7 +556,7 @@ components:
           type: string
           format: bigint
           example: '300000'
-        derivation:
+        change:
           $ref: '#/components/schemas/Derivation'
     CreateTransactionResponse:
       required:

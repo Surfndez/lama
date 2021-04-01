@@ -57,7 +57,7 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
             keychainId,
             account.coin,
             apiCreateTransactionRequest.coinSelection,
-            apiCreateTransactionRequest.outputs,
+            apiCreateTransactionRequest.outputs.map(_.toCommon),
             apiCreateTransactionRequest.feeLevel,
             apiCreateTransactionRequest.customFeePerKb,
             apiCreateTransactionRequest.maxUtxos

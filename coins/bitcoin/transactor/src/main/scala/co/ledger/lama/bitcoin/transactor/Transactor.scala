@@ -17,7 +17,6 @@ import co.ledger.lama.bitcoin.transactor.services.{CoinSelectionService, Transac
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.{BitcoinLikeCoin, Coin, Sort}
 import fs2.{Chunk, Stream}
-import io.circe.syntax._
 
 import java.util.UUID
 
@@ -228,7 +227,7 @@ class Transactor(
             // TODO: Add back the utxos in the exception. With a show instance ?
             //  utxos : ${utxos.asJson}
             new Exception(s"""Impossible to create raw transaction satisfying criterias :
-                outputs: ${outputs.asJson}
+                outputs: ${outputs}
                 estimatedFeeSatPerKb: $estimatedFeeSatPerKb
               """)
           )

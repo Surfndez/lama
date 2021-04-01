@@ -3,7 +3,7 @@ package co.ledger.lama.bitcoin.api.models
 import co.ledger.lama.bitcoin.common.models.transactor.{
   CoinSelectionStrategy,
   FeeLevel,
-  PrepareTxOutput,
+  PrepareTxOutput => commonPrepareTxOutput,
   RawTransaction
 }
 import co.ledger.lama.common.models.implicits._
@@ -12,6 +12,31 @@ import io.circe.generic.extras.semiauto._
 import co.ledger.lama.bitcoin.common.models
 
 object transactor {
+
+  case class PrepareTxOutput(
+      address: String,
+      value: String,
+      change: Option[List[Int]] = None
+  ) {
+    def toCommon: commonPrepareTxOutput =
+      commonPrepareTxOutput(
+        address,
+        BigInt(value),
+        change
+      )
+  }
+
+  object PrepareTxOutput {
+    implicit val encoder: Encoder[PrepareTxOutput] = deriveConfiguredEncoder[PrepareTxOutput]
+    implicit val decoder: Decoder[PrepareTxOutput] = deriveConfiguredDecoder[PrepareTxOutput]
+
+    def fromCommon(common: commonPrepareTxOutput): PrepareTxOutput =
+      PrepareTxOutput(
+        common.address,
+        common.toString,
+        common.change
+      )
+  }
 
   case class CreateTransactionRequest(
       coinSelection: CoinSelectionStrategy,
