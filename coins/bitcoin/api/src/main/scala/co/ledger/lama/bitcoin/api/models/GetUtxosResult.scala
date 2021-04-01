@@ -6,7 +6,7 @@ import io.circe.{Decoder, Encoder}
 import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
 
 case class GetUtxosResult(
-    utxos: List[PickableUtxo],
+    utxos: List[ConfirmedUtxo],
     total: Int,
     truncated: Boolean
 ) {}
@@ -19,7 +19,7 @@ object GetUtxosResult {
 
   def fromCommon(
       getUtxos: interpreter.GetUtxosResult,
-      utxos: List[PickableUtxo],
+      utxos: List[ConfirmedUtxo],
   ): GetUtxosResult =
     GetUtxosResult(
       utxos,

@@ -8,7 +8,7 @@ import co.ledger.lama.bitcoin.common.models.interpreter
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
 
-case class PickableUtxo(
+case class ConfirmedUtxo(
     height: Long,
     confirmations: Long,
     transactionHash: String,
@@ -33,14 +33,14 @@ case class PickableUtxo(
     )
 }
 
-object PickableUtxo {
-  implicit val encoder: Encoder[PickableUtxo] = deriveConfiguredEncoder[PickableUtxo]
-  implicit val decoder: Decoder[PickableUtxo] = deriveConfiguredDecoder[PickableUtxo]
+object ConfirmedUtxo {
+  implicit val encoder: Encoder[ConfirmedUtxo] = deriveConfiguredEncoder[ConfirmedUtxo]
+  implicit val decoder: Decoder[ConfirmedUtxo] = deriveConfiguredDecoder[ConfirmedUtxo]
 
-  def fromCommon(utxo: interpreter.Utxo, height: Long, confirmations: Long): PickableUtxo =  {
-    PickableUtxo(
-      height,
-      confirmations,
+  def fromCommon(utxo: interpreter.ConfirmedUtxo): ConfirmedUtxo =  {
+    ConfirmedUtxo(
+      utxo.height,
+      utxo.confirmations,
       utxo.transactionHash,
       utxo.outputIndex,
       utxo.value,

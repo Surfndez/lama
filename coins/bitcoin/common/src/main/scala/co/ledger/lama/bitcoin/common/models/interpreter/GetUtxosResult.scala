@@ -3,7 +3,7 @@ package co.ledger.lama.bitcoin.common.models.interpreter
 import co.ledger.lama.bitcoin.interpreter.protobuf
 
 case class GetUtxosResult(
-    utxos: List[Utxo],
+    utxos: List[ConfirmedUtxo],
     total: Int,
     truncated: Boolean
 ) {
@@ -18,7 +18,7 @@ case class GetUtxosResult(
 object GetUtxosResult {
   def fromProto(proto: protobuf.GetUtxosResult): GetUtxosResult =
     GetUtxosResult(
-      proto.utxos.map(Utxo.fromProto).toList,
+      proto.utxos.map(ConfirmedUtxo.fromProto).toList,
       proto.total,
       proto.truncated
     )

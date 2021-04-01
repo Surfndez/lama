@@ -320,17 +320,15 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
 
           _ <- log.info(s"Fetching UTXOs for account: $accountId")
 
-          internalUtxos <- interpreterClient // List[common.Utxo]
+          internalUtxos <- interpreterClient
             .getUtxos(
               accountId = accountId,
               limit = boundedLimit.value,
               offset = offset.getOrElse(0),
               sort = sort
             )
-          // FIXME (BACK-1737): fetch the correct height and confirmations
-          apiPickableUtxos = internalUtxos.utxos
-            .map(apiModels.PickableUtxo.fromCommon(_, -1, -1))
-          response = apiModels.GetUtxosResult.fromCommon(internalUtxos, apiPickableUtxos)
+          apiConfirmedUtxos = internalUtxos.utxos.map(apiModels.ConfirmedUtxo.fromCommon)
+          response = apiModels.GetUtxosResult.fromCommon(internalUtxos, apiConfirmedUtxos)
         } yield response).flatMap(Ok(_))
 
       // Get account balances

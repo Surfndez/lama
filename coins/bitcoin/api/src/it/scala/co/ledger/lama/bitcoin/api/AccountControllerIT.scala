@@ -287,6 +287,14 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
               utxos.size shouldBe account.expected.utxosSize
             }
 
+            it should s"have only utxos with >0 height and confirmations in UTXO API" in {
+              utxos.size shouldBe account.expected.utxosSize
+              if(account.expected.utxosSize > 0) {
+                utxos.map(_.height).forall(_ > 0) should be(true)
+                utxos.map(_.confirmations).forall(_ > 0) should be(true)
+              }
+            }
+
             it should s"have ${account.expected.opsSize} operations" in {
               operations.size shouldBe account.expected.opsSize
             }

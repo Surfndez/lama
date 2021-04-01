@@ -213,7 +213,9 @@ class InterpreterClientMock extends InterpreterClient {
         )
       )
       .map { case (tx, output) =>
-        Utxo(
+        ConfirmedUtxo(
+          tx.block.map(_.height).getOrElse(-1),
+          tx.confirmations,
           tx.hash,
           output.outputIndex,
           output.value,

@@ -151,7 +151,7 @@ class OperationService(
   ): IO[GetUtxosResult] =
     for {
       utxos <- OperationQueries
-        .fetchUTXOs(accountId, sort, Some(limit + 1), Some(offset))
+        .fetchConfirmedUTXOs(accountId, sort, Some(limit + 1), Some(offset))
         .transact(db)
         .compile
         .toList

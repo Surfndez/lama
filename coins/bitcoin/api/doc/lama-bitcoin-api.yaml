@@ -891,11 +891,11 @@ components:
           type: boolean
           example: false
         utxos:
-          $ref: '#/components/schemas/PickableUtxo'
+          $ref: '#/components/schemas/ConfirmedUtxo'
         total:
           type: number
           example: 1
-    PickableUtxo:
+    ConfirmedUtxo:
       required:
         - height
         - confirmations

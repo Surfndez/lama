@@ -91,7 +91,7 @@ message GetUtxosRequest {
 }
 
 message GetUtxosResult {
-  repeated Utxo utxos = 1;
+  repeated ConfirmedUtxo utxos = 1;
   int32 total = 2;
   bool truncated = 3;
 }

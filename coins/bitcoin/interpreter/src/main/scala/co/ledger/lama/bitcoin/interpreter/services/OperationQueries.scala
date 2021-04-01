@@ -116,18 +116,18 @@ object OperationQueries extends DoobieLogHandler {
       .query[Int]
       .unique
 
-  def fetchUTXOs(
+  def fetchConfirmedUTXOs(
       accountId: UUID,
       sort: Sort = Sort.Ascending,
       limit: Option[Int] = None,
       offset: Option[Int] = None
-  ): Stream[ConnectionIO, Utxo] = {
+  ): Stream[ConnectionIO, ConfirmedUtxo] = {
     val orderF  = Fragment.const(s"ORDER BY tx.block_time $sort, tx.hash $sort")
     val limitF  = limit.map(l => fr"LIMIT $l").getOrElse(Fragment.empty)
     val offsetF = offset.map(o => fr"OFFSET $o").getOrElse(Fragment.empty)
 
     val query =
-      sql"""SELECT tx.hash, o.output_index, o.value, o.address, o.script_hex, o.change_type, o.derivation, tx.block_time
+      sql"""SELECT tx.block_height, tx.confirmations, tx.hash, o.output_index, o.value, o.address, o.script_hex, o.change_type, o.derivation, tx.block_time
             FROM output o
               LEFT JOIN input i
                 ON o.account_id = i.account_id
@@ -142,7 +142,7 @@ object OperationQueries extends DoobieLogHandler {
               AND o.derivation IS NOT NULL
               AND i.address IS NULL
          """ ++ orderF ++ limitF ++ offsetF
-    query.query[Utxo].stream
+    query.query[ConfirmedUtxo].stream
   }
 
   def fetchUnconfirmedUTXOs(
