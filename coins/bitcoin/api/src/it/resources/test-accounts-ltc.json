@@ -12,12 +12,12 @@
     },
     "expected": {
       "extended_public_key": "Ltub2YVEdR2HA21h8snykKmpKoARQqjvVKUv36fLDsisBBxt8tSLKhmPA97vem7Be9GoomUDpVoj4f84So16mAf58LJdHEWKDpmk1wNbXHzPAYu",
-      "ops_size": 15,
-      "utxos_size": 2,
-      "last_tx_hash": "e9a23061908544b82155fff99714040a1ab183407bbd0d436b273553f6b1004b",
-      "balance": 90973,
-      "balance_history_size": 14,
-      "amount_received": 21922825,
+      "ops_size": 16,
+      "utxos_size": 3,
+      "last_tx_hash": "752e58e1275e297d6c7295f5a77d73cb73d7389869b3a89caa2d7ddb3292f769",
+      "balance": 1090973,
+      "balance_history_size": 15,
+      "amount_received": 22922825,
       "amount_sent": 21831852
     }
   }

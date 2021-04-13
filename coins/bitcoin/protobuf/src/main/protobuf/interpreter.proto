@@ -56,14 +56,14 @@ message GetOperationsRequest {
   bytes account_id = 1;
   int64 block_height = 2;
   int32 limit = 3;
-  int32 offset = 4;
-  SortingOrder sort = 5;
+  SortingOrder sort = 4;
+  string cursor = 5;
 }
 
 message GetOperationsResult {
   repeated Operation operations = 1;
   int32 total = 2;
-  bool truncated = 3;
+  PaginationCursor cursor = 3;
 }
 
 message GetOperationRequest {
@@ -121,4 +121,9 @@ message GetBalanceHistoryResult {
 
 message ResultCount {
   int32 count = 1;
+}
+
+message PaginationCursor {
+  string previous = 1;
+  string next = 2;
 }

@@ -7,10 +7,10 @@ import co.ledger.lama.bitcoin.interpreter.Config.Db
 import co.ledger.lama.bitcoin.interpreter.models.OperationToSave
 import co.ledger.lama.bitcoin.interpreter.services.OperationQueries.{
   OpWithoutDetails,
-  TransactionDetails
+  OperationDetails
 }
 import co.ledger.lama.common.logging.DefaultContextLogging
-import co.ledger.lama.common.models.{Sort, TxHash}
+import co.ledger.lama.common.models.{PaginationToken, Sort, TxHash}
 import doobie._
 import doobie.implicits._
 import fs2._
@@ -23,53 +23,102 @@ class OperationService(
     batchConcurrency: Db.BatchConcurrency
 ) extends DefaultContextLogging {
 
+  private val numberOfOperationsToBuildByQuery = 5
+
   def getOperations(
       accountId: UUID,
-      blockHeight: Long,
       limit: Int,
-      offset: Int,
-      sort: Sort
-  )(implicit cs: ContextShift[IO]): IO[GetOperationsResult] =
+      sort: Sort,
+      cursor: Option[PaginationToken[OperationPaginationState]]
+  )(implicit cs: ContextShift[IO]): IO[GetOperationsResult] = {
     for {
-      opsWithTx <- OperationQueries
-        .fetchOperations(accountId, blockHeight, sort, Some(limit + 1), Some(offset))
-        .groupAdjacentBy(_.op.hash) // many operations by hash (RECEIVED AND SENT)
-        .chunkN(OperationService.numberOfOperationsToBuildByQuery)
-        .flatMap { ops =>
-          val txHashes = ops.map { case (txHash, _) => txHash }.toNel
+      operations <-
+        Stream
+          .evalSeq(OperationQueries.fetchOperations(accountId, limit, sort, cursor))
+          .groupAdjacentBy(_.op.hash) // many operations by hash (RECEIVED AND SENT)
+          .chunkN(numberOfOperationsToBuildByQuery)
+          .flatMap { ops =>
+            val txHashes = ops.map { case (txHash, _) => txHash }.toNel
 
-          val inputsAndOutputs = Stream
-            .emits(txHashes.toList)
-            .flatMap(txHashes =>
-              OperationQueries
-                .fetchTransactionDetails(accountId, sort, txHashes)
-            )
+            val inputsAndOutputs = Stream
+              .emits(txHashes.toList)
+              .flatMap(txHashes =>
+                OperationQueries
+                  .fetchOperationDetails(accountId, sort, txHashes)
+              )
 
-          Stream
-            .chunk(ops)
-            .covary[ConnectionIO]
-            .zip(inputsAndOutputs)
-        }
+            Stream
+              .chunk(ops)
+              .covary[ConnectionIO]
+              .zip(inputsAndOutputs)
+          }
+          .transact(db)
+          .through(makeOperation)
+          .compile
+          .toList
+
+      total <- OperationQueries
+        .countOperations(accountId)
         .transact(db)
-        .through(makeOperation)
-        .compile
-        .toList
 
-      total <- OperationQueries.countOperations(accountId, blockHeight).transact(db)
+      // Build previous pagination by taking the first operation state.
+      previousPagination <- operations.headOption
+        .map { o =>
+          OperationQueries
+            .hasPreviousPage(accountId, o.uid, sort)
+            .transact(db)
+            .map {
+              case true =>
+                Some(
+                  PaginationToken(
+                    OperationPaginationState(o.uid, o.blockHeight.getOrElse(0)),
+                    isNext = false
+                  )
+                )
+              case false => None
+            }
+        }
+        .getOrElse(IO.pure(None))
 
-      // we get 1 more than necessary to know if there's more, then we return the correct number
-      truncated = opsWithTx.size > limit
+      // Build next pagination by taking the last operation state
+      nextPagination <- operations.lastOption
+        .map { o =>
+          OperationQueries
+            .hasNextPage(accountId, o.uid, sort)
+            .transact(db)
+            .map {
+              case true =>
+                Some(
+                  PaginationToken(
+                    OperationPaginationState(o.uid, o.blockHeight.getOrElse(0)),
+                    isNext = true
+                  )
+                )
+              case false => None
+            }
+        }
+        .getOrElse(IO.pure(None))
 
     } yield {
-      val operations = opsWithTx.take(limit)
-      GetOperationsResult(operations, total, truncated)
+      // Build the cursor pagination only if we have a previous or next pagination.
+      val cursorPagination =
+        Option
+          .when(previousPagination.isDefined || nextPagination.isDefined) {
+            PaginationCursor(
+              previous = previousPagination.map(_.toBase64),
+              next = nextPagination.map(_.toBase64)
+            )
+          }
+
+      GetOperationsResult(operations, total, cursorPagination)
     }
+  }
 
   private lazy val makeOperation: Pipe[
     IO,
     (
         (TxHash, Chunk[OpWithoutDetails]),
-        OperationQueries.TransactionDetails
+        OperationQueries.OperationDetails
     ),
     Operation
   ] =
@@ -95,7 +144,7 @@ class OperationService(
       opWithTx <- OptionT(OperationQueries.findOperation(accountId, operationId))
       inputsWithOutputsWithTxHash <- OptionT(
         OperationQueries
-          .fetchTransactionDetails(
+          .fetchOperationDetails(
             accountId.value,
             Sort.Ascending,
             NonEmptyList.one(opWithTx.op.hash)
@@ -114,7 +163,7 @@ class OperationService(
 
   private def operation(
       emptyOperation: OpWithoutDetails,
-      inputsWithOutputsByTxHash: TransactionDetails
+      inputsWithOutputsByTxHash: OperationDetails
   ) =
     Operation(
       uid = emptyOperation.op.uid,
@@ -209,8 +258,4 @@ class OperationService(
         }
         .flatMap(Stream.chunk)
   }
-}
-
-object OperationService {
-  val numberOfOperationsToBuildByQuery = 5
 }

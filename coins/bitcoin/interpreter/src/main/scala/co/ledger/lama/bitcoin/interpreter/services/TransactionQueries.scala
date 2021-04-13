@@ -1,7 +1,8 @@
 package co.ledger.lama.bitcoin.interpreter.services
 
-import java.util.UUID
+import cats.data.NonEmptyList
 
+import java.util.UUID
 import co.ledger.lama.bitcoin.common.models.interpreter.{
   BlockView,
   InputView,
@@ -10,12 +11,19 @@ import co.ledger.lama.bitcoin.common.models.interpreter.{
 }
 import co.ledger.lama.bitcoin.interpreter.models.implicits._
 import co.ledger.lama.common.logging.DoobieLogHandler
+import co.ledger.lama.common.models.{Sort, TxHash}
 import doobie._
 import doobie.implicits._
 import doobie.postgres.implicits._
 import fs2._
 
 object TransactionQueries extends DoobieLogHandler {
+
+  case class TransactionDetails(
+      txHash: TxHash,
+      inputs: List[InputView],
+      outputs: List[OutputView]
+  )
 
   def fetchMostRecentBlocks(accountId: UUID): Stream[ConnectionIO, BlockView] = {
     sql"""SELECT DISTINCT block_hash, block_height, block_time
@@ -115,4 +123,75 @@ object TransactionQueries extends DoobieLogHandler {
           WHERE account_id = $accountId
           AND block_height >= $blockHeight
        """.update.run
+
+  def fetchTransactionDetails(
+      accountId: UUID,
+      sort: Sort,
+      txHashes: NonEmptyList[TxHash]
+  ): Stream[doobie.ConnectionIO, TransactionDetails] = {
+    log.logger.debug(
+      s"Fetching inputs and outputs for accountId $accountId and hashes in $txHashes"
+    )
+
+    def groupByTxHash[T]: Pipe[ConnectionIO, (TxHash, T), (TxHash, Chunk[T])] =
+      _.groupAdjacentBy { case (txHash, _) => txHash }
+        .map { case (txHash, chunks) => txHash -> chunks.map(_._2) }
+
+    val inputs  = fetchInputs(accountId, sort, txHashes).stream.through(groupByTxHash)
+    val outputs = fetchOutputs(accountId, sort, txHashes).stream.through(groupByTxHash)
+
+    inputs
+      .zip(outputs)
+      .collect {
+        case ((txhash1, i), (txHash2, o)) if txhash1 == txHash2 =>
+          TransactionDetails(
+            txhash1,
+            inputs = i.toList.flatten.sortBy(i => (i.outputHash, i.outputIndex)),
+            outputs = o.toList.flatten.sortBy(_.outputIndex)
+          )
+      }
+  }
+
+  private def transactionOrder(sort: Sort) =
+    Fragment.const(s"ORDER BY t.block_time $sort, t.hash $sort")
+
+  private def allTxHashes(hashes: NonEmptyList[TxHash]) =
+    Fragments.in(fr"t.hash", hashes.map(_.hex))
+
+  private def fetchInputs(
+      accountId: UUID,
+      sort: Sort,
+      txHashes: NonEmptyList[TxHash]
+  ) = {
+
+    val belongsToTxs = allTxHashes(txHashes)
+
+    (sql"""
+          SELECT t.hash, i.output_hash, i.output_index, i.input_index, i.value, i.address, i.script_signature, i.txinwitness, i.sequence, i.derivation
+            FROM transaction t
+            LEFT JOIN input i on i.account_id = t.account_id and i.hash = t.hash
+           WHERE t.account_id = $accountId
+             AND $belongsToTxs
+       """ ++ transactionOrder(sort))
+      .query[(TxHash, Option[InputView])]
+  }
+
+  private def fetchOutputs(
+      accountId: UUID,
+      sort: Sort,
+      txHashes: NonEmptyList[TxHash]
+  ) = {
+
+    val belongsToTxs = allTxHashes(txHashes)
+
+    (
+      sql"""
+          SELECT t.hash, output.output_index, output.value, output.address, output.script_hex, output.change_type, output.derivation
+            FROM transaction t  
+            LEFT JOIN output on output.account_id = t.account_id and output.hash = t.hash
+           WHERE t.account_id = $accountId
+             AND $belongsToTxs
+       """ ++ transactionOrder(sort)
+    ).query[(TxHash, Option[OutputView])]
+  }
 }

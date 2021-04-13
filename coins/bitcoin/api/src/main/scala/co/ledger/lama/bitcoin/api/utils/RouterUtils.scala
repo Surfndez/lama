@@ -48,6 +48,8 @@ object RouterUtils {
   object OptionalOffsetQueryParamMatcher extends OptionalQueryParamDecoderMatcher[Int]("offset")
   object OptionalSortQueryParamMatcher   extends OptionalQueryParamDecoderMatcher[Sort]("sort")
 
+  object OptionalCursorQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("cursor")
+
   implicit val isoInstantCodec: QueryParamCodec[Instant] =
     QueryParamCodec.instantQueryParamCodec(DateTimeFormatter.ISO_INSTANT)
 

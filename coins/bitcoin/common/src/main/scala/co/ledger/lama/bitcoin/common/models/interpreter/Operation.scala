@@ -62,22 +62,35 @@ object Operation {
     )
   }
 
-  def uid(accountId: AccountId, txId: TxId, operationType: OperationType): UID = {
+  def uid(
+      accountId: AccountId,
+      txId: TxId,
+      operationType: OperationType,
+      blockHeight: Option[Long]
+  ): UID = {
 
     val libcoreType = operationType match {
       case OperationType.Send    => "SEND"
       case OperationType.Receive => "RECEIVE"
     }
 
-    val rawUid = s"uid:${accountId.value.toString.toLowerCase}+${txId.value}+$libcoreType"
+    val blockHeightPrefix = blockHeight.getOrElse(0L)
+    val txIdPrefix        = txId.value.take(2).toList.map(_.toLong).mkString.toLong.toHexString
 
-    UID(
+    // This prefix ensures to have a sequential uid
+    val prefix = s"$blockHeightPrefix$txIdPrefix"
+
+    val rawUid =
+      s"uid:${accountId.value.toString.toLowerCase}+${txId.value}+$libcoreType"
+
+    val hex =
       MessageDigest
         .getInstance("SHA-256")
         .digest(rawUid.getBytes("UTF-8"))
         .map("%02x".format(_))
         .mkString
-    )
+
+    UID(prefix ++ hex)
   }
 
 }

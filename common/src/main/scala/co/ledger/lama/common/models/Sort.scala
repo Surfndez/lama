@@ -4,14 +4,19 @@ import io.circe.{Decoder, Encoder}
 import pureconfig.ConfigReader
 import pureconfig.error.CannotConvert
 
-abstract class Sort(val name: String) {
+sealed trait Sort {
+  val name: String
   override def toString: String = name
 }
 
 object Sort {
-  case object Ascending extends Sort("ASC")
+  final case object Ascending extends Sort {
+    val name: String = "ASC"
+  }
 
-  case object Descending extends Sort("DESC")
+  final case object Descending extends Sort {
+    val name: String = "DESC"
+  }
 
   val all: Map[String, Sort] = Map(Ascending.name -> Ascending, Descending.name -> Descending)
 

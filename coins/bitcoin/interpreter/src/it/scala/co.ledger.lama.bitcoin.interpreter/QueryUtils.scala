@@ -23,7 +23,7 @@ object QueryUtils {
       accountId: UUID,
       txHash: TxHash
   ): IO[Option[(List[InputView], List[OutputView])]] = {
-    OperationQueries
+    TransactionQueries
       .fetchTransactionDetails(accountId, Sort.Descending, NonEmptyList.one(txHash))
       .transact(db)
       .map(io => (io.inputs, io.outputs))
@@ -47,10 +47,8 @@ object QueryUtils {
 
   def fetchOps(db: Transactor[IO], accountId: UUID): IO[List[OperationQueries.OpWithoutDetails]] = {
     OperationQueries
-      .fetchOperations(accountId)
+      .fetchOperations(accountId, 1000, Sort.Descending, None)
       .transact(db)
-      .compile
-      .toList
   }
 
   def saveOp(db: Transactor[IO], operation: OperationToSave): IO[Unit] = {

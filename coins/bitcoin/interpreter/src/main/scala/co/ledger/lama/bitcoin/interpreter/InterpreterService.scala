@@ -55,19 +55,18 @@ class InterpreterGrpcService(
   ): IO[protobuf.GetOperationsResult] = {
     for {
       accountId <- UuidUtils.bytesToUuidIO(request.accountId)
-      sort = Sort.fromIsAsc(request.sort.isAsc)
+      sort   = Sort.fromIsAsc(request.sort.isAsc)
+      cursor = PaginationToken.fromBase64[OperationPaginationState](request.cursor)
       _ <- log.info(s"""Getting operations with parameters:
                   - accountId: $accountId
-                  - blockHeight: ${request.blockHeight}
                   - limit: ${request.limit}
-                  - offset: ${request.offset}
-                  - sort: $sort""")
+                  - sort: $sort
+                  - cursor: $cursor""")
       opResult <- interpreter.getOperations(
         accountId,
-        request.blockHeight,
         request.limit,
-        request.offset,
-        sort
+        sort,
+        cursor
       )
     } yield opResult.toProto
   }

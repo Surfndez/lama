@@ -42,14 +42,12 @@ class Interpreter(
 
   def getOperations(
       accountId: UUID,
-      blockHeight: Long,
       requestLimit: Int,
-      requestOffset: Int,
-      sort: Sort
+      sort: Sort,
+      cursor: Option[PaginationToken[OperationPaginationState]]
   ): IO[GetOperationsResult] = {
-    val limit  = if (requestLimit <= 0) 20 else requestLimit
-    val offset = if (requestOffset < 0) 0 else requestOffset
-    operationService.getOperations(accountId, blockHeight, limit, offset, sort)
+    val limit = if (requestLimit <= 0) 20 else requestLimit
+    operationService.getOperations(accountId, limit, sort, cursor)
   }
 
   def getOperation(

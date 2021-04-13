@@ -6,11 +6,12 @@ import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.interpreter.models.{OperationToSave, TransactionAmounts}
 import co.ledger.lama.bitcoin.interpreter.models.implicits._
 import co.ledger.lama.common.logging.DoobieLogHandler
-import co.ledger.lama.common.models.{Sort, TxHash}
+import co.ledger.lama.common.models.{PaginationToken, Sort, TxHash}
 import doobie._
 import doobie.implicits._
 import doobie.postgres.implicits._
 import fs2.{Chunk, Pipe, Stream}
+
 import java.time.Instant
 import java.util.UUID
 
@@ -41,33 +42,34 @@ object OperationQueries extends DoobieLogHandler {
   )
 
   case class OpWithoutDetails(op: Op, tx: Tx)
-  case class TransactionDetails(
+
+  case class OperationDetails(
       txHash: TxHash,
       inputs: List[InputView],
       outputs: List[OutputView]
   )
 
-  def fetchTransactionDetails(
+  def fetchOperationDetails(
       accountId: UUID,
       sort: Sort,
-      txHashes: NonEmptyList[TxHash]
-  ): Stream[doobie.ConnectionIO, TransactionDetails] = {
+      opHashes: NonEmptyList[TxHash]
+  ): Stream[doobie.ConnectionIO, OperationDetails] = {
     log.logger.debug(
-      s"Fetching inputs and outputs for accountId $accountId and hashes in $txHashes"
+      s"Fetching inputs and outputs for accountId $accountId and hashes in $opHashes"
     )
 
     def groupByTxHash[T]: Pipe[ConnectionIO, (TxHash, T), (TxHash, Chunk[T])] =
       _.groupAdjacentBy { case (txHash, _) => txHash }
         .map { case (txHash, chunks) => txHash -> chunks.map(_._2) }
 
-    val inputs  = fetchInputs(accountId, sort, txHashes).stream.through(groupByTxHash)
-    val outputs = fetchOutputs(accountId, sort, txHashes).stream.through(groupByTxHash)
+    val inputs  = fetchInputs(accountId, sort, opHashes).stream.through(groupByTxHash)
+    val outputs = fetchOutputs(accountId, sort, opHashes).stream.through(groupByTxHash)
 
     inputs
       .zip(outputs)
       .collect {
         case ((txhash1, i), (txHash2, o)) if txhash1 == txHash2 =>
-          TransactionDetails(
+          OperationDetails(
             txhash1,
             inputs = i.toList.flatten.sortBy(i => (i.outputHash, i.outputIndex)),
             outputs = o.toList.flatten.sortBy(_.outputIndex)
@@ -181,45 +183,46 @@ object OperationQueries extends DoobieLogHandler {
        """.update.run
   }
 
-  private def transactionOrder(sort: Sort) =
-    Fragment.const(s"ORDER BY t.block_time $sort, t.hash $sort")
-  private def allTxHashes(hashes: NonEmptyList[TxHash]) =
-    Fragments.in(fr"t.hash", hashes.map(_.hex))
+  private def operationOrder(sort: Sort) =
+    Fragment.const(s"ORDER BY o.uid $sort")
+
+  private def allOpHashes(hashes: NonEmptyList[TxHash]) =
+    Fragments.in(fr"o.hash", hashes.map(_.hex))
 
   private def fetchInputs(
       accountId: UUID,
       sort: Sort,
-      txHashes: NonEmptyList[TxHash]
+      opHashes: NonEmptyList[TxHash]
   ) = {
 
-    val belongsToTxs = allTxHashes(txHashes)
+    val belongsToOps = allOpHashes(opHashes)
 
     (sql"""
-          SELECT t.hash, i.output_hash, i.output_index, i.input_index, i.value, i.address, i.script_signature, i.txinwitness, i.sequence, i.derivation
-            FROM transaction t 
-            LEFT JOIN input i on i.account_id = t.account_id and i.hash = t.hash
-           WHERE t.account_id = $accountId
-             AND $belongsToTxs
-       """ ++ transactionOrder(sort))
+          SELECT o.hash, i.output_hash, i.output_index, i.input_index, i.value, i.address, i.script_signature, i.txinwitness, i.sequence, i.derivation
+            FROM operation o
+            LEFT JOIN input i on i.account_id = o.account_id and i.hash = o.hash
+           WHERE o.account_id = $accountId
+             AND $belongsToOps
+       """ ++ operationOrder(sort))
       .query[(TxHash, Option[InputView])]
   }
 
   private def fetchOutputs(
       accountId: UUID,
       sort: Sort,
-      txHashes: NonEmptyList[TxHash]
+      opHashes: NonEmptyList[TxHash]
   ) = {
 
-    val belongsToTxs = allTxHashes(txHashes)
+    val belongsToOps = allOpHashes(opHashes)
 
     (
       sql"""
-          SELECT t.hash, output.output_index, output.value, output.address, output.script_hex, output.change_type, output.derivation
-            FROM transaction t  
-            LEFT JOIN output on output.account_id = t.account_id and output.hash = t.hash
-           WHERE t.account_id = $accountId
-             AND $belongsToTxs
-       """ ++ transactionOrder(sort)
+          SELECT o.hash, output.output_index, output.value, output.address, output.script_hex, output.change_type, output.derivation
+            FROM operation o  
+            LEFT JOIN output on output.account_id = o.account_id and output.hash = o.hash
+           WHERE o.account_id = $accountId
+             AND $belongsToOps
+       """ ++ operationOrder(sort)
     ).query[(TxHash, Option[OutputView])]
   }
 
@@ -237,26 +240,76 @@ object OperationQueries extends DoobieLogHandler {
            JOIN "operation" o on t.hash = o.hash and o.account_id = t.account_id 
        """
 
+  def hasPreviousPage(accountId: UUID, uid: Operation.UID, sort: Sort): ConnectionIO[Boolean] =
+    hasMorePage(accountId, uid, sort, isNext = false)
+
+  def hasNextPage(accountId: UUID, uid: Operation.UID, sort: Sort): ConnectionIO[Boolean] =
+    hasMorePage(accountId, uid, sort, isNext = true)
+
+  private def hasMorePage(
+      accountId: UUID,
+      uid: Operation.UID,
+      sort: Sort,
+      isNext: Boolean
+  ): ConnectionIO[Boolean] = {
+    val baseFragment = fr"SELECT uid FROM operation WHERE account_id = $accountId"
+
+    val filtersF =
+      (isNext, sort) match {
+        case (true, Sort.Ascending) | (false, Sort.Descending) =>
+          fr"AND uid > ${uid.hex} ORDER BY uid ASC"
+        case (true, Sort.Descending) | (false, Sort.Ascending) =>
+          fr"AND uid < ${uid.hex} ORDER BY uid DESC"
+      }
+
+    (baseFragment ++ filtersF ++ fr"LIMIT 1")
+      .query[String]
+      .option
+      .map(_.nonEmpty)
+  }
+
   def fetchOperations(
       accountId: UUID,
-      blockHeight: Long = 0L,
+      limit: Int,
       sort: Sort = Sort.Descending,
-      limit: Option[Int] = None,
-      offset: Option[Int] = None
-  ): Stream[ConnectionIO, OpWithoutDetails] = {
-    val limitF  = limit.map(l => fr"LIMIT $l").getOrElse(Fragment.empty)
-    val offsetF = offset.map(o => fr"OFFSET $o").getOrElse(Fragment.empty)
+      cursor: Option[PaginationToken[OperationPaginationState]]
+  ): ConnectionIO[List[OpWithoutDetails]] = {
+    val accountIdF = fr"WHERE o.account_id = $accountId"
 
-    val filter =
-      fr"""
-             WHERE o.account_id = $accountId
-               AND (o.block_height >= $blockHeight
-                OR o.block_height IS NULL)
-         """ ++ transactionOrder(sort) ++ limitF ++ offsetF
+    val filtersF = cursor
+      .map { page =>
+        val blockHeight = page.state.blockHeight
+        val uid         = page.state.uid.hex
 
-    (operationWithTx ++ filter)
+        (page.isNext, sort) match {
+          case (true, Sort.Ascending) | (false, Sort.Descending) =>
+            fr"""
+                 AND (o.block_height >= $blockHeight OR o.block_height IS NULL)
+                 AND o.uid > $uid
+                 ORDER BY o.uid ASC
+              """
+
+          case (true, Sort.Descending) | (false, Sort.Ascending) =>
+            fr"""
+                 AND (o.block_height <= $blockHeight OR o.block_height IS NULL)
+                 AND o.uid < $uid
+                 ORDER BY o.uid DESC
+              """
+        }
+      }
+      .getOrElse(Fragment.const(s"ORDER BY o.uid $sort"))
+
+    val limitF = fr"LIMIT $limit"
+
+    (operationWithTx ++ accountIdF ++ filtersF ++ limitF)
       .query[OpWithoutDetails]
-      .stream
+      .to[List]
+      .map { list =>
+        cursor match {
+          case Some(PaginationToken(_, false)) => list.reverse
+          case _                               => list
+        }
+      }
   }
 
   def findOperation(

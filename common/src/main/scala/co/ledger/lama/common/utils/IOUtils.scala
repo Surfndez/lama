@@ -25,6 +25,28 @@ object IOUtils {
       }
   }
 
+  def fetchPaginatedItemsByCursor[T](
+      evaluate: (Int, Option[String]) => IO[T],
+      getNextCursor: T => Option[String],
+      limit: Int = 20,
+      cursor: Option[String]
+  ): Pull[IO, T, Unit] = {
+    Pull
+      .eval(
+        evaluate(limit, cursor)
+      )
+      .flatMap { res =>
+        getNextCursor(res) match {
+          case nextCursor @ Some(_) =>
+            Pull.output(Chunk(res)) >>
+              fetchPaginatedItemsByCursor[T](evaluate, getNextCursor, limit, nextCursor)
+
+          case None =>
+            Pull.output(Chunk(res))
+        }
+      }
+  }
+
   def retry[T](io: IO[T], policy: RetryPolicy = RetryPolicy.linear())(implicit
       t: Timer[IO]
   ): IO[T] = {

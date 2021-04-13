@@ -276,9 +276,8 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
       // List account operations
       case GET -> Root / UUIDVar(
             accountId
-          ) / "operations" :? OptionalBlockHeightQueryParamMatcher(blockHeight)
+          ) / "operations" :? OptionalCursorQueryParamMatcher(cursor)
           +& OptionalBoundedLimitQueryParamMatcher(limit)
-          +& OptionalOffsetQueryParamMatcher(offset)
           +& OptionalSortQueryParamMatcher(sort) =>
         for {
           boundedLimit <- parseBoundedLimit(limit)
@@ -286,10 +285,9 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
           res <- interpreterClient
             .getOperations(
               accountId = accountId,
-              blockHeight = blockHeight.getOrElse(0L),
               limit = boundedLimit.value,
-              offset = offset.getOrElse(0),
-              sort = sort
+              sort = sort,
+              cursor = cursor
             )
             .flatMap(Ok(_))
         } yield res

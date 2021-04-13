@@ -10,38 +10,51 @@ import org.scalatest.matchers.should.Matchers
 
 import java.time.Instant
 import java.util.UUID
+import scala.util.Random
 
 class QueriesIT extends AnyFlatSpecLike with Matchers with TestResources {
 
-  val block: BlockView = BlockView(
-    "00000000000000000008c76a28e115319fb747eb29a7e0794526d0fe47608379",
-    570153,
-    Instant.parse("2019-04-04T10:03:22Z")
-  )
-
   val accountId: UUID = UUID.fromString("b723c553-3a9a-4130-8883-ee2f6c2f9201")
 
-  val outputs = List(
-    OutputView(0, 50000, "1DtwACvd338XtHBFYJRVKRLxviD7YtYADa", "script", None, None),
-    OutputView(1, 9434, "1LK8UbiRwUzC8KFEbMKvgbvriM9zLMce3C", "script", None, None)
-  )
-  val inputs = List(
-    InputView(
-      "0f38e5f1b12078495a9e80c6e0d77af3d674cfe6096bb6e7909993a53b6e8386",
-      0,
-      0,
-      80000,
-      "1LD1pARePgXXyZA1J3EyvRtB82vxENs5wQ",
-      "script",
-      List(),
-      4294967295L,
-      None
+  def randomAlphanumeric(length: Int): String =
+    Random.alphanumeric.take(length).mkString
+
+  def generateBlock(): BlockView = {
+    val blockHash   = randomAlphanumeric(10)
+    val blockHeight = Random.nextInt(5)
+    BlockView(
+      blockHash,
+      blockHeight,
+      Instant.parse("2019-04-04T10:03:22Z")
     )
-  )
-  val transactionToInsert: TransactionView =
+  }
+
+  def generateTransaction(): TransactionView = {
+    val txId = randomAlphanumeric(10)
+
+    val outputs = List(
+      OutputView(0, 50000, randomAlphanumeric(10), "script", None, None),
+      OutputView(1, 9434, randomAlphanumeric(10), "script", None, None)
+    )
+    val inputs = List(
+      InputView(
+        randomAlphanumeric(10),
+        0,
+        0,
+        80000,
+        "1LD1pARePgXXyZA1J3EyvRtB82vxENs5wQ",
+        "script",
+        List(),
+        4294967295L,
+        None
+      )
+    )
+
+    val block = generateBlock()
+
     TransactionView(
-      "txId",
-      "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1f",
+      txId,
+      txId,
       Instant.parse("2019-04-04T10:03:22Z"),
       0,
       20566,
@@ -50,6 +63,9 @@ class QueriesIT extends AnyFlatSpecLike with Matchers with TestResources {
       Some(block),
       1
     )
+  }
+
+  val transactionToInsert: TransactionView = generateTransaction()
 
   "transaction saved in db" should "not be returned and populated by fetch before Interpreter.compute" in IOAssertion {
     setup() *>
@@ -68,7 +84,12 @@ class QueriesIT extends AnyFlatSpecLike with Matchers with TestResources {
           opWithTx <- QueryUtils.fetchOpAndTx(
             db,
             account,
-            Operation.uid(account, Operation.TxId(transactionToInsert.hash), opToSave.operationType)
+            Operation.uid(
+              account,
+              Operation.TxId(transactionToInsert.hash),
+              opToSave.operationType,
+              opToSave.blockHeight
+            )
           )
         } yield {
 
@@ -90,7 +111,8 @@ class QueriesIT extends AnyFlatSpecLike with Matchers with TestResources {
     Operation.uid(
       Operation.AccountId(accountId),
       Operation.TxId(transactionToInsert.id),
-      OperationType.Send
+      OperationType.Send,
+      transactionToInsert.block.map(_.height)
     ),
     accountId,
     transactionToInsert.hash,
@@ -99,9 +121,9 @@ class QueriesIT extends AnyFlatSpecLike with Matchers with TestResources {
       i.value
     }.sum,
     transactionToInsert.fees,
-    block.time,
-    Some(block.hash),
-    Some(block.height)
+    transactionToInsert.block.get.time,
+    transactionToInsert.block.map(_.hash),
+    transactionToInsert.block.map(_.height)
   )
 
   "operation saved in db" should "be fetched" in IOAssertion {

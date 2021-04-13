@@ -12,22 +12,24 @@ class OperationTest extends AnyFlatSpec with Matchers {
 
     val accountId = Operation.AccountId(UUID.fromString("3bd0b597-3638-4167-9ed3-aa4267efbe0c"))
     val txId      = Operation.TxId("169e1e83e930853391bc6f35f605c6754cfead57cf8387639d3b4096c54f18f4")
-    val uid       = Operation.uid(accountId, txId, OperationType.Receive)
+    val uid       = Operation.uid(accountId, txId, OperationType.Receive, None)
 
     uid should be(
-      Operation.UID("f8e341fb691ba8e4f611635e46637aa9bdfed84d01f1040d180ed3a166386cd1")
+      Operation.UID("0135af8e341fb691ba8e4f611635e46637aa9bdfed84d01f1040d180ed3a166386cd1")
     )
 
-    uid should not be Operation.uid(accountId, txId, OperationType.Send)
+    uid should not be Operation.uid(accountId, txId, OperationType.Send, None)
     uid should not be Operation.uid(
       Operation.AccountId(UUID.randomUUID()),
       txId,
-      OperationType.Receive
+      OperationType.Receive,
+      None
     )
     uid should not be Operation.uid(
       accountId,
       Operation.TxId("another tx id"),
-      OperationType.Receive
+      OperationType.Receive,
+      None
     )
   }
 

@@ -154,7 +154,13 @@ class InterpreterClientMock extends InterpreterClient {
       operationType: OperationType
   ) = {
     Operation(
-      Operation.uid(Operation.AccountId(accountId), Operation.TxId(tx.id), operationType),
+      Operation
+        .uid(
+          Operation.AccountId(accountId),
+          Operation.TxId(tx.id),
+          operationType,
+          tx.block.map(_.height)
+        ),
       accountId,
       tx.hash,
       tx,
@@ -168,27 +174,27 @@ class InterpreterClientMock extends InterpreterClient {
 
   def getOperations(
       accountId: UUID,
-      blockHeight: Long,
       limit: Int,
-      offset: Int,
-      sort: Option[Sort]
+      sort: Option[Sort],
+      cursor: Option[String]
   ): IO[GetOperationsResult] = {
 
     val ops: List[Operation] = operations(accountId)
-      .filter(_.transaction.block.exists(_.height > blockHeight))
+      //.filter(_.transaction.block.exists(_.height > blockHeight))
       .sortBy(_.transaction.block.get.height)
-      .slice(offset, offset + limit)
+      .slice(0, limit)
 
-    val total = operations(accountId).count(_.transaction.block.get.height > blockHeight)
+    val total = operations(accountId).count(_.transaction.block.isDefined)
 
     IO(
       new GetOperationsResult(
         ops,
         total,
-        ops.size < operations(accountId).size
+        None
       )
     )
   }
+
   def getOperation(
       accountId: UUID,
       operationId: String

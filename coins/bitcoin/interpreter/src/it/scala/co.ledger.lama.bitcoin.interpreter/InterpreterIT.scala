@@ -111,13 +111,16 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
           resOpsBeforeDeletion <- interpreter.getOperations(
             accountId,
-            blockHeight = 0L,
             20,
-            0,
-            Sort.Ascending
+            Sort.Ascending,
+            None
           )
 
-          GetOperationsResult(opsBeforeDeletion, opsBeforeDeletionTotal, opsBeforeDeletionTrunc) =
+          GetOperationsResult(
+            opsBeforeDeletion,
+            opsBeforeDeletionTotal,
+            opsBeforeDeletionCursor
+          ) =
             resOpsBeforeDeletion
 
           resUtxoBeforeDeletion <- interpreter.getUtxos(
@@ -143,13 +146,12 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
           resOpsAfterDeletion <- interpreter.getOperations(
             accountId,
-            blockHeight = 0L,
             20,
-            0,
-            Sort.Ascending
+            Sort.Ascending,
+            None
           )
 
-          GetOperationsResult(opsAfterDeletion, opsAfterDeletionTotal, opsAfterDeletionTrunc) =
+          GetOperationsResult(opsAfterDeletion, opsAfterDeletionTotal, opsAfterDeletionCursor) =
             resOpsAfterDeletion
 
           balancesAfterDeletion <- interpreter.getBalanceHistory(
@@ -165,7 +167,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
           opsBeforeDeletion should have size 3
           opsBeforeDeletionTotal shouldBe 3
-          opsBeforeDeletionTrunc shouldBe false
+          opsBeforeDeletionCursor shouldBe None
 
           utxosBeforeDeletion should have size 3
           utxosBeforeDeletionTotal shouldBe 3
@@ -175,7 +177,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
           opsAfterDeletion shouldBe empty
           opsAfterDeletionTotal shouldBe 0
-          opsAfterDeletionTrunc shouldBe false
+          opsAfterDeletionCursor shouldBe None
 
           balancesAfterDeletion shouldBe empty
 
@@ -213,7 +215,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
             List(outputAddress1),
             Coin.Btc
           )
-          res <- interpreter.getOperations(accountId, 0L, 20, 0, Sort.Descending)
+          res <- interpreter.getOperations(accountId, 20, Sort.Descending, None)
           GetOperationsResult(operations, _, _) = res
           currentBalance <- interpreter.getBalance(accountId)
           balanceHistory <- interpreter.getBalanceHistory(accountId, None, None, 0)
@@ -267,7 +269,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
             List(outputAddress1),
             Coin.Btc
           )
-          res <- interpreter.getOperations(accountId, 0L, 20, 0, Sort.Descending)
+          res <- interpreter.getOperations(accountId, 20, Sort.Descending, None)
           GetOperationsResult(operations, _, _) = res
         } yield {
           operations should have size 1
@@ -329,7 +331,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
           _             <- interpreter.compute(accountId, List(outputAddress1), Coin.Btc)
           firstBalance  <- interpreter.getBalance(accountId)
           firstBalanceH <- interpreter.getBalanceHistory(accountId, None, None, 0)
-          r1            <- interpreter.getOperations(accountId, 0L, 20, 0, Sort.Descending)
+          r1            <- interpreter.getOperations(accountId, 20, Sort.Descending, None)
           GetOperationsResult(firstOperations, _, _) = r1
 
           _ <- saveTxs(
@@ -342,7 +344,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
           _              <- interpreter.compute(accountId, List(outputAddress1, outputAddress2), Coin.Btc)
           secondBalance  <- interpreter.getBalance(accountId)
           secondBalanceH <- interpreter.getBalanceHistory(accountId, None, None, 0)
-          r2             <- interpreter.getOperations(accountId, 0L, 20, 0, Sort.Descending)
+          r2             <- interpreter.getOperations(accountId, 20, Sort.Descending, None)
           GetOperationsResult(secondOperations, _, _) = r2
 
           _ <- saveTxs(
@@ -357,7 +359,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
           _            <- interpreter.compute(accountId, List(outputAddress1, outputAddress2), Coin.Btc)
           lastBalance  <- interpreter.getBalance(accountId)
           lastBalanceH <- interpreter.getBalanceHistory(accountId, None, None, 0)
-          r3           <- interpreter.getOperations(accountId, 0L, 20, 0, Sort.Descending)
+          r3           <- interpreter.getOperations(accountId, 20, Sort.Descending, None)
           GetOperationsResult(lastOperations, _, _) = r3
 
         } yield {

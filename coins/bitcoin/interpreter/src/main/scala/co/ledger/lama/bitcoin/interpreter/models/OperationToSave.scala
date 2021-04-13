@@ -68,7 +68,8 @@ case class TransactionAmounts(
 
   private def makeOperationToSave(amount: BigInt, operationType: OperationType) = {
     OperationToSave(
-      Operation.uid(Operation.AccountId(accountId), Operation.TxId(hash), operationType),
+      Operation
+        .uid(Operation.AccountId(accountId), Operation.TxId(hash), operationType, blockHeight),
       accountId = accountId,
       hash = hash,
       operationType = operationType,

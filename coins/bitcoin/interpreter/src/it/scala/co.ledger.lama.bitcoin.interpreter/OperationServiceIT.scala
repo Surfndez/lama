@@ -2,11 +2,10 @@ package co.ledger.lama.bitcoin.interpreter
 
 import java.time.Instant
 import java.util.UUID
-
 import cats.data.NonEmptyList
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.interpreter.services.{FlaggingService, OperationService}
-import co.ledger.lama.common.models.Sort
+import co.ledger.lama.common.models.{PaginationToken, Sort}
 import co.ledger.lama.common.utils.IOAssertion
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -95,16 +94,15 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
 
           res <- operationService.getOperations(
             accountId,
-            blockHeight = 0L,
             limit = 20,
-            offset = 0,
-            sort = Sort.Ascending
+            sort = Sort.Ascending,
+            None
           )
-          GetOperationsResult(ops, total, trunc) = res
+          GetOperationsResult(ops, total, cursor) = res
         } yield {
           ops should have size 1
           total shouldBe 1
-          trunc shouldBe false
+          cursor shouldBe None
 
           val op = ops.head
           val tx = op.transaction
@@ -144,7 +142,8 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
               Operation.TxId(
                 insertTx1.hash // because of compute which  put tx.hash in operation.hash instead of txid
               ),
-              OperationType.Send
+              OperationType.Send,
+              insertTx1.block.map(_.height)
             )
           )
 
@@ -169,7 +168,7 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
 
   }
 
-  it should "fetched only ops from a blockHeight cursor" in IOAssertion {
+  it should "fetched only ops from a cursor" in IOAssertion {
     setup() *>
       appResources.use { db =>
         val operationService = new OperationService(db, conf.db.batchConcurrency)
@@ -183,18 +182,41 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
             .compute(accountId)
             .compile
             .toList
-          res <- operationService.getOperations(
+
+          resFirstPage <- operationService.getOperations(
             accountId,
-            blockHeight = block2.height,
-            limit = 20,
-            offset = 0,
-            sort = Sort.Ascending
+            limit = 1,
+            sort = Sort.Ascending,
+            None
           )
-          GetOperationsResult(ops, total, trunc) = res
+
+          firstPageNextCursor = resFirstPage.cursor
+            .flatMap(_.next)
+            .flatMap(PaginationToken.fromBase64[OperationPaginationState](_))
+
+          resLastPage <- operationService.getOperations(
+            accountId,
+            limit = 1,
+            sort = Sort.Ascending,
+            firstPageNextCursor
+          )
+
+          GetOperationsResult(ops, total, lastPageCursor) = resLastPage
         } yield {
+
+          firstPageNextCursor shouldBe Some(
+            PaginationToken(
+              OperationPaginationState(
+                uid = resFirstPage.operations.last.uid,
+                blockHeight = block1.height
+              ),
+              isNext = true
+            )
+          )
+
           ops should have size 1
-          total shouldBe 1
-          trunc shouldBe false
+          total shouldBe 2
+          lastPageCursor.flatMap(_.next) shouldBe None
 
           val op = ops.head
           val tx = op.transaction

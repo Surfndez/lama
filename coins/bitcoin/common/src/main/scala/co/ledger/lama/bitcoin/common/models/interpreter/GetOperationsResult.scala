@@ -8,13 +8,13 @@ import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfigur
 case class GetOperationsResult(
     operations: List[Operation],
     total: Int,
-    truncated: Boolean
+    cursor: Option[PaginationCursor]
 ) {
   def toProto: protobuf.GetOperationsResult =
     protobuf.GetOperationsResult(
       operations.map(_.toProto),
       total,
-      truncated
+      cursor.map(_.toProto)
     )
 }
 
@@ -27,6 +27,6 @@ object GetOperationsResult {
     GetOperationsResult(
       proto.operations.map(Operation.fromProto).toList,
       proto.total,
-      proto.truncated
+      proto.cursor.map(PaginationCursor.fromProto)
     )
 }

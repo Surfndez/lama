@@ -70,11 +70,17 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
       uri = accounts / accountId.toString
     )
 
-  private def getOperationsRequest(accountId: UUID, offset: Int, limit: Int, sort: Sort) =
+  private def getOperationsRequest(
+      accountId: UUID,
+      sort: Sort,
+      limit: Int,
+      cursor: Option[String]
+  ) =
     Request[IO](
       method = Method.GET,
       uri = Uri.unsafeFromString(
-        s"$serverUrl/accounts/$accountId/operations?limit=$limit&offset=$offset&sort=$sort"
+        s"$serverUrl/accounts/$accountId/operations?sort=$sort&limit=$limit"
+          ++ cursor.map(c => s"&cursor=$c").getOrElse("")
       )
     )
 
@@ -161,22 +167,22 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
               )
 
             operations <- IOUtils
-              .fetchPaginatedItems[GetOperationsResult](
-                (offset, limit) =>
+              .fetchPaginatedItemsByCursor[GetOperationsResult](
+                (limit, cursor) =>
                   IOUtils.retryIf[GetOperationsResult](
                     client.expect[GetOperationsResult](
                       getOperationsRequest(
                         accountRegistered.accountId,
-                        offset,
+                        Sort.Descending,
                         limit,
-                        Sort.Descending
+                        cursor
                       )
                     ),
                     _.operations.nonEmpty
                   ),
-                _.truncated,
-                0,
-                20
+                _.cursor.flatMap(_.next),
+                20,
+                None
               )
               .stream
               .compile

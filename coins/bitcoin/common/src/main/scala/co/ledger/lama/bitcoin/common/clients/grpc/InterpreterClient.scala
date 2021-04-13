@@ -27,10 +27,9 @@ trait InterpreterClient {
 
   def getOperations(
       accountId: UUID,
-      blockHeight: Long,
       limit: Int,
-      offset: Int,
-      sort: Option[Sort]
+      sort: Option[Sort],
+      cursor: Option[String]
   ): IO[GetOperationsResult]
 
   def getOperation(
@@ -119,19 +118,17 @@ class InterpreterGrpcClient(
 
   def getOperations(
       accountId: UUID,
-      blockHeight: Long,
       limit: Int,
-      offset: Int,
-      sort: Option[Sort]
+      sort: Option[Sort],
+      cursor: Option[String]
   ): IO[GetOperationsResult] =
     client
       .getOperations(
         protobuf.GetOperationsRequest(
           accountId = UuidUtils.uuidToBytes(accountId),
-          blockHeight = blockHeight,
           limit = limit,
-          offset = offset,
-          sort = sort.map(_.toProto).getOrElse(protobuf.SortingOrder.DESC)
+          sort = sort.map(_.toProto).getOrElse(protobuf.SortingOrder.DESC),
+          cursor = cursor.getOrElse("")
         ),
         new Metadata
       )
