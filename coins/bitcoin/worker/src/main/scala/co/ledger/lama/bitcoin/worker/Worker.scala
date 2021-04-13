@@ -14,7 +14,7 @@ import co.ledger.lama.bitcoin.worker.services._
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.Status.{Registered, Unregistered}
 import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
-import co.ledger.lama.common.models.{AccountIdentifier, Coin, ReportError, ReportableEvent}
+import co.ledger.lama.common.models.{Account, Coin, ReportError, ReportableEvent}
 import fs2.Stream
 import io.circe.syntax._
 
@@ -79,7 +79,7 @@ class Worker(
     // sync the whole account per streamed batch
     for {
 
-      keychainId <- IO.fromTry(Try(UUID.fromString(account.key)))
+      keychainId <- IO.fromTry(Try(UUID.fromString(account.identifier)))
 
       addressesUsedByMempool <- bookkeeper
         .record[UnconfirmedTransaction](
@@ -133,7 +133,7 @@ class Worker(
   def lastMinedBlock(coin: Coin): IO[LastMinedBlock] =
     explorerClient(coin).getCurrentBlock.map(LastMinedBlock)
 
-  private def rewindToLastValidBlock(account: AccountIdentifier, lastKnownBlock: Block): IO[Block] =
+  private def rewindToLastValidBlock(account: Account, lastKnownBlock: Block): IO[Block] =
     for {
       lvb <- cursorService(account.coin).getLastValidState(AccountId(account.id), lastKnownBlock)
       _   <- log.info(s"Last valid block : $lvb")

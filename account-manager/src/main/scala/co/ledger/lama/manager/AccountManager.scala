@@ -36,7 +36,7 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
       group: AccountGroup
   ): IO[SyncEventResult] = {
 
-    val account = AccountIdentifier(
+    val account = Account(
       key,
       coinFamily,
       coin,
@@ -62,12 +62,12 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
             label,
             syncFrequency
           )
-        accountId     = accountInfo.id
+        accountId     = accountInfo.account.id
         syncFrequency = accountInfo.syncFrequency
 
         // Create then insert the registered event.
         syncEvent = WorkableEvent[JsonObject](
-          account.id,
+          account,
           UUID.randomUUID(),
           Status.Registered,
           None,
@@ -91,15 +91,15 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
 
   def resyncAccount(accountId: UUID, wipe: Boolean): IO[SyncEventResult] =
     for {
-      account <- getAccountInfo(accountId)
+      accountInfos <- getAccountInfo(accountId)
 
       resyncFromCursor =
         if (wipe) None
-        else account.lastSyncEvent.flatMap(_.cursor)
+        else accountInfos.lastSyncEvent.flatMap(_.cursor)
 
       // Create then insert the registered event.
       syncEvent = WorkableEvent[JsonObject](
-        account.id,
+        accountInfos.account,
         UUID.randomUUID(),
         Status.Registered,
         resyncFromCursor,
@@ -107,7 +107,7 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
         Instant.now()
       )
       _ <- Queries.insertSyncEvent(syncEvent).transact(db)
-    } yield SyncEventResult(syncEvent.accountId, syncEvent.syncId)
+    } yield SyncEventResult(syncEvent.account.id, syncEvent.syncId)
 
   def unregisterAccount(
       accountId: UUID
@@ -125,18 +125,18 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
         case Some(e) =>
           IO.pure(
             SyncEventResult(
-              e.accountId,
+              e.account.id,
               e.syncId
             )
           )
 
         case _ =>
           for { //TODO: refacto double for ?
-            account <- getInfos(accountId)
+            accountInfos <- getInfos(accountId)
 
             // Create then insert an unregistered event.
             event = WorkableEvent[JsonObject](
-              account.id,
+              accountInfos.account,
               UUID.randomUUID(),
               Status.Unregistered,
               None,
@@ -147,7 +147,7 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
             result <- Queries
               .insertSyncEvent(event)
               .transact(db)
-              .map(_ => SyncEventResult(event.accountId, event.syncId))
+              .map(_ => SyncEventResult(event.account.id, event.syncId))
           } yield result
       }
     } yield result
@@ -157,17 +157,13 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
   ): IO[AccountInfo] =
     for {
       accountInfo   <- getInfos(accountId)
-      lastSyncEvent <- Queries.getLastSyncEvent(accountInfo.id).transact(db)
+      lastSyncEvent <- Queries.getLastSyncEvent(accountInfo.account.id).transact(db)
     } yield {
       AccountInfo(
-        accountInfo.id,
-        accountInfo.key,
-        accountInfo.coinFamily,
-        accountInfo.coin,
+        accountInfo.account,
         accountInfo.syncFrequency,
         lastSyncEvent,
-        accountInfo.label,
-        accountInfo.group
+        accountInfo.label
       )
     }
 
@@ -202,25 +198,21 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
       total <- Queries.countAccounts().transact(db)
     } yield {
       AccountsResult(
-        accounts.map(account =>
+        accounts.map(accountStatus =>
           AccountInfo(
-            account.id,
-            account.key,
-            account.coinFamily,
-            account.coin,
-            account.syncFrequency,
+            accountStatus.account,
+            accountStatus.syncFrequency,
             Some(
               SyncEvent(
-                account.id,
-                account.syncId,
-                account.status,
-                account.cursor,
-                account.error,
-                account.updated
+                accountStatus.account,
+                accountStatus.syncId,
+                accountStatus.status,
+                accountStatus.cursor,
+                accountStatus.error,
+                accountStatus.updated
               )
             ),
-            account.label,
-            account.group
+            accountStatus.label
           )
         ),
         total

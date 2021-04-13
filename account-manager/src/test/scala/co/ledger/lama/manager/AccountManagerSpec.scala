@@ -58,8 +58,8 @@ class AccountManagerSpec extends AnyFlatSpecLike with Matchers with BeforeAndAft
   val updatedSyncFrequency: Long          = 10000L
   val alternateUpdatedSyncFrequency: Long = 99999L
 
-  val accountIdentifier: AccountIdentifier =
-    AccountIdentifier(testKey, coinFamily, coin, testGroup)
+  val accountIdentifier: Account =
+    Account(testKey, coinFamily, coin, testGroup)
 
   it should "register a new account" in IOAssertion {
     transactor.use { db =>
@@ -74,7 +74,7 @@ class AccountManagerSpec extends AnyFlatSpecLike with Matchers with BeforeAndAft
 
         // it should be an account uuid from extendKey, coinFamily, coin
         response.accountId shouldBe
-          AccountIdentifier(
+          Account(
             testKey,
             CoinFamily.Bitcoin,
             Coin.Btc,
@@ -82,7 +82,7 @@ class AccountManagerSpec extends AnyFlatSpecLike with Matchers with BeforeAndAft
           ).id
 
         // check event
-        event.map(_.accountId) shouldBe Some(response.accountId)
+        event.map(_.account.id) shouldBe Some(response.accountId)
         event.map(_.syncId) shouldBe Some(response.syncId)
         event.map(_.status) shouldBe Some(Status.Registered)
         event.flatMap(_.cursor) shouldBe None
@@ -142,7 +142,7 @@ class AccountManagerSpec extends AnyFlatSpecLike with Matchers with BeforeAndAft
 
         // it should be an account uuid from extendKey, coinFamily, coin
         response.accountId shouldBe
-          AccountIdentifier(
+          Account(
             testKey,
             CoinFamily.Bitcoin,
             Coin.Btc,
@@ -168,7 +168,7 @@ class AccountManagerSpec extends AnyFlatSpecLike with Matchers with BeforeAndAft
 
         // check event
         unregisteredEvent = event.get
-        unregisteredEvent.accountId shouldBe response.accountId
+        unregisteredEvent.account.id shouldBe response.accountId
         unregisteredEvent.syncId shouldBe response.syncId
         unregisteredEvent.status shouldBe Status.Unregistered
         unregisteredEvent.cursor shouldBe None
@@ -197,7 +197,7 @@ class AccountManagerSpec extends AnyFlatSpecLike with Matchers with BeforeAndAft
       new AccountManager(db, conf.coins)
         .getAccountInfo(registeredAccountId)
         .map { response =>
-          response.key shouldBe testKey
+          response.account.identifier shouldBe testKey
           response.syncFrequency shouldBe updatedSyncFrequency
           response.lastSyncEvent shouldBe Some(unregisteredEvent)
         }
@@ -215,43 +215,51 @@ class AccountManagerSpec extends AnyFlatSpecLike with Matchers with BeforeAndAft
     }
   }
 
-
   it should "get all accounts only in target group" in IOAssertion {
     transactor.use { db =>
-      val service = new AccountManager(db, conf.coins)
-      val group1 = AccountGroup("First Group")
-      val group2 = AccountGroup("Second Group")
-      val keyA = UUID.randomUUID().toString
-      val keyB = UUID.randomUUID().toString
-      val keyC = UUID.randomUUID().toString
-      val accountIdA1 = AccountIdentifier(keyA, coinFamily, coin, group1).id
-      val accountIdB1 = AccountIdentifier(keyB, coinFamily, coin, group1).id
-      val accountIdA2 = AccountIdentifier(keyA, coinFamily, coin, group2).id
-      val accountIdC2 = AccountIdentifier(keyC, coinFamily, coin, group2).id
+      val service     = new AccountManager(db, conf.coins)
+      val group1      = AccountGroup("First Group")
+      val group2      = AccountGroup("Second Group")
+      val keyA        = UUID.randomUUID().toString
+      val keyB        = UUID.randomUUID().toString
+      val keyC        = UUID.randomUUID().toString
+      val accountIdA1 = Account(keyA, coinFamily, coin, group1).id
+      val accountIdB1 = Account(keyB, coinFamily, coin, group1).id
+      val accountIdA2 = Account(keyA, coinFamily, coin, group2).id
+      val accountIdC2 = Account(keyC, coinFamily, coin, group2).id
 
       for {
         _ <- service.registerAccount(keyA, coinFamily, coin, None, None, group1)
         _ <- service.registerAccount(keyB, coinFamily, coin, None, None, group1)
         _ <- service.registerAccount(keyA, coinFamily, coin, None, None, group2)
         _ <- service.registerAccount(keyC, coinFamily, coin, None, None, group2)
-        listGroup1 <- service.getAccounts(Some(group1), 0, 0).map(_.accounts).map(innerList => innerList.map(_.id))
-        listGroup2 <- service.getAccounts(Some(group2), 0, 0).map(_.accounts).map(innerList => innerList.map(_.id))
-        listAllGroups <- service.getAccounts(None, 0, 0).map(_.accounts).map(innerList => innerList.map(_.id))
+        listGroup1 <- service
+          .getAccounts(Some(group1), 0, 0)
+          .map(_.accounts)
+          .map(innerList => innerList.map(_.account.id))
+        listGroup2 <- service
+          .getAccounts(Some(group2), 0, 0)
+          .map(_.accounts)
+          .map(innerList => innerList.map(_.account.id))
+        listAllGroups <- service
+          .getAccounts(None, 0, 0)
+          .map(_.accounts)
+          .map(innerList => innerList.map(_.account.id))
       } yield {
         listGroup1 should have size 2
-        listGroup1 should contain (accountIdA1)
-        listGroup1 should contain (accountIdB1)
+        listGroup1 should contain(accountIdA1)
+        listGroup1 should contain(accountIdB1)
 
         listGroup2 should have size 2
-        listGroup2 should contain (accountIdA2)
-        listGroup2 should contain (accountIdC2)
+        listGroup2 should contain(accountIdA2)
+        listGroup2 should contain(accountIdC2)
 
         // We do not check the size on All Groups because
         // the test did register other accounts earlier
-        listAllGroups should contain (accountIdA1)
-        listAllGroups should contain (accountIdB1)
-        listAllGroups should contain (accountIdA2)
-        listAllGroups should contain (accountIdC2)
+        listAllGroups should contain(accountIdA1)
+        listAllGroups should contain(accountIdB1)
+        listAllGroups should contain(accountIdA2)
+        listAllGroups should contain(accountIdC2)
       }
     }
   }

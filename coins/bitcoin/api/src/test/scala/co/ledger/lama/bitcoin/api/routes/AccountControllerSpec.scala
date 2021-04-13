@@ -247,17 +247,13 @@ object AccountControllerSpec {
   def firstRejected(addresses: List[Address]): IO[List[AddressValidation]] =
     IO.delay(Rejected(addresses.head, reason = "rejected") :: addresses.tail.map(Accepted))
 
-  def validAccount(id: UUID): IO[AccountInfo] =
+  def validAccount(identifier: UUID): IO[AccountInfo] =
     IO.delay(
       new AccountInfo(
-        id,
-        UUID.randomUUID().toString,
-        CoinFamily.Bitcoin,
-        Coin.Btc,
+        Account(identifier.toString, CoinFamily.Bitcoin, Coin.Btc, AccountGroup("TestGroup")),
         1L,
         None,
-        None,
-        AccountGroup("TestGroup")
+        None
       )
     )
 

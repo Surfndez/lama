@@ -82,14 +82,10 @@ message AccountInfoRequest {
 }
 
 message AccountInfoResult {
-    bytes account_id = 1;
-    string key = 2;
+    Account account = 1;
     uint64 sync_frequency = 3;
     SyncEvent last_sync_event = 4;
-    CoinFamily coin_family = 5;
-    Coin coin = 6;
     AccountLabel label = 7;
-    GroupLabel group = 8;
 }
 
 message GetSyncEventsRequest {
@@ -104,8 +100,15 @@ message GetSyncEventsResult {
     int32 total = 2;
 }
 
+message Account {
+    string identifier = 1;
+    CoinFamily coinFamily = 2;
+    Coin coin = 3;
+    string group = 4;
+}
+
 message SyncEvent {
-    bytes account_id = 1;
+    Account account = 1;
     bytes sync_id = 2;
     string status = 3;
     bytes cursor = 4;

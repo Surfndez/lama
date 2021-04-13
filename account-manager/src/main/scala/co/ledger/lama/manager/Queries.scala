@@ -6,7 +6,7 @@ import cats.data.NonEmptyList
 import co.ledger.lama.common.logging.DoobieLogHandler
 import co.ledger.lama.common.models.messages.WorkerMessage
 import co.ledger.lama.common.models.{
-  AccountIdentifier,
+  Account,
   AccountInfo,
   Coin,
   CoinFamily,
@@ -37,7 +37,7 @@ object Queries extends DoobieLogHandler {
       coinFamily: CoinFamily,
       coin: Coin
   ): Stream[ConnectionIO, WorkerMessage[JsonObject]] =
-    sql"""SELECT "key", coin_family, coin, group_col, account_id, sync_id, status, "cursor", "error", updated
+    sql"""SELECT "key", coin_family, coin, group_col, sync_id, status, "cursor", "error", updated
           FROM workable_event
           WHERE coin_family = $coinFamily
           AND coin = $coin
@@ -50,7 +50,7 @@ object Queries extends DoobieLogHandler {
       coin: Coin
   ): Stream[ConnectionIO, TriggerableEvent[JsonObject]] =
     (
-      sql"""SELECT account_id, sync_id, status, "cursor", "error", updated
+      sql"""SELECT "key", coin_family, coin, group_col, sync_id, status, "cursor", "error", updated
             FROM account_sync_status
             WHERE updated + sync_frequency < CURRENT_TIMESTAMP
             AND coin_family = $coinFamily
@@ -62,21 +62,24 @@ object Queries extends DoobieLogHandler {
         )
     ).query[TriggerableEvent[JsonObject]].stream
 
-  def getAccounts(group: Option[String], offset: Int, limit: Int): Stream[ConnectionIO, AccountSyncStatus] = {
+  def getAccounts(
+      group: Option[String],
+      offset: Int,
+      limit: Int
+  ): Stream[ConnectionIO, AccountSyncStatus] = {
     val groupFilter = group.map(name => fr"group_col = $name")
-    val q: Fragment = fr"""SELECT account_id, "key", coin_family, coin,
-        extract(epoch FROM sync_frequency) / 60 * 60, label, group_col, sync_id,
+    val q: Fragment = fr"""SELECT "key", coin_family, coin, group_col,
+        extract(epoch FROM sync_frequency) / 60 * 60, label, sync_id,
         status, "cursor", "error", updated
     FROM account_sync_status """ ++
-          Fragments.whereAndOpt(groupFilter) ++
-          fr"""LIMIT $limit""" ++
-          fr"""OFFSET $offset"""
-      q.query[AccountSyncStatus]
-      .stream
+      Fragments.whereAndOpt(groupFilter) ++
+      fr"""LIMIT $limit""" ++
+      fr"""OFFSET $offset"""
+    q.query[AccountSyncStatus].stream
   }
 
   def getAccountInfo(accountId: UUID): ConnectionIO[Option[AccountInfo]] =
-    sql"""SELECT account_id, "key", coin_family, coin, extract(epoch FROM sync_frequency)/60*60, label, group_col
+    sql"""SELECT "key", coin_family, coin, group_col, extract(epoch FROM sync_frequency)/60*60, label
           FROM account_info
           WHERE account_id = $accountId
          """
@@ -103,34 +106,59 @@ object Queries extends DoobieLogHandler {
   }
 
   def insertAccountInfo(
-      accountIdentifier: AccountIdentifier,
+      account: Account,
       label: Option[String],
       syncFrequency: Long
   ): ConnectionIO[AccountInfo] = {
-    val accountId  = accountIdentifier.id
-    val key        = accountIdentifier.key
-    val coinFamily = accountIdentifier.coinFamily
-    val coin       = accountIdentifier.coin
-    val group      = accountIdentifier.group
+    val accountId  = account.id
+    val key        = account.identifier
+    val coinFamily = account.coinFamily
+    val coin       = account.coin
+    val group      = account.group
 
     val syncFrequencyInterval = new PGInterval()
     syncFrequencyInterval.setSeconds(syncFrequency.toDouble)
 
-    sql"""INSERT INTO account_info(account_id, "key", coin_family, coin, sync_frequency, label, group_col)
-          VALUES($accountId, $key, $coinFamily, $coin, $syncFrequencyInterval, $label, $group)
-          RETURNING account_id, key, coin_family, coin, extract(epoch FROM sync_frequency)/60*60, label, group_col
+    sql"""INSERT INTO account_info(account_id, "key", coin_family, coin, group_col, sync_frequency, label)
+          VALUES($accountId, $key, $coinFamily, $coin, $group, $syncFrequencyInterval, $label)
+          RETURNING 
+            key, 
+            coin_family, 
+            coin, 
+            group_col,  
+            extract(epoch FROM sync_frequency)/60*60, 
+            label
           """
       .query[AccountInfo]
       .unique
   }
 
   def insertSyncEvent(e: SyncEvent[JsonObject]): ConnectionIO[Int] =
-    sql"""INSERT INTO account_sync_event(account_id, sync_id, status, "cursor", "error")
-          VALUES(${e.accountId}, ${e.syncId}, ${e.status}, ${e.cursor}, ${e.error.asJson.asObject})
+    sql"""INSERT INTO account_sync_event(account_id, "key", coin_family, coin, group_col, sync_id, status, "cursor", "error")
+          VALUES(
+            ${e.account.id}, 
+            ${e.account.identifier}, 
+            ${e.account.coinFamily}, 
+            ${e.account.coin}, 
+            ${e.account.group}, 
+            ${e.syncId}, 
+            ${e.status}, 
+            ${e.cursor}, 
+            ${e.error.asJson.asObject}
+          )
           """.update.run
 
   def getLastSyncEvent(accountId: UUID): ConnectionIO[Option[SyncEvent[JsonObject]]] =
-    sql"""SELECT account_id, sync_id, status, "cursor", "error", updated
+    sql"""SELECT 
+            "key", 
+            coin_family, 
+            coin, 
+            group_col, 
+            sync_id, 
+            status, 
+            "cursor", 
+            "error", 
+            updated
           FROM account_sync_status
           WHERE account_id = $accountId
           """
@@ -149,7 +177,10 @@ object Queries extends DoobieLogHandler {
 
     val query =
       sql"""SELECT
-              account_id,
+              account_info."key", 
+              account_info.coin_family, 
+              account_info.coin, 
+              account_info.group_col,
               sync_id,
               status,
               "cursor",

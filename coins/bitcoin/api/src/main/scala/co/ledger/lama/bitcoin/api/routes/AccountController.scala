@@ -48,14 +48,14 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
         _                           <- log.info(s"Preparing transaction creation for account: $accountId")
         apiCreateTransactionRequest <- req.as[CreateTransactionRequest]
 
-        account    <- accountManagerClient.getAccountInfo(accountId)
-        keychainId <- UuidUtils.stringToUuidIO(account.key)
+        accountInfo <- accountManagerClient.getAccountInfo(accountId)
+        keychainId  <- UuidUtils.stringToUuidIO(accountInfo.account.identifier)
 
         internalResponse <- transactorClient
           .createTransaction(
             accountId,
             keychainId,
-            account.coin,
+            accountInfo.account.coin,
             apiCreateTransactionRequest.coinSelection,
             apiCreateTransactionRequest.outputs.map(_.toCommon),
             apiCreateTransactionRequest.feeLevel,
@@ -97,13 +97,13 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
         _       <- log.info(s"Broadcasting transaction for account: $accountId")
         request <- req.as[BroadcastTransactionRequest]
 
-        account    <- accountManagerClient.getAccountInfo(accountId)
-        keychainId <- UuidUtils.stringToUuidIO(account.key)
+        accountInfo <- accountManagerClient.getAccountInfo(accountId)
+        keychainId  <- UuidUtils.stringToUuidIO(accountInfo.account.identifier)
 
         txInfo <- transactorClient
           .broadcastTransaction(
             keychainId,
-            account.coin.name,
+            accountInfo.account.coin.name,
             request.rawTransaction,
             request.derivations,
             request.signatures
@@ -119,7 +119,7 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
           accountId
         ) / "recipients" =>
       for {
-        coin      <- accountManagerClient.getAccountInfo(accountId).map(_.coin)
+        coin      <- accountManagerClient.getAccountInfo(accountId).map(_.account.coin)
         addresses <- req.as[NonEmptyList[String]]
         result <- transactorClient
           .validateAddresses(coin, addresses.map(TransactorClient.Address))
@@ -185,9 +185,9 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
           .flatMap { case (account, balance) =>
             Ok(
               AccountWithBalance(
-                account.id,
-                account.coinFamily,
-                account.coin,
+                account.account.id,
+                account.account.coinFamily,
+                account.account.coin,
                 account.syncFrequency,
                 account.lastSyncEvent,
                 balance.balance,
@@ -240,7 +240,9 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
 
           // Get Account Info
           accountsResult <- accountManagerClient.getAccounts(None, boundedLimit.value, offset)
-          accountsWithIds = accountsResult.accounts.map(account => account.id -> account)
+          accountsWithIds = accountsResult.accounts.map(accountInfo =>
+            accountInfo.account.id -> accountInfo
+          )
 
           // Get Balance
           accountsWithBalances <- accountsWithIds.parTraverse { case (accountId, account) =>
@@ -251,9 +253,9 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
         t.flatMap { case (accountsWithBalances, total) =>
           val accountsInfos = accountsWithBalances.map { case (account, balance) =>
             AccountWithBalance(
-              account.id,
-              account.coinFamily,
-              account.coin,
+              account.account.id,
+              account.account.coinFamily,
+              account.account.coin,
               account.syncFrequency,
               account.lastSyncEvent,
               balance.balance,
@@ -326,7 +328,7 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
               sort = sort
             )
           apiConfirmedUtxos = internalUtxos.utxos.map(apiModels.ConfirmedUtxo.fromCommon)
-          response = apiModels.GetUtxosResult.fromCommon(internalUtxos, apiConfirmedUtxos)
+          response          = apiModels.GetUtxosResult.fromCommon(internalUtxos, apiConfirmedUtxos)
         } yield response).flatMap(Ok(_))
 
       // Get account balances
@@ -366,8 +368,8 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
           +& OptionalToIndexQueryParamMatcher(to)
           +& OptionalChangeTypeParamMatcher(change) =>
         for {
-          account    <- accountManagerClient.getAccountInfo(accountId)
-          keychainId <- UuidUtils.stringToUuidIO(account.key)
+          accountInfo <- accountManagerClient.getAccountInfo(accountId)
+          keychainId  <- UuidUtils.stringToUuidIO(accountInfo.account.identifier)
 
           response <- keychainClient
             .getAddresses(
@@ -385,8 +387,8 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
             accountId
           ) / "addresses" / "fresh" :? OptionalChangeTypeParamMatcher(change) =>
         for {
-          account      <- accountManagerClient.getAccountInfo(accountId)
-          keychainId   <- UuidUtils.stringToUuidIO(account.key)
+          accountInfo  <- accountManagerClient.getAccountInfo(accountId)
+          keychainId   <- UuidUtils.stringToUuidIO(accountInfo.account.identifier)
           keychainInfo <- keychainClient.getKeychainInfo(keychainId)
 
           response <- keychainClient
@@ -403,8 +405,8 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
       case GET -> Root / UUIDVar(accountId) / "resync"
           :? OptionalWipeQueryParamMatcher(wipe) =>
         for {
-          _       <- log.info(s"Fetching account informations for id: $accountId")
-          account <- accountManagerClient.getAccountInfo(accountId)
+          _           <- log.info(s"Fetching account informations for id: $accountId")
+          accountInfo <- accountManagerClient.getAccountInfo(accountId)
 
           isWipe = wipe.getOrElse(false)
 
@@ -414,10 +416,10 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
             if (isWipe) {
               for {
                 _          <- log.info("Resetting keychain")
-                keychainId <- UuidUtils.stringToUuidIO(account.key)
+                keychainId <- UuidUtils.stringToUuidIO(accountInfo.account.identifier)
                 res        <- keychainClient.resetKeychain(keychainId)
                 _          <- log.info("Removing interpreter data")
-                _          <- interpreterClient.removeDataFromCursor(account.id, None)
+                _          <- interpreterClient.removeDataFromCursor(accountInfo.account.id, None)
               } yield res
             } else IO.unit
 
@@ -428,11 +430,11 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
       case DELETE -> Root / UUIDVar(accountId) =>
         for {
 
-          _       <- log.info(s"Fetching account informations for id: $accountId")
-          account <- accountManagerClient.getAccountInfo(accountId)
+          _           <- log.info(s"Fetching account informations for id: $accountId")
+          accountInfo <- accountManagerClient.getAccountInfo(accountId)
 
           _          <- log.info("Deleting keychain")
-          keychainId <- UuidUtils.stringToUuidIO(account.key)
+          keychainId <- UuidUtils.stringToUuidIO(accountInfo.account.identifier)
           _ <- keychainClient
             .deleteKeychain(keychainId)
             .map(_ => log.info("Keychain deleted"))
@@ -441,7 +443,7 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
             )
 
           _ <- log.info("Unregistering account")
-          _ <- accountManagerClient.unregisterAccount(account.id)
+          _ <- accountManagerClient.unregisterAccount(accountInfo.account.id)
           _ <- log.info("Account unregistered")
 
           res <- Ok()

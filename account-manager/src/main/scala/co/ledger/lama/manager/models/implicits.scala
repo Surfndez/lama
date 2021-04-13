@@ -53,10 +53,10 @@ object implicits {
 
   implicit lazy val syncEventRead: Read[SyncEvent[JsonObject]] =
     Read[
-      (UUID, UUID, Status, Option[JsonObject], Option[JsonObject], Instant)
-    ].map { case (accountId, syncId, status, cursor, error, updated) =>
+      (Account, UUID, Status, Option[JsonObject], Option[JsonObject], Instant)
+    ].map { case (account, syncId, status, cursor, error, updated) =>
       SyncEvent(
-        accountId,
+        account,
         syncId,
         status,
         cursor,
@@ -67,10 +67,10 @@ object implicits {
 
   implicit lazy val triggerableEventRead: Read[TriggerableEvent[JsonObject]] =
     Read[
-      (UUID, UUID, TriggerableStatus, Option[JsonObject], Option[JsonObject], Instant)
-    ].map { case (accountId, syncId, status, cursor, error, updated) =>
+      (Account, UUID, TriggerableStatus, Option[JsonObject], Option[JsonObject], Instant)
+    ].map { case (account, syncId, status, cursor, error, updated) =>
       TriggerableEvent(
-        accountId,
+        account,
         syncId,
         status,
         cursor,
@@ -82,62 +82,48 @@ object implicits {
   implicit lazy val workerMessageRead: Read[WorkerMessage[JsonObject]] =
     Read[
       (
-          String,
-          CoinFamily,
-          Coin,
-          String,
-          UUID,
+          Account,
           UUID,
           WorkableStatus,
           Option[JsonObject],
           Option[JsonObject],
           Instant
       )
-    ].map {
-      case (key, coinFamily, coin, group, accountId, syncId, status, cursor, error, updated) =>
-        WorkerMessage(
-          account = AccountIdentifier(key, coinFamily, coin, AccountGroup(group)),
-          event = WorkableEvent(
-            accountId,
-            syncId,
-            status,
-            cursor,
-            error.flatMap(_.asJson.as[ReportError].toOption),
-            updated
-          )
+    ].map { case (account, syncId, status, cursor, error, updated) =>
+      WorkerMessage(
+        account = account,
+        event = WorkableEvent(
+          account,
+          syncId,
+          status,
+          cursor,
+          error.flatMap(_.asJson.as[ReportError].toOption),
+          updated
         )
+      )
     }
 
   implicit val accountGroupRead: Read[AccountGroup] =
-    Read[String].map {
-      case group => AccountGroup(group)
+    Read[String].map { case group =>
+      AccountGroup(group)
     }
 
   implicit val accountInfoRead: Read[AccountInfo] =
-    Read[(UUID, String, CoinFamily, Coin, Long, Option[String], AccountGroup)].map {
-      case (accountId, key, coinFamily, coin, syncFrequency, label, group) =>
-        AccountInfo(
-          accountId,
-          key,
-          coinFamily,
-          coin,
-          syncFrequency,
-          None,
-          label,
-          group
-        )
+    Read[(Account, Long, Option[String])].map { case (account, syncFrequency, label) =>
+      AccountInfo(
+        account,
+        syncFrequency,
+        None,
+        label
+      )
     }
 
   implicit val accountSyncStatusRead: Read[AccountSyncStatus] =
     Read[
       (
-          UUID,
-          String,
-          CoinFamily,
-          Coin,
+          Account,
           Long,
           Option[String],
-          AccountGroup,
           UUID,
           Status,
           Option[JsonObject],
@@ -146,13 +132,9 @@ object implicits {
       )
     ].map {
       case (
-            accountId,
-            key,
-            coinFamily,
-            coin,
+            account,
             syncFrequency,
             label,
-            group,
             syncId,
             status,
             cursor,
@@ -160,13 +142,9 @@ object implicits {
             updated
           ) =>
         AccountSyncStatus(
-          accountId,
-          key,
-          coinFamily,
-          coin,
+          account,
           syncFrequency,
           label,
-          group,
           syncId,
           status,
           cursor,

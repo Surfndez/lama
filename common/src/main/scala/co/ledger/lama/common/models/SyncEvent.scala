@@ -11,7 +11,7 @@ import co.ledger.lama.common.models.implicits._
 import co.ledger.lama.common.utils.{ByteStringUtils, TimestampProtoUtils, UuidUtils}
 
 sealed trait SyncEvent[T] {
-  def accountId: UUID
+  def account: Account
   def syncId: UUID
   def status: Status
   def cursor: Option[T]
@@ -20,7 +20,7 @@ sealed trait SyncEvent[T] {
 
   def toProto(implicit enc: Encoder[T]): protobuf.SyncEvent =
     protobuf.SyncEvent(
-      accountId = UuidUtils.uuidToBytes(accountId),
+      account = Some(account.toProto),
       syncId = UuidUtils.uuidToBytes(syncId),
       status = status.name,
       cursor = ByteStringUtils.serialize[T](cursor),
@@ -48,7 +48,7 @@ object SyncEvent {
   }
 
   def apply[T](
-      accountId: UUID,
+      account: Account,
       syncId: UUID,
       status: Status,
       cursor: Option[T],
@@ -57,18 +57,18 @@ object SyncEvent {
   ): SyncEvent[T] =
     status match {
       case ws: WorkableStatus =>
-        WorkableEvent(accountId, syncId, ws, cursor, error, time)
+        WorkableEvent(account, syncId, ws, cursor, error, time)
       case rs: ReportableStatus =>
-        ReportableEvent(accountId, syncId, rs, cursor, error, time)
+        ReportableEvent(account, syncId, rs, cursor, error, time)
       case ts: TriggerableStatus =>
-        TriggerableEvent(accountId, syncId, ts, cursor, error, time)
+        TriggerableEvent(account, syncId, ts, cursor, error, time)
       case ns: FlaggedStatus =>
-        FlaggedEvent(accountId, syncId, ns, cursor, error, time)
+        FlaggedEvent(account, syncId, ns, cursor, error, time)
     }
 
   def fromProto[T](proto: protobuf.SyncEvent)(implicit dec: Decoder[T]): SyncEvent[T] =
     SyncEvent[T](
-      UuidUtils.bytesToUuid(proto.accountId).get,
+      Account.fromProto(proto.account.get),
       UuidUtils.bytesToUuid(proto.syncId).get,
       Status.fromKey(proto.status).get,
       ByteStringUtils.deserialize[T](proto.cursor),
@@ -79,7 +79,7 @@ object SyncEvent {
 }
 
 case class WorkableEvent[T](
-    accountId: UUID,
+    account: Account,
     syncId: UUID,
     status: WorkableStatus,
     cursor: Option[T],
@@ -88,7 +88,7 @@ case class WorkableEvent[T](
 ) extends SyncEvent[T] {
   def asPublished: FlaggedEvent[T] =
     FlaggedEvent[T](
-      accountId,
+      account,
       syncId,
       Status.Published,
       cursor,
@@ -99,7 +99,7 @@ case class WorkableEvent[T](
   // TODO: newCursor should not be optional
   def asReportableSuccessEvent(newCursor: Option[T]): ReportableEvent[T] =
     ReportableEvent(
-      accountId,
+      account,
       syncId,
       status.success,
       newCursor,
@@ -109,7 +109,7 @@ case class WorkableEvent[T](
 
   def asReportableFailureEvent(error: ReportError): ReportableEvent[T] = {
     ReportableEvent(
-      accountId,
+      account,
       syncId,
       status.failure,
       cursor,
@@ -128,7 +128,7 @@ object WorkableEvent {
 }
 
 case class ReportableEvent[T](
-    accountId: UUID,
+    account: Account,
     syncId: UUID,
     status: ReportableStatus,
     cursor: Option[T],
@@ -145,7 +145,7 @@ object ReportableEvent {
 }
 
 case class TriggerableEvent[T](
-    accountId: UUID,
+    account: Account,
     syncId: UUID,
     status: TriggerableStatus,
     cursor: Option[T],
@@ -154,7 +154,7 @@ case class TriggerableEvent[T](
 ) extends SyncEvent[T] {
   def nextWorkable: WorkableEvent[T] =
     WorkableEvent[T](
-      accountId,
+      account,
       UUID.randomUUID(),
       status.nextWorkable,
       cursor,
@@ -172,7 +172,7 @@ object TriggerableEvent {
 }
 
 case class FlaggedEvent[T](
-    accountId: UUID,
+    account: Account,
     syncId: UUID,
     status: FlaggedStatus,
     cursor: Option[T],

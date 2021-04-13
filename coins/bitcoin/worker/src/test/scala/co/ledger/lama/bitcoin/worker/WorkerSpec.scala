@@ -10,13 +10,7 @@ import co.ledger.lama.bitcoin.worker.SyncEventServiceFixture.{registered, End, Q
 import co.ledger.lama.bitcoin.worker.services.{CursorStateService, SyncEventService}
 import co.ledger.lama.common.models.Status.Registered
 import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
-import co.ledger.lama.common.models.{
-  AccountGroup,
-  AccountIdentifier,
-  Coin,
-  CoinFamily,
-  WorkableEvent
-}
+import co.ledger.lama.common.models.{AccountGroup, Account, Coin, CoinFamily, WorkableEvent}
 import co.ledger.lama.common.utils.IOAssertion
 import fs2.concurrent.Queue
 import org.scalatest.flatspec.AnyFlatSpec
@@ -34,7 +28,7 @@ class WorkerSpec extends AnyFlatSpec with Matchers {
   implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)
 
   val accountIdentifier =
-    AccountIdentifier(
+    Account(
       UUID.randomUUID().toString,
       CoinFamily.Bitcoin,
       Coin.Btc,
@@ -66,7 +60,7 @@ class WorkerSpec extends AnyFlatSpec with Matchers {
   val alreadyValidBlockCursorService: CursorStateService[IO] = (_, b) => IO.pure(b)
 
   def worker(
-      messages: Queue[IO, Option[(AccountIdentifier, WorkableEvent[Block])]],
+      messages: Queue[IO, Option[(Account, WorkableEvent[Block])]],
       interpreter: InterpreterClient = new InterpreterClientMock,
       explorer: ExplorerClient = defaultExplorer
   ) = new Worker(
@@ -169,16 +163,16 @@ object SyncEventServiceFixture {
 
   def workableEvents(implicit
       cs: ContextShift[IO]
-  ): IO[Queue[IO, Option[(AccountIdentifier, WorkableEvent[Block])]]] =
-    Queue.bounded[IO, Option[(AccountIdentifier, WorkableEvent[Block])]](5)
+  ): IO[Queue[IO, Option[(Account, WorkableEvent[Block])]]] =
+    Queue.bounded[IO, Option[(Account, WorkableEvent[Block])]](5)
 
   def registered(
-      accountId: AccountIdentifier,
+      accountId: Account,
       cursor: Option[Block]
-  ): (AccountIdentifier, WorkableEvent[Block]) =
+  ): (Account, WorkableEvent[Block]) =
     accountId ->
       WorkableEvent(
-        accountId.id,
+        accountId,
         syncId = UUID.randomUUID(),
         status = Registered,
         cursor,
@@ -187,7 +181,7 @@ object SyncEventServiceFixture {
       )
 
   def syncEventService(
-      receiving: Queue[IO, Option[(AccountIdentifier, WorkableEvent[Block])]]
+      receiving: Queue[IO, Option[(Account, WorkableEvent[Block])]]
   ): SyncEventService = {
     new SyncEventService {
       override def consumeWorkerMessages: fs2.Stream[IO, WorkerMessage[Block]] = {

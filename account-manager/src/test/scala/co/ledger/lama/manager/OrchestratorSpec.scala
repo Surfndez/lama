@@ -47,9 +47,9 @@ class FakeOrchestrator(nbEvents: Int, override val awakeEvery: FiniteDuration)
 
     (1 to nbEvents).map { i =>
       val account =
-        AccountIdentifier(s"xpub-$i", CoinFamily.Bitcoin, Coin.Btc, AccountGroup("TestGroup"))
+        Account(s"xpub-$i", CoinFamily.Bitcoin, Coin.Btc, AccountGroup("TestGroup"))
       val event = WorkableEvent[JsonObject](
-        accountId = account.id,
+        account = account,
         syncId = UUID.randomUUID(),
         status = Status.Registered,
         cursor = None,
@@ -103,7 +103,7 @@ class FakeSyncEventTask(workerMessages: Seq[WorkerMessage[JsonObject]]) extends 
     Stream.emits(
       workerMessages.map(message =>
         TriggerableEvent(
-          message.account.id,
+          message.account,
           message.event.syncId,
           Status.Synchronized,
           message.event.cursor,

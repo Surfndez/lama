@@ -295,7 +295,7 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
 
             it should s"have only utxos with >0 height and confirmations in UTXO API" in {
               utxos.size shouldBe account.expected.utxosSize
-              if(account.expected.utxosSize > 0) {
+              if (account.expected.utxosSize > 0) {
                 utxos.map(_.height).forall(_ > 0) should be(true)
                 utxos.map(_.confirmations).forall(_ > 0) should be(true)
               }
@@ -306,7 +306,7 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
             }
 
             val lastTxHash = operations.head.hash
-            it should s"have fetch operations to last cursor $lastTxHash" in {
+            it should s"have fetch operations to last cursor ${account.expected.lastTxHash}" in {
               lastTxHash shouldBe account.expected.lastTxHash
             }
 

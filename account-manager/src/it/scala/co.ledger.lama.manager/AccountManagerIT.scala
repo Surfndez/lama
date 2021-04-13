@@ -38,7 +38,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
           for {
             // Register an account.
             registeredResult <- service.registerAccount(
-              accountTest.key,
+              accountTest.identifier,
               CoinFamily.Bitcoin,
               Coin.Btc,
               None,
@@ -127,7 +127,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                 WorkerMessage(
                   account = accountTest,
                   event = WorkableEvent(
-                    accountTest.id,
+                    accountTest,
                     registeredSyncId,
                     Status.Registered,
                     None,
@@ -140,7 +140,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                 WorkerMessage(
                   account = accountTest,
                   event = WorkableEvent(
-                    accountTest.id,
+                    accountTest,
                     messageSent2.event.syncId,
                     Status.Registered,
                     syncedCursorJson,
@@ -153,7 +153,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                 WorkerMessage(
                   account = accountTest,
                   event = WorkableEvent(
-                    accountTest.id,
+                    accountTest,
                     messageSent3.event.syncId,
                     Status.Registered,
                     None,
@@ -166,7 +166,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                 WorkerMessage(
                   account = accountTest,
                   event = WorkableEvent(
-                    accountTest.id,
+                    accountTest,
                     unregisteredSyncId,
                     Status.Unregistered,
                     None,
@@ -179,7 +179,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                 WorkerMessage(
                   account = accountTest,
                   event = WorkableEvent(
-                    accountTest.id,
+                    accountTest,
                     messageSent5.event.syncId,
                     Status.Unregistered,
                     None,
@@ -201,7 +201,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
               val eventsBatch1 = syncEvents.slice(0, 3)
               eventsBatch1 shouldBe List(
                 WorkableEvent(
-                  accountTest.id,
+                  accountTest,
                   registeredSyncId,
                   Status.Registered,
                   None,
@@ -209,7 +209,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                   eventsBatch1.head.time
                 ),
                 FlaggedEvent(
-                  accountTest.id,
+                  accountTest,
                   registeredSyncId,
                   Status.Published,
                   None,
@@ -217,7 +217,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                   eventsBatch1(1).time
                 ),
                 ReportableEvent(
-                  accountTest.id,
+                  accountTest,
                   registeredSyncId,
                   Status.Synchronized,
                   syncedCursorJson,
@@ -231,7 +231,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
               val eventsBatch2 = syncEvents.slice(3, 6)
               eventsBatch2 shouldBe List(
                 WorkableEvent(
-                  accountTest.id,
+                  accountTest,
                   messageSent2.event.syncId,
                   Status.Registered,
                   syncedCursorJson,
@@ -239,7 +239,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                   eventsBatch2.head.time
                 ),
                 FlaggedEvent(
-                  accountTest.id,
+                  accountTest,
                   messageSent2.event.syncId,
                   Status.Published,
                   syncedCursorJson,
@@ -247,7 +247,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                   eventsBatch2(1).time
                 ),
                 ReportableEvent(
-                  accountTest.id,
+                  accountTest,
                   messageSent2.event.syncId,
                   Status.SyncFailed,
                   syncedCursorJson,
@@ -261,7 +261,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
               val eventsBatch3 = syncEvents.slice(6, 9)
               eventsBatch3 shouldBe List(
                 WorkableEvent(
-                  accountTest.id,
+                  accountTest,
                   messageSent3.event.syncId,
                   Status.Registered,
                   None,
@@ -269,7 +269,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                   eventsBatch3.head.time
                 ),
                 FlaggedEvent(
-                  accountTest.id,
+                  accountTest,
                   messageSent3.event.syncId,
                   Status.Published,
                   None,
@@ -277,7 +277,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                   eventsBatch3(1).time
                 ),
                 ReportableEvent(
-                  accountTest.id,
+                  accountTest,
                   messageSent3.event.syncId,
                   Status.Synchronized,
                   syncedCursorJson,
@@ -295,7 +295,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
               val eventsBatch4 = syncEvents.slice(9, 12)
               eventsBatch4 shouldBe List(
                 WorkableEvent(
-                  accountTest.id,
+                  accountTest,
                   messageSent4.event.syncId,
                   Status.Unregistered,
                   None,
@@ -303,7 +303,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                   eventsBatch4.head.time
                 ),
                 FlaggedEvent(
-                  accountTest.id,
+                  accountTest,
                   messageSent4.event.syncId,
                   Status.Published,
                   None,
@@ -311,7 +311,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                   eventsBatch4(1).time
                 ),
                 ReportableEvent(
-                  accountTest.id,
+                  accountTest,
                   messageSent4.event.syncId,
                   Status.DeleteFailed,
                   None,
@@ -325,7 +325,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
               val eventsBatch5 = syncEvents.slice(12, 15)
               eventsBatch5 shouldBe List(
                 WorkableEvent(
-                  accountTest.id,
+                  accountTest,
                   messageSent5.event.syncId,
                   Status.Unregistered,
                   None,
@@ -333,7 +333,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                   eventsBatch5.head.time
                 ),
                 FlaggedEvent(
-                  accountTest.id,
+                  accountTest,
                   messageSent5.event.syncId,
                   Status.Published,
                   None,
@@ -341,7 +341,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                   eventsBatch5(1).time
                 ),
                 ReportableEvent(
-                  accountTest.id,
+                  accountTest,
                   messageSent5.event.syncId,
                   Status.Deleted,
                   None,
