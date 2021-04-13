@@ -146,7 +146,7 @@ object AccountController extends Http4sDsl[IO] with DefaultContextLogging {
       case req @ POST -> Root =>
         val ra = for {
           creationRequest <- req.as[CreationRequest]
-          _               <- log.info(s"Creating keychain with arguments: $creationRequest")
+          _               <- log.info(s"Creating keychain for account registration")
 
           createdKeychain <- keychainClient.create(
             creationRequest.accountKey,
