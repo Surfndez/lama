@@ -1,11 +1,10 @@
 package co.ledger.lama.manager
 
 import java.util.UUID
-
 import cats.effect.IO
 import co.ledger.lama.common.logging.DefaultContextLogging
+import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import co.ledger.lama.common.models.{WithBusinessId, WorkableEvent}
-import co.ledger.lama.common.utils.RabbitUtils
 import co.ledger.lama.manager.Exceptions.RedisUnexpectedException
 import com.redis.RedisClient
 import com.redis.serialization.{Format, Parse}

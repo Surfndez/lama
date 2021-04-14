@@ -25,6 +25,8 @@ import java.time.Instant
 import java.util.UUID
 
 import co.ledger.lama.bitcoin.common.models.interpreter.TransactionView
+import co.ledger.lama.common.utils.rabbitmq.AutoAckMessage
+import dev.profunktor.fs2rabbit.model.DeliveryTag
 
 import scala.concurrent.ExecutionContext
 
@@ -66,7 +68,7 @@ class WorkerSpec extends AnyFlatSpec with Matchers {
   val alreadyValidBlockCursorService: CursorStateService[IO] = (_, b) => IO.pure(b)
 
   def worker(
-      messages: Queue[IO, Option[(Account, WorkableEvent[Block])]],
+      messages: Queue[IO, Option[WorkableEvent[Block]]],
       interpreter: InterpreterClient = new InterpreterClientMock,
       explorer: ExplorerClient = defaultExplorer
   ) = new Worker(
@@ -169,30 +171,31 @@ object SyncEventServiceFixture {
 
   def workableEvents(implicit
       cs: ContextShift[IO]
-  ): IO[Queue[IO, Option[(Account, WorkableEvent[Block])]]] =
-    Queue.bounded[IO, Option[(Account, WorkableEvent[Block])]](5)
+  ): IO[Queue[IO, Option[WorkableEvent[Block]]]] =
+    Queue.bounded[IO, Option[WorkableEvent[Block]]](5)
 
   def registered(
       accountId: Account,
       cursor: Option[Block]
-  ): (Account, WorkableEvent[Block]) =
-    accountId ->
-      WorkableEvent(
-        accountId,
-        syncId = UUID.randomUUID(),
-        status = Registered,
-        cursor,
-        error = None,
-        Instant.now()
-      )
+  ): WorkableEvent[Block] =
+    WorkableEvent(
+      accountId,
+      syncId = UUID.randomUUID(),
+      status = Registered,
+      cursor,
+      error = None,
+      Instant.now()
+    )
 
   def syncEventService(
-      receiving: Queue[IO, Option[(Account, WorkableEvent[Block])]]
+      receiving: Queue[IO, Option[WorkableEvent[Block]]]
   ): SyncEventService = {
     new SyncEventService {
-      override def consumeWorkerEvents: fs2.Stream[IO, WorkableEvent[Block]] = {
+      override def consumeWorkerEvents: fs2.Stream[IO, AutoAckMessage[WorkableEvent[Block]]] = {
         receiving.dequeue.unNoneTerminate
-          .map { case (_, event) => event }
+          .evalMap { event =>
+            AutoAckMessage.wrap(event, DeliveryTag(0L))(_ => IO.unit)
+          }
       }
 
       override def reportEvent(message: ReportableEvent[Block]): IO[Unit] = IO.unit

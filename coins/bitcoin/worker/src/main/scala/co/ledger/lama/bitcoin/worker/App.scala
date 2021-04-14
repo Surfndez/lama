@@ -9,8 +9,9 @@ import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.services.Clients
 import co.ledger.lama.common.services.grpc.HealthService
 import co.ledger.lama.common.models.Coin
-import co.ledger.lama.common.utils.{RabbitUtils, ResourceUtils}
+import co.ledger.lama.common.utils.ResourceUtils
 import co.ledger.lama.common.utils.ResourceUtils.grpcManagedChannel
+import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.ExchangeType
 import io.grpc.{ManagedChannel, Server}

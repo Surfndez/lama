@@ -10,7 +10,8 @@ import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.common.models.Notification.BalanceUpdated
 import co.ledger.lama.common.models.Status.{Deleted, Published, Registered, Synchronized}
 import co.ledger.lama.common.models.{BalanceUpdatedNotification, Sort}
-import co.ledger.lama.common.utils.{IOAssertion, IOUtils, RabbitUtils}
+import co.ledger.lama.common.utils.{IOAssertion, IOUtils}
+import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.{AMQPChannel, ExchangeName, QueueName, RoutingKey}
 import fs2.Stream

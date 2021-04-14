@@ -8,7 +8,8 @@ import co.ledger.lama.bitcoin.worker.config.Config
 import co.ledger.lama.bitcoin.worker.services.{CursorStateService, RabbitSyncEventService}
 import co.ledger.lama.common.models._
 import co.ledger.lama.common.services.Clients
-import co.ledger.lama.common.utils.{IOAssertion, RabbitUtils}
+import co.ledger.lama.common.utils.IOAssertion
+import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.{ExchangeName, ExchangeType, QueueName, RoutingKey}
 import fs2.Stream

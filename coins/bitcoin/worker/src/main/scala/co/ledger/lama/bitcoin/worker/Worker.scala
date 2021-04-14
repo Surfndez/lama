@@ -31,27 +31,29 @@ class Worker(
 
   def run(implicit cs: ContextShift[IO], t: Timer[IO]): Stream[IO, Unit] =
     syncEventService.consumeWorkerEvents
-      .evalMap { event =>
-        val reportableEvent =
-          event.status match {
+      .evalMap { autoAckMsg =>
+        autoAckMsg.unwrap { event =>
+          val reportableEvent = event.status match {
             case Registered   => synchronizeAccount(event)
             case Unregistered => deleteAccount(event)
           }
 
-        // In case of error, fallback to a reportable failed event.
-        log.info(s"Received event: ${event.asJson.toString}") *>
-          reportableEvent
-            .handleErrorWith { error =>
-              val failedEvent = event.asReportableFailureEvent(
-                ReportError.fromThrowable(error)
-              )
+          // In case of error, fallback to a reportable failed event.
+          log.info(s"Received event: ${event.asJson.toString}") *>
+            reportableEvent
+              .handleErrorWith { error =>
+                val failedEvent = event.asReportableFailureEvent(
+                  ReportError.fromThrowable(error)
+                )
 
-              log.error(s"Failed event: $failedEvent", error) *>
-                IO.pure(failedEvent)
-            }
-            .flatMap { reportableEvent =>
-              syncEventService.reportEvent(reportableEvent)
-            }
+                log.error(s"Failed event: $failedEvent", error) *>
+                  IO.pure(failedEvent)
+              }
+              // Always report the event at the end.
+              .flatMap { reportableEvent =>
+                syncEventService.reportEvent(reportableEvent)
+              }
+        }
       }
 
   def synchronizeAccount(

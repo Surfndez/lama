@@ -3,8 +3,9 @@ package co.ledger.lama.manager
 import cats.effect.IO
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models._
-import co.ledger.lama.common.utils.{IOAssertion, RabbitUtils}
+import co.ledger.lama.common.utils.IOAssertion
 import co.ledger.lama.manager.config.CoinConfig
+import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.ExchangeName
 import doobie.implicits._

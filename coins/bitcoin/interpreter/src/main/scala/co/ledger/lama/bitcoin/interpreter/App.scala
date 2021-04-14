@@ -4,7 +4,8 @@ import cats.effect.{ExitCode, IO, IOApp, Resource}
 import co.ledger.lama.common.services.RabbitNotificationService
 import co.ledger.lama.common.services.grpc.HealthService
 import co.ledger.lama.common.utils.ResourceUtils.{grpcServer, postgresTransactor}
-import co.ledger.lama.common.utils.{DbUtils, RabbitUtils}
+import co.ledger.lama.common.utils.DbUtils
+import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import fs2.Stream
 import pureconfig.ConfigSource
 

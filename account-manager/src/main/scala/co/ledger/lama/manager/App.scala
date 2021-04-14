@@ -2,8 +2,9 @@ package co.ledger.lama.manager
 
 import cats.effect.{ExitCode, IO, IOApp}
 import co.ledger.lama.common.services.grpc.HealthService
-import co.ledger.lama.common.utils.{DbUtils, RabbitUtils}
+import co.ledger.lama.common.utils.DbUtils
 import co.ledger.lama.common.utils.ResourceUtils.{grpcServer, postgresTransactor}
+import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import co.ledger.lama.manager.config.{Config, OrchestratorConfig}
 import co.ledger.lama.manager.utils.RedisUtils
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient

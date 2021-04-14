@@ -4,7 +4,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits.showInterpolator
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models._
-import co.ledger.lama.common.utils.RabbitUtils
+import co.ledger.lama.common.utils.rabbitmq.{AutoAckMessage, RabbitUtils}
 import co.ledger.lama.manager.config.CoinConfig
 import com.redis.RedisClient
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
@@ -33,11 +33,11 @@ trait SyncEventTask {
     tickerStream(tick, stopAtNbTick) >> publishableWorkerEvents.through(publishWorkerEventsPipe)
 
   // Source of report events to report.
-  def reportableEvents: Stream[IO, ReportableEvent[JsonObject]]
+  def reportableEvents: Stream[IO, AutoAckMessage[ReportableEvent[JsonObject]]]
 
   // Report events pipe transformation:
   // Stream[IO, ReportableEvent[JsonObject]] => Stream[IO, Unit].
-  def reportEventPipe: Pipe[IO, ReportableEvent[JsonObject], Unit]
+  def reportEventPipe: Pipe[IO, AutoAckMessage[ReportableEvent[JsonObject]], Unit]
 
   // Source reportable events then report the event of events.
   def reportEvents: Stream[IO, Unit] =
@@ -105,19 +105,21 @@ class CoinSyncEventTask(
     }
 
   // Consume events to report from the events exchange queue.
-  def reportableEvents: Stream[IO, ReportableEvent[JsonObject]] =
+  def reportableEvents: Stream[IO, AutoAckMessage[ReportableEvent[JsonObject]]] =
     RabbitUtils
-      .createAutoAckConsumer[ReportableEvent[JsonObject]](
+      .createConsumer[ReportableEvent[JsonObject]](
         rabbit,
         conf.queueName(eventsExchangeName)
       )
 
   // Insert reportable events in database and publish next pending event.
-  def reportEventPipe: Pipe[IO, ReportableEvent[JsonObject], Unit] =
-    _.evalMap { event =>
-      Queries.insertSyncEvent(event).transact(db).void *>
-        publisher.dequeue(event.account.id) *>
-        log.info(show"Reported event: $event")
+  def reportEventPipe: Pipe[IO, AutoAckMessage[ReportableEvent[JsonObject]], Unit] =
+    _.evalMap { autoAckMessage =>
+      autoAckMessage.unwrap { event =>
+        Queries.insertSyncEvent(event).transact(db).void *>
+          publisher.dequeue(event.account.id) *>
+          log.info(show"Reported event: $event")
+      }
     }
 
   // Fetch triggerable events from database.

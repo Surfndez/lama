@@ -5,7 +5,8 @@ import cats.effect.{ContextShift, IO, Resource, Timer}
 import co.ledger.lama.common.models._
 import co.ledger.lama.common.services.RabbitNotificationService
 import co.ledger.lama.common.services.RabbitNotificationService.NotificationPublisher
-import co.ledger.lama.common.utils.{IOAssertion, RabbitUtils}
+import co.ledger.lama.common.utils.IOAssertion
+import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.{AMQPChannel, RoutingKey}
 import fs2.Stream

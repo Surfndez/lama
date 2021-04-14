@@ -1,27 +1,27 @@
 package co.ledger.lama.bitcoin.api
 
 import cats.effect.{ExitCode, IO, IOApp}
+import cats.implicits._
+import co.ledger.lama.bitcoin.api.Config.Config
 import co.ledger.lama.bitcoin.api.middlewares.LoggingMiddleware._
+import co.ledger.lama.bitcoin.api.routes.{AccountController, HealthController, VersionController}
 import co.ledger.lama.bitcoin.common.clients.grpc.{
   InterpreterGrpcClient,
   KeychainGrpcClient,
   TransactorGrpcClient
 }
-import co.ledger.lama.common.utils.ResourceUtils.grpcManagedChannel
-import Config.Config
-import co.ledger.lama.bitcoin.api.routes.{AccountController, HealthController, VersionController}
 import co.ledger.lama.common.clients.grpc.AccountManagerGrpcClient
+import co.ledger.lama.common.utils.ResourceUtils.grpcManagedChannel
 import co.ledger.protobuf.lama.common.HealthFs2Grpc
 import io.grpc.ManagedChannel
-import org.http4s.server.middleware._
 import org.http4s.implicits.http4sKleisliResponseSyntaxOptionT
 import org.http4s.server.Router
 import org.http4s.server.blaze.BlazeServerBuilder
+import org.http4s.server.middleware._
 import pureconfig.ConfigSource
-import cats.implicits._
 
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
 object App extends IOApp {
 

@@ -3,7 +3,8 @@ package co.ledger.lama.manager
 import cats.effect.{Blocker, ContextShift, IO, Resource, Timer}
 import cats.implicits._
 import co.ledger.lama.common.models.{AccountGroup, Account, Coin, CoinFamily}
-import co.ledger.lama.common.utils.{DbUtils, RabbitUtils}
+import co.ledger.lama.common.utils.DbUtils
+import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import co.ledger.lama.manager.config.Config
 import co.ledger.lama.manager.utils.RedisUtils
 import com.redis.RedisClient

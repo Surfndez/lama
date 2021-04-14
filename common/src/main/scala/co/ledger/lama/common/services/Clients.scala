@@ -1,9 +1,8 @@
 package co.ledger.lama.common.services
 
 import java.util.concurrent.Executors
-
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Resource, Timer}
-import co.ledger.lama.common.utils.RabbitUtils
+import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import dev.profunktor.fs2rabbit.config.Fs2RabbitConfig
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import org.http4s.client.Client
