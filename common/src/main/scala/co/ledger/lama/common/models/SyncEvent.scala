@@ -1,5 +1,6 @@
 package co.ledger.lama.common.models
 
+import cats.Show
 import java.time.Instant
 import java.util.UUID
 
@@ -78,6 +79,8 @@ object SyncEvent {
 
 }
 
+trait WithBusinessId[K] { def businessId: K }
+
 case class WorkableEvent[T](
     account: Account,
     syncId: UUID,
@@ -85,7 +88,11 @@ case class WorkableEvent[T](
     cursor: Option[T],
     error: Option[ReportError],
     time: Instant
-) extends SyncEvent[T] {
+) extends SyncEvent[T]
+    with WithBusinessId[UUID] {
+
+  val businessId: UUID = account.id
+
   def asPublished: FlaggedEvent[T] =
     FlaggedEvent[T](
       account,
@@ -142,6 +149,9 @@ object ReportableEvent {
 
   implicit def decoder[T: Decoder]: Decoder[ReportableEvent[T]] =
     deriveConfiguredDecoder[ReportableEvent[T]]
+
+  implicit def showMessage[T: Encoder]: Show[ReportableEvent[T]] =
+    Show.show(reportMsg => s"${reportMsg.account}:")
 }
 
 case class TriggerableEvent[T](

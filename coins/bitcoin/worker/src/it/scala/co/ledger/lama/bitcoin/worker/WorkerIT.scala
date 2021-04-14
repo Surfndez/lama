@@ -6,7 +6,6 @@ import co.ledger.lama.bitcoin.common.clients.http.ExplorerHttpClient
 import co.ledger.lama.bitcoin.common.models.explorer.Block
 import co.ledger.lama.bitcoin.worker.config.Config
 import co.ledger.lama.bitcoin.worker.services.{CursorStateService, RabbitSyncEventService}
-import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
 import co.ledger.lama.common.models._
 import co.ledger.lama.common.services.Clients
 import co.ledger.lama.common.utils.{IOAssertion, RabbitUtils}
@@ -81,29 +80,25 @@ class WorkerIT extends AnyFlatSpecLike with Matchers {
 
           val syncId = UUID.randomUUID()
 
-          val registeredMessage =
-            WorkerMessage[Block](
-              account = account,
-              event = WorkableEvent(
-                account,
-                syncId,
-                Status.Registered,
-                None,
-                None,
-                Instant.now()
-              )
-            )
+          val registeredMessage = WorkableEvent[Block](
+            account,
+            syncId,
+            Status.Registered,
+            None,
+            None,
+            Instant.now()
+          )
 
           Stream
             .eval {
-              accountManager.publishWorkerMessage(registeredMessage) *>
-                accountManager.consumeReportMessage
+              accountManager.publishWorkerEvent(registeredMessage) *>
+                accountManager.consumeReportEvent
             }
             .concurrently(worker.run)
             .take(1)
             .compile
             .last
-            .map { reportMessage =>
+            .map { reportEvent =>
               it should "have 35 used addresses for the account" in {
                 keychainClient.usedAddresses.size shouldBe 35
               }
@@ -119,10 +114,10 @@ class WorkerIT extends AnyFlatSpecLike with Matchers {
                   )
                   .distinctBy(_.hash) should have size expectedTxsSize
 
-                reportMessage should not be empty
-                reportMessage.get.account shouldBe account
+                reportEvent should not be empty
+                reportEvent.get.account shouldBe account
 
-                val event = reportMessage.get.event
+                val event = reportEvent.get
                 event.cursor.get.height should be > expectedLastBlockHeight
                 event.cursor.get.time should be > Instant.parse("2020-08-20T13:01:16Z")
               }
@@ -178,16 +173,16 @@ class SimpleAccountManager(
     routingKey: RoutingKey
 ) {
 
-  private lazy val consumer: Stream[IO, ReportMessage[Block]] =
-    RabbitUtils.createAutoAckConsumer[ReportMessage[Block]](rabbit, lamaEventsQueueName)
+  private lazy val consumer: Stream[IO, ReportableEvent[Block]] =
+    RabbitUtils.createAutoAckConsumer[ReportableEvent[Block]](rabbit, lamaEventsQueueName)
 
-  private lazy val publisher: Stream[IO, WorkerMessage[Block] => IO[Unit]] =
-    RabbitUtils.createPublisher[WorkerMessage[Block]](rabbit, workerEventsExchangeName, routingKey)
+  private lazy val publisher: Stream[IO, WorkableEvent[Block] => IO[Unit]] =
+    RabbitUtils.createPublisher[WorkableEvent[Block]](rabbit, workerEventsExchangeName, routingKey)
 
-  def consumeReportMessage: IO[ReportMessage[Block]] =
+  def consumeReportEvent: IO[ReportableEvent[Block]] =
     consumer.take(1).compile.last.map(_.get)
 
-  def publishWorkerMessage(message: WorkerMessage[Block]): IO[Unit] =
+  def publishWorkerEvent(message: WorkableEvent[Block]): IO[Unit] =
     publisher.evalMap(p => p(message)).compile.drain
 
 }

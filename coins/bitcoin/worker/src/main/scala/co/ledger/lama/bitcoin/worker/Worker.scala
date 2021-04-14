@@ -13,12 +13,11 @@ import co.ledger.lama.bitcoin.worker.services.CursorStateService.AccountId
 import co.ledger.lama.bitcoin.worker.services._
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.Status.{Registered, Unregistered}
-import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
-import co.ledger.lama.common.models.{Account, Coin, ReportError, ReportableEvent}
+import co.ledger.lama.common.models.{Account, Coin, ReportError, ReportableEvent, WorkableEvent}
 import fs2.Stream
 import io.circe.syntax._
-
 import java.util.UUID
+
 import scala.math.Ordering.Implicits._
 import scala.util.Try
 
@@ -31,38 +30,32 @@ class Worker(
 ) extends DefaultContextLogging {
 
   def run(implicit cs: ContextShift[IO], t: Timer[IO]): Stream[IO, Unit] =
-    syncEventService.consumeWorkerMessages
-      .evalMap { message =>
+    syncEventService.consumeWorkerEvents
+      .evalMap { event =>
         val reportableEvent =
-          message.event.status match {
-            case Registered   => synchronizeAccount(message)
-            case Unregistered => deleteAccount(message)
+          event.status match {
+            case Registered   => synchronizeAccount(event)
+            case Unregistered => deleteAccount(event)
           }
 
         // In case of error, fallback to a reportable failed event.
-        log.info(s"Received message: ${message.asJson.toString}") *>
+        log.info(s"Received event: ${event.asJson.toString}") *>
           reportableEvent
             .handleErrorWith { error =>
-              val failedEvent = message.event.asReportableFailureEvent(
+              val failedEvent = event.asReportableFailureEvent(
                 ReportError.fromThrowable(error)
               )
 
               log.error(s"Failed event: $failedEvent", error) *>
                 IO.pure(failedEvent)
             }
-            // Always report the event within a message at the end.
             .flatMap { reportableEvent =>
-              syncEventService.reportMessage(
-                ReportMessage(
-                  account = message.account,
-                  event = reportableEvent
-                )
-              )
+              syncEventService.reportEvent(reportableEvent)
             }
       }
 
   def synchronizeAccount(
-      workerMessage: WorkerMessage[Block]
+      workerEvent: WorkableEvent[Block]
   )(implicit cs: ContextShift[IO], t: Timer[IO]): IO[ReportableEvent[Block]] = {
 
     val bookkeeper = Bookkeeper(
@@ -71,10 +64,8 @@ class Worker(
       interpreterClient
     )
 
-    val account       = workerMessage.account
-    val workableEvent = workerMessage.event
-
-    val previousBlockState = workableEvent.cursor
+    val account            = workerEvent.account
+    val previousBlockState = workerEvent.cursor
 
     // sync the whole account per streamed batch
     for {
@@ -124,7 +115,7 @@ class Worker(
 
     } yield {
       // Create the reportable successful event.
-      workableEvent.asReportableSuccessEvent(Some(lastMinedBlock.block))
+      workerEvent.asReportableSuccessEvent(Some(lastMinedBlock.block))
     }
   }
 
@@ -149,8 +140,8 @@ class Worker(
         }
     } yield lvb
 
-  def deleteAccount(message: WorkerMessage[Block]): IO[ReportableEvent[Block]] =
+  def deleteAccount(event: WorkableEvent[Block]): IO[ReportableEvent[Block]] =
     interpreterClient
-      .removeDataFromCursor(message.account.id, None)
-      .map(_ => message.event.asReportableSuccessEvent(None))
+      .removeDataFromCursor(event.account.id, None)
+      .map(_ => event.asReportableSuccessEvent(None))
 }

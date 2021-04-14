@@ -6,7 +6,6 @@ import java.util.UUID
 
 import co.ledger.lama.common.models._
 import co.ledger.lama.common.models.implicits._
-import co.ledger.lama.common.models.messages.WorkerMessage
 import doobie.util.meta.Meta
 import doobie.postgres.implicits._
 import doobie.implicits.javasql._
@@ -65,6 +64,20 @@ object implicits {
       )
     }
 
+  implicit lazy val workableEventRead: Read[WorkableEvent[JsonObject]] =
+    Read[
+      (Account, UUID, WorkableStatus, Option[JsonObject], Option[JsonObject], Instant)
+    ].map { case (account, syncId, status, cursor, error, updated) =>
+      WorkableEvent(
+        account,
+        syncId,
+        status,
+        cursor,
+        error.flatMap(_.asJson.as[ReportError].toOption),
+        updated
+      )
+    }
+
   implicit lazy val triggerableEventRead: Read[TriggerableEvent[JsonObject]] =
     Read[
       (Account, UUID, TriggerableStatus, Option[JsonObject], Option[JsonObject], Instant)
@@ -76,30 +89,6 @@ object implicits {
         cursor,
         error.flatMap(_.asJson.as[ReportError].toOption),
         updated
-      )
-    }
-
-  implicit lazy val workerMessageRead: Read[WorkerMessage[JsonObject]] =
-    Read[
-      (
-          Account,
-          UUID,
-          WorkableStatus,
-          Option[JsonObject],
-          Option[JsonObject],
-          Instant
-      )
-    ].map { case (account, syncId, status, cursor, error, updated) =>
-      WorkerMessage(
-        account = account,
-        event = WorkableEvent(
-          account,
-          syncId,
-          status,
-          cursor,
-          error.flatMap(_.asJson.as[ReportError].toOption),
-          updated
-        )
       )
     }
 

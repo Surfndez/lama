@@ -3,8 +3,8 @@ package co.ledger.lama.manager
 import java.util.UUID
 
 import cats.effect.IO
+import co.ledger.lama.common.models.WithBusinessId
 import co.ledger.lama.common.models.implicits._
-import co.ledger.lama.common.models.messages.WithBusinessId
 import co.ledger.lama.common.utils.IOAssertion
 import com.redis.RedisClient
 import fs2.Stream
@@ -23,53 +23,53 @@ class PublisherSpec extends AnyFlatSpecLike with Matchers with Inspectors with B
   val redisServer              = new RedisServer(6380)
   val redisClient: RedisClient = new RedisClient("localhost", 6380)
 
-  val nbMessages: Int = 10
+  val nbEvents: Int = 10
 
   def publishers: Seq[TestPublisher] =
-    (1 to 5).map(i => new TestPublisher(redisClient, nbMessages, i))
+    (1 to 5).map(i => new TestPublisher(redisClient, nbEvents, i))
 
   forAll(publishers) { publisher =>
-    val maxOnGoingMessages   = publisher.maxOnGoingMessages
-    val messages             = publisher.messages
-    val countPendingMessages = nbMessages - maxOnGoingMessages
+    val maxOnGoingEvents   = publisher.maxOnGoingEvents
+    val events             = publisher.events
+    val countPendingEvents = nbEvents - maxOnGoingEvents
 
-    it should s" have $maxOnGoingMessages published messages and $countPendingMessages pending messages" in IOAssertion {
+    it should s" have $maxOnGoingEvents published events and $countPendingEvents pending events" in IOAssertion {
       Stream
-        .emits(messages)
+        .emits(events)
         .evalMap(publisher.enqueue)
         .compile
         .drain
         .map { _ =>
-          publisher.countPendingMessages shouldBe Some(countPendingMessages)
-          publisher.publishedMessages should have size maxOnGoingMessages
+          publisher.countPendingEvents shouldBe Some(countPendingEvents)
+          publisher.publishedEvents should have size maxOnGoingEvents
           assert(
-            publisher.publishedMessages.containsSlice(publisher.messages.take(maxOnGoingMessages))
+            publisher.publishedEvents.containsSlice(publisher.events.take(maxOnGoingEvents))
           )
         }
     }
   }
 
   forAll(publishers) { publisher =>
-    val maxOnGoingMessages = publisher.maxOnGoingMessages
-    val messages           = publisher.messages
+    val maxOnGoingEvents = publisher.maxOnGoingEvents
+    val events           = publisher.events
 
-    it should s"publish messages $maxOnGoingMessages by $maxOnGoingMessages" in IOAssertion {
+    it should s"publish messages $maxOnGoingEvents by $maxOnGoingEvents" in IOAssertion {
       Stream
-        .emits(messages)
+        .emits(events)
         .evalMap(publisher.enqueue)
         .zipWithIndex
         .evalMap { case (_, index) =>
-          val publishedMessages   = publisher.publishedMessages
-          val pendingMessagesSize = publisher.countPendingMessages
+          val publishedEvents   = publisher.publishedEvents
+          val pendingEventsSize = publisher.countPendingEvents
 
           // at each iteration, call dequeue to publish next event
           publisher.dequeue(publisher.key).map { _ =>
-            (index, pendingMessagesSize, publishedMessages)
+            (index, pendingEventsSize, publishedEvents)
           }
         }
-        .map { case (index, pendingMessagesSize, publishedMessages) =>
-          pendingMessagesSize shouldBe Some(0)
-          publishedMessages shouldBe publisher.messages.take(index.toInt + 1)
+        .map { case (index, pendingEventsSize, publishedEvents) =>
+          pendingEventsSize shouldBe Some(0)
+          publishedEvents shouldBe publisher.events.take(index.toInt + 1)
         }
         .compile
         .drain
@@ -88,36 +88,36 @@ class PublisherSpec extends AnyFlatSpecLike with Matchers with Inspectors with B
 
 }
 
-case class TestMessage(accountId: UUID, eventId: String) extends WithBusinessId[UUID] {
+case class TestEvent(accountId: UUID, eventId: String) extends WithBusinessId[UUID] {
   val businessId: UUID = accountId
 }
 
-object TestMessage {
-  implicit val decoder: Decoder[TestMessage] = deriveConfiguredDecoder[TestMessage]
-  implicit val encoder: Encoder[TestMessage] = deriveConfiguredEncoder[TestMessage]
+object TestEvent {
+  implicit val decoder: Decoder[TestEvent] = deriveConfiguredDecoder[TestEvent]
+  implicit val encoder: Encoder[TestEvent] = deriveConfiguredEncoder[TestEvent]
 }
 
 class TestPublisher(
     val redis: RedisClient,
-    val nbMessages: Int,
-    override val maxOnGoingMessages: Int
+    val nbEvents: Int,
+    override val maxOnGoingEvents: Int
 )(implicit
-    val enc: Encoder[TestMessage],
-    val dec: Decoder[TestMessage]
-) extends Publisher[UUID, TestMessage] {
+    val enc: Encoder[TestEvent],
+    val dec: Decoder[TestEvent]
+) extends Publisher[UUID, TestEvent] {
   import Publisher._
 
   val key: UUID = UUID.randomUUID()
 
-  val messages: Seq[TestMessage] = (1 to nbMessages).map(i => TestMessage(key, s"message$i"))
+  val events: Seq[TestEvent] = (1 to nbEvents).map(i => TestEvent(key, s"event$i"))
 
-  var publishedMessages: mutable.Seq[TestMessage] = mutable.Seq.empty
+  var publishedEvents: mutable.Seq[TestEvent] = mutable.Seq.empty
 
-  def publish(message: TestMessage): IO[Unit] =
+  def publish(event: TestEvent): IO[Unit] =
     IO.pure {
-      publishedMessages = publishedMessages ++ Seq(message)
+      publishedEvents = publishedEvents ++ Seq(event)
     }
 
-  def countPendingMessages: Option[Long] = redis.llen(pendingMessagesKey(key.toString))
+  def countPendingEvents: Option[Long] = redis.llen(pendingEventsKey(key.toString))
 
 }

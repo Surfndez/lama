@@ -4,7 +4,6 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits.showInterpolator
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models._
-import co.ledger.lama.common.models.messages.{ReportMessage, WorkerMessage}
 import co.ledger.lama.common.utils.RabbitUtils
 import co.ledger.lama.manager.config.CoinConfig
 import com.redis.RedisClient
@@ -20,29 +19,29 @@ import scala.concurrent.duration.FiniteDuration
 
 trait SyncEventTask {
 
-  // Source of worker messages to publish.
-  def publishableWorkerMessages: Stream[IO, WorkerMessage[JsonObject]]
+  // Source of worker events to publish.
+  def publishableWorkerEvents: Stream[IO, WorkableEvent[JsonObject]]
 
   // Publish events pipe transformation:
-  // Stream[IO, WorkerMessage[JsonObject]] => Stream[IO, Unit].
-  def publishWorkerMessagePipe: Pipe[IO, WorkerMessage[JsonObject], Unit]
+  // Stream[IO, WorkableEvent[JsonObject]] => Stream[IO, Unit].
+  def publishWorkerEventsPipe: Pipe[IO, WorkableEvent[JsonObject], Unit]
 
-  // Awake every tick, source worker messages then publish.
-  def publishWorkerMessages(tick: FiniteDuration, stopAtNbTick: Option[Long] = None)(implicit
+  // Awake every tick, source worker events then publish.
+  def publishWorkerEvents(tick: FiniteDuration, stopAtNbTick: Option[Long] = None)(implicit
       t: Timer[IO]
   ): Stream[IO, Unit] =
-    tickerStream(tick, stopAtNbTick) >> publishableWorkerMessages.through(publishWorkerMessagePipe)
+    tickerStream(tick, stopAtNbTick) >> publishableWorkerEvents.through(publishWorkerEventsPipe)
 
-  // Source of report messages to report.
-  def reportableMessages: Stream[IO, ReportMessage[JsonObject]]
+  // Source of report events to report.
+  def reportableEvents: Stream[IO, ReportableEvent[JsonObject]]
 
   // Report events pipe transformation:
-  // Stream[IO, ReportMessage[JsonObject]] => Stream[IO, Unit].
-  def reportMessagePipe: Pipe[IO, ReportMessage[JsonObject], Unit]
+  // Stream[IO, ReportableEvent[JsonObject]] => Stream[IO, Unit].
+  def reportEventPipe: Pipe[IO, ReportableEvent[JsonObject], Unit]
 
-  // Source reportable messages then report the event of messages.
-  def reportMessages: Stream[IO, Unit] =
-    reportableMessages.through(reportMessagePipe)
+  // Source reportable events then report the event of events.
+  def reportEvents: Stream[IO, Unit] =
+    reportableEvents.through(reportEventPipe)
 
   // Source of triggerable events.
   def triggerableEvents: Stream[IO, TriggerableEvent[JsonObject]]
@@ -80,45 +79,45 @@ class CoinSyncEventTask(
     extends SyncEventTask
     with DefaultContextLogging {
 
-  // Fetch worker messages ready to publish from database.
-  def publishableWorkerMessages: Stream[IO, WorkerMessage[JsonObject]] =
+  // Fetch worker events ready to publish from database.
+  def publishableWorkerEvents: Stream[IO, WorkableEvent[JsonObject]] =
     Queries
-      .fetchPublishableWorkerMessages(conf.coinFamily, conf.coin)
+      .fetchPublishableWorkerEvents(conf.coinFamily, conf.coin)
       .transact(db)
 
   // Publisher publishing to the worker exchange with routingKey = "coinFamily.coin".
   private val publisher =
-    new WorkerMessagePublisher(
+    new WorkableEventPublisher(
       redis,
       rabbit,
       workerExchangeName,
       conf.routingKey
     )
 
-  // Publish messages to the worker exchange queue, mark event as published then insert.
-  def publishWorkerMessagePipe: Pipe[IO, WorkerMessage[JsonObject], Unit] =
-    _.evalMap { message =>
-      publisher.enqueue(message) &>
+  // Publish events to the worker exchange queue, mark event as published then insert.
+  def publishWorkerEventsPipe: Pipe[IO, WorkableEvent[JsonObject], Unit] =
+    _.evalMap { event =>
+      publisher.enqueue(event) &>
         Queries
-          .insertSyncEvent(message.event.asPublished)
+          .insertSyncEvent(event.asPublished)
           .transact(db)
           .void
     }
 
-  // Consume messages to report from the events exchange queue.
-  def reportableMessages: Stream[IO, ReportMessage[JsonObject]] =
+  // Consume events to report from the events exchange queue.
+  def reportableEvents: Stream[IO, ReportableEvent[JsonObject]] =
     RabbitUtils
-      .createAutoAckConsumer[ReportMessage[JsonObject]](
+      .createAutoAckConsumer[ReportableEvent[JsonObject]](
         rabbit,
         conf.queueName(eventsExchangeName)
       )
 
   // Insert reportable events in database and publish next pending event.
-  def reportMessagePipe: Pipe[IO, ReportMessage[JsonObject], Unit] =
-    _.evalMap { message =>
-          Queries.insertSyncEvent(message.event).transact(db).void *>
-            publisher.dequeue(message.account.id) *>
-            log.info(show"Reported message: $message")
+  def reportEventPipe: Pipe[IO, ReportableEvent[JsonObject], Unit] =
+    _.evalMap { event =>
+      Queries.insertSyncEvent(event).transact(db).void *>
+        publisher.dequeue(event.account.id) *>
+        log.info(show"Reported event: $event")
     }
 
   // Fetch triggerable events from database.

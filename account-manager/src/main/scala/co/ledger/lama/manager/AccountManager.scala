@@ -198,23 +198,7 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
       total <- Queries.countAccounts().transact(db)
     } yield {
       AccountsResult(
-        accounts.map(accountStatus =>
-          AccountInfo(
-            accountStatus.account,
-            accountStatus.syncFrequency,
-            Some(
-              SyncEvent(
-                accountStatus.account,
-                accountStatus.syncId,
-                accountStatus.status,
-                accountStatus.cursor,
-                accountStatus.error,
-                accountStatus.updated
-              )
-            ),
-            accountStatus.label
-          )
-        ),
+        accounts.map(_.toAccountInfo),
         total
       )
     }

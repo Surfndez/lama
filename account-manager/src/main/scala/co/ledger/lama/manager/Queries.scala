@@ -4,7 +4,6 @@ import java.util.UUID
 
 import cats.data.NonEmptyList
 import co.ledger.lama.common.logging.DoobieLogHandler
-import co.ledger.lama.common.models.messages.WorkerMessage
 import co.ledger.lama.common.models.{
   Account,
   AccountInfo,
@@ -13,7 +12,8 @@ import co.ledger.lama.common.models.{
   Sort,
   SyncEvent,
   TriggerableEvent,
-  TriggerableStatus
+  TriggerableStatus,
+  WorkableEvent
 }
 import co.ledger.lama.manager.models._
 import co.ledger.lama.manager.models.implicits._
@@ -33,16 +33,16 @@ object Queries extends DoobieLogHandler {
       .query[Int]
       .unique
 
-  def fetchPublishableWorkerMessages(
+  def fetchPublishableWorkerEvents(
       coinFamily: CoinFamily,
       coin: Coin
-  ): Stream[ConnectionIO, WorkerMessage[JsonObject]] =
+  ): Stream[ConnectionIO, WorkableEvent[JsonObject]] =
     sql"""SELECT "key", coin_family, coin, group_col, sync_id, status, "cursor", "error", updated
           FROM workable_event
           WHERE coin_family = $coinFamily
           AND coin = $coin
        """
-      .query[WorkerMessage[JsonObject]]
+      .query[WorkableEvent[JsonObject]]
       .stream
 
   def fetchTriggerableEvents(
@@ -68,9 +68,18 @@ object Queries extends DoobieLogHandler {
       limit: Int
   ): Stream[ConnectionIO, AccountSyncStatus] = {
     val groupFilter = group.map(name => fr"group_col = $name")
-    val q: Fragment = fr"""SELECT "key", coin_family, coin, group_col,
-        extract(epoch FROM sync_frequency) / 60 * 60, label, sync_id,
-        status, "cursor", "error", updated
+    val q: Fragment = fr"""SELECT 
+                            "key", 
+                            coin_family, 
+                            coin, 
+                            group_col,
+                            extract(epoch FROM sync_frequency) / 60 * 60, 
+                            label, 
+                            sync_id,
+                            status, 
+                            "cursor", 
+                            "error", 
+                            updated
     FROM account_sync_status """ ++
       Fragments.whereAndOpt(groupFilter) ++
       fr"""LIMIT $limit""" ++
