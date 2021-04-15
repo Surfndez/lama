@@ -20,7 +20,7 @@ case class Account(
     identifier,
     coinFamily.toProto,
     coin.toProto,
-    group.name
+    Some(group.toProto)
   )
 }
 
@@ -33,6 +33,6 @@ object Account {
       proto.identifier,
       CoinFamily.fromProto(proto.coinFamily),
       Coin.fromProto(proto.coin),
-      AccountGroup(proto.group)
+      AccountGroup.fromProto(proto.getGroup)
     )
 }

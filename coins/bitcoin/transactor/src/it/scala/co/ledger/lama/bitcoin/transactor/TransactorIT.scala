@@ -19,8 +19,7 @@ import co.ledger.lama.bitcoin.common.models.transactor.{
 import co.ledger.lama.bitcoin.common.clients.grpc.mocks.{InterpreterClientMock, KeychainClientMock}
 import co.ledger.lama.bitcoin.common.clients.http.mocks.ExplorerClientMock
 import co.ledger.lama.bitcoin.transactor.services.BitcoinLibClientServiceMock
-import co.ledger.lama.common.models.Coin
-import co.ledger.lama.common.models.Coin.Btc
+import co.ledger.lama.common.models.{Account, AccountGroup, Coin, CoinFamily}
 import co.ledger.lama.common.utils.IOAssertion
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -43,7 +42,8 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
         TransactorConfig(200)
       )
 
-    val accountId = UUID.randomUUID()
+    val identifier = UUID.randomUUID().toString
+    val account    = Account(identifier, CoinFamily.Bitcoin, Coin.Btc, AccountGroup("group"))
 
     val transactionHash = "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1f"
 
@@ -102,20 +102,19 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
       // save the transactions with the futures utxos
       _ <- Stream
         .emits(transactions)
-        .through(interpreterService.saveTransactions(accountId))
+        .through(interpreterService.saveTransactions(account.id))
         .compile
         .drain
 
       // compute to flag utxos as belonging
       _ <- interpreterService.compute(
-        accountId,
-        Btc,
+        account,
         List(outputAddress1, outputAddress2, outputAddress3)
       )
 
       // create a transaction using prevously saved utxoq
       response <- transactor.createTransaction(
-        accountId,
+        account.id,
         UUID.randomUUID(),
         recipients,
         Coin.Btc,

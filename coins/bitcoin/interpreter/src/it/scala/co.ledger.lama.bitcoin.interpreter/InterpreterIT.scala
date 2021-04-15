@@ -3,13 +3,14 @@ package co.ledger.lama.bitcoin.interpreter
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
+
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.implicits._
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.interpreter.Config.Db
 import co.ledger.lama.bitcoin.interpreter.models.AccountTxView
-import co.ledger.lama.common.models.{Coin, Sort}
+import co.ledger.lama.common.models.{Account, AccountGroup, Coin, CoinFamily, Sort}
 import co.ledger.lama.common.utils.IOAssertion
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -17,7 +18,14 @@ import fs2.Stream
 
 class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
-  val accountId: UUID = UUID.fromString("b723c553-3a9a-4130-8883-ee2f6c2f9202")
+  val account: Account =
+    Account(
+      "b723c553-3a9a-4130-8883-ee2f6c2f9202",
+      CoinFamily.Bitcoin,
+      Coin.Btc,
+      AccountGroup("group")
+    )
+  val accountId: UUID = account.id
 
   private val outputAddress1 =
     AccountAddress("1DtwACvd338XtHBFYJRVKRLxviD7YtYADa", ChangeType.External, NonEmptyList.of(1, 0))
@@ -104,9 +112,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
           blocks <- interpreter.getLastBlocks(accountId)
 
           _ <- interpreter.compute(
-            accountId,
-            List(inputAddress, outputAddress2),
-            Coin.Btc
+            account,
+            List(inputAddress, outputAddress2)
           )
 
           resOpsBeforeDeletion <- interpreter.getOperations(
@@ -211,9 +218,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
           _ <- saveTxs(interpreter, List(uTx, uTx2))
 
           _ <- interpreter.compute(
-            accountId,
-            List(outputAddress1),
-            Coin.Btc
+            account,
+            List(outputAddress1)
           )
           res <- interpreter.getOperations(accountId, 20, Sort.Descending, None)
           GetOperationsResult(operations, _, _) = res
@@ -265,9 +271,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
           _ <- saveTxs(interpreter, List(uTx, tx))
 
           _ <- interpreter.compute(
-            accountId,
-            List(outputAddress1),
-            Coin.Btc
+            account,
+            List(outputAddress1)
           )
           res <- interpreter.getOperations(accountId, 20, Sort.Descending, None)
           GetOperationsResult(operations, _, _) = res
@@ -328,7 +333,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
         for {
           _             <- saveTxs(interpreter, List(uTx1))
-          _             <- interpreter.compute(accountId, List(outputAddress1), Coin.Btc)
+          _             <- interpreter.compute(account, List(outputAddress1))
           firstBalance  <- interpreter.getBalance(accountId)
           firstBalanceH <- interpreter.getBalanceHistory(accountId, None, None, 0)
           r1            <- interpreter.getOperations(accountId, 20, Sort.Descending, None)
@@ -341,7 +346,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
               uTx2
             )
           )
-          _              <- interpreter.compute(accountId, List(outputAddress1, outputAddress2), Coin.Btc)
+          _              <- interpreter.compute(account, List(outputAddress1, outputAddress2))
           secondBalance  <- interpreter.getBalance(accountId)
           secondBalanceH <- interpreter.getBalanceHistory(accountId, None, None, 0)
           r2             <- interpreter.getOperations(accountId, 20, Sort.Descending, None)
@@ -356,7 +361,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
               uTx3
             )
           )
-          _            <- interpreter.compute(accountId, List(outputAddress1, outputAddress2), Coin.Btc)
+          _            <- interpreter.compute(account, List(outputAddress1, outputAddress2))
           lastBalance  <- interpreter.getBalance(accountId)
           lastBalanceH <- interpreter.getBalanceHistory(accountId, None, None, 0)
           r3           <- interpreter.getOperations(accountId, 20, Sort.Descending, None)

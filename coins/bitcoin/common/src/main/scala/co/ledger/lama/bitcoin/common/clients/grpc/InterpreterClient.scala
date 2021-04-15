@@ -2,12 +2,13 @@ package co.ledger.lama.bitcoin.common.clients.grpc
 
 import java.time.Instant
 import java.util.UUID
+
 import cats.effect.{ContextShift, IO}
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.common.utils.BtcProtoUtils._
 import co.ledger.lama.bitcoin.interpreter.protobuf
 import co.ledger.lama.common.clients.grpc.GrpcClient
-import co.ledger.lama.common.models.{Coin, Sort}
+import co.ledger.lama.common.models.{Account, Sort}
 import co.ledger.lama.common.utils.{TimestampProtoUtils, UuidUtils}
 import io.grpc.{ManagedChannel, Metadata}
 import fs2._
@@ -20,8 +21,7 @@ trait InterpreterClient {
   def getLastBlocks(accountId: UUID): IO[List[BlockView]]
 
   def compute(
-      accountId: UUID,
-      coin: Coin,
+      account: Account,
       addresses: List[AccountAddress]
   ): IO[Int]
 
@@ -101,16 +101,14 @@ class InterpreterGrpcClient(
       .map(_.blocks.map(BlockView.fromProto).toList)
 
   def compute(
-      accountId: UUID,
-      coin: Coin,
+      account: Account,
       addresses: List[AccountAddress]
   ): IO[Int] =
     client
       .compute(
         protobuf.ComputeRequest(
-          UuidUtils.uuidToBytes(accountId),
-          addresses.map(_.toProto),
-          coin.name
+          Some(account.toBtcProto),
+          addresses.map(_.toProto)
         ),
         new Metadata()
       )

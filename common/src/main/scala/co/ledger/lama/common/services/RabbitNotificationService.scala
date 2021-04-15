@@ -38,7 +38,7 @@ object RabbitNotificationService extends DefaultContextLogging {
 
   def routingKey(notification: Notification): RoutingKey =
     RoutingKey(
-      s"${notification.coinFamily.name}.${notification.coin.name}.${notification.accountId.toString}"
+      s"${notification.account.group.name}.${notification.account.coinFamily.name}.${notification.account.coin.name}.${notification.account.id.toString}"
     )
 
 }

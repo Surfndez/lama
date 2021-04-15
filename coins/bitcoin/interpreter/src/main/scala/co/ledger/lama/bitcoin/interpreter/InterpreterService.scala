@@ -2,10 +2,11 @@ package co.ledger.lama.bitcoin.interpreter
 
 import cats.effect.{ConcurrentEffect, IO}
 import co.ledger.lama.bitcoin.common.models.interpreter._
+import co.ledger.lama.bitcoin.common.utils.BtcProtoUtils._
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.bitcoin.interpreter.models.AccountTxView
 import co.ledger.lama.bitcoin.interpreter.protobuf.SaveTransactionRequest
-import co.ledger.lama.common.models._
+import co.ledger.lama.common.models.PaginationToken
 import co.ledger.lama.common.utils.{TimestampProtoUtils, UuidUtils}
 import io.grpc.{Metadata, ServerServiceDefinition}
 import fs2.Stream
@@ -55,7 +56,7 @@ class InterpreterGrpcService(
   ): IO[protobuf.GetOperationsResult] = {
     for {
       accountId <- UuidUtils.bytesToUuidIO(request.accountId)
-      sort   = Sort.fromIsAsc(request.sort.isAsc)
+      sort   = Sort.fromProto(request.sort)
       cursor = PaginationToken.fromBase64[OperationPaginationState](request.cursor)
       _ <- log.info(s"""Getting operations with parameters:
                   - accountId: $accountId
@@ -85,7 +86,7 @@ class InterpreterGrpcService(
   def getUtxos(request: protobuf.GetUtxosRequest, ctx: Metadata): IO[protobuf.GetUtxosResult] = {
     for {
       accountId <- UuidUtils.bytesToUuidIO(request.accountId)
-      sort = Sort.fromIsAsc(request.sort.isAsc)
+      sort = Sort.fromProto(request.sort)
       _   <- log.info(s"""Getting UTXOs with parameters:
                                - accountId: $accountId
                                - limit: ${request.limit}
@@ -129,12 +130,9 @@ class InterpreterGrpcService(
       ctx: Metadata
   ): IO[protobuf.ResultCount] =
     for {
-      coin <- IO.fromOption(Coin.fromKey(request.coinId))(
-        new IllegalArgumentException(s"Unknown coin type ${request.coinId}) in compute request")
-      )
-      accountId <- UuidUtils.bytesToUuidIO(request.accountId)
+      account   <- IO(BtcAccount.fromBtcProto(request.account.get))
       addresses <- IO(request.addresses.map(AccountAddress.fromProto).toList)
-      nbOps     <- interpreter.compute(accountId, addresses, coin)
+      nbOps     <- interpreter.compute(account, addresses)
     } yield protobuf.ResultCount(nbOps)
 
   def getBalance(

@@ -150,7 +150,7 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
                 rabbitClient,
                 conf.eventsConfig.lamaEventsExchangeName,
                 RoutingKey(
-                  s"${coinConf.coinFamily}.${coinConf.coin}.${accountRegistered.accountId.toString}"
+                  s"*.${coinConf.coinFamily}.${coinConf.coin}.${accountRegistered.accountId.toString}"
                 )
               )(channel)
 
@@ -262,7 +262,7 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
             }
 
             it should "emit a balance notification" in {
-              balanceNotification.accountId shouldBe accountRegistered.accountId
+              balanceNotification.account.id shouldBe accountRegistered.accountId
               val Right(notificationBalance) =
                 balanceNotification.currentBalance.as[CurrentBalance]
               notificationBalance.balance shouldBe balances.last.balance

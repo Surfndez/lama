@@ -22,4 +22,24 @@ object BtcProtoUtils {
       }
   }
 
+  implicit class AccountBtcProtoUtils(account: models.Account) {
+    def toBtcProto: protobuf.Account = {
+      protobuf.Account(
+        account.identifier,
+        account.coinFamily.name,
+        account.coin.name,
+        account.group.name
+      )
+    }
+  }
+
+  object BtcAccount {
+    def fromBtcProto(proto: protobuf.Account): models.Account =
+      models.Account(
+        proto.identifier,
+        models.CoinFamily.fromKey(proto.coinFamily).get,
+        models.Coin.fromKey(proto.coin).get,
+        models.AccountGroup(proto.group)
+      )
+  }
 }

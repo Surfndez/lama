@@ -104,7 +104,7 @@ message Account {
     string identifier = 1;
     CoinFamily coinFamily = 2;
     Coin coin = 3;
-    string group = 4;
+    GroupLabel group = 4;
 }
 
 message SyncEvent {

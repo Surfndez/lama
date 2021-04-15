@@ -88,32 +88,30 @@ class Interpreter(
   }
 
   def compute(
-      accountId: UUID,
-      addresses: List[AccountAddress],
-      coin: Coin
+      account: Account,
+      addresses: List[AccountAddress]
   ): IO[Int] =
     for {
-      balanceHistoryCount <- balanceService.getBalanceHistoryCount(accountId)
+      balanceHistoryCount <- balanceService.getBalanceHistoryCount(account.id)
 
       start <- clock.monotonic(TimeUnit.MILLISECONDS)
 
-      _ <- log.info(s"[$accountId] Flagging inputs and outputs belong")
+      _ <- log.info(s"[${account.id}] Flagging inputs and outputs belong")
 
-      _ <- flaggingService.flagInputsAndOutputs(accountId, addresses)
+      _ <- flaggingService.flagInputsAndOutputs(account.id, addresses)
 
       flaggingEnd <- clock.monotonic(TimeUnit.MILLISECONDS)
 
-      _ <- operationService.deleteUnconfirmedOperations(accountId)
+      _ <- operationService.deleteUnconfirmedOperations(account.id)
 
       cleanUnconfirmedEnd <- clock.monotonic(TimeUnit.MILLISECONDS)
 
-      _ <- log.info(s"[$accountId] Computing operations")
+      _ <- log.info(s"[${account.id}] Computing operations")
       nbSavedOps <- operationService
-        .compute(accountId)
+        .compute(account.id)
         .through(
           notify(
-            accountId,
-            coin,
+            account,
             balanceHistoryCount > 0
           )
         )
@@ -122,23 +120,21 @@ class Interpreter(
 
       computeOperationEnd <- clock.monotonic(TimeUnit.MILLISECONDS)
 
-      _ <- log.info(s"[$accountId] Computing balance history")
-      _ <- balanceService.computeNewBalanceHistory(accountId)
+      _ <- log.info(s"[${account.id}] Computing balance history")
+      _ <- balanceService.computeNewBalanceHistory(account.id)
 
       end <- clock.monotonic(TimeUnit.MILLISECONDS)
 
-      _ <- log.info(s"[$accountId] $nbSavedOps operations saved in ${end - start}ms ")
+      _ <- log.info(s"[${account.id}] $nbSavedOps operations saved in ${end - start}ms ")
       _ <- log.info(
-        s"[$accountId] flagging: ${flaggingEnd - start}ms, cleaning: ${cleanUnconfirmedEnd - flaggingEnd}ms, compute operations: ${computeOperationEnd - cleanUnconfirmedEnd}ms"
+        s"[${account.id}] flagging: ${flaggingEnd - start}ms, cleaning: ${cleanUnconfirmedEnd - flaggingEnd}ms, compute operations: ${computeOperationEnd - cleanUnconfirmedEnd}ms"
       )
 
-      currentBalance <- balanceService.getCurrentBalance(accountId)
+      currentBalance <- balanceService.getCurrentBalance(account.id)
 
       _ <- publish(
         BalanceUpdatedNotification(
-          accountId = accountId,
-          coinFamily = CoinFamily.Bitcoin,
-          coin = coin,
+          account = account,
           currentBalance = currentBalance.asJson
         )
       )
@@ -146,21 +142,18 @@ class Interpreter(
     } yield nbSavedOps
 
   def notify(
-      accountId: UUID,
-      coin: Coin,
+      account: Account,
       shouldNotify: Boolean
   ): Pipe[IO, Operation.UID, Int] =
     _.parEvalMap(maxConcurrent) { opId =>
       OptionT
         .whenF(shouldNotify)(
-          operationService.getOperation(Operation.AccountId(accountId), opId)
+          operationService.getOperation(Operation.AccountId(account.id), opId)
         )
         .foldF(IO.unit) { operation =>
           publish(
             OperationNotification(
-              accountId = accountId,
-              coinFamily = CoinFamily.Bitcoin,
-              coin = coin,
+              account = account,
               operation = operation.asJson
             )
           )

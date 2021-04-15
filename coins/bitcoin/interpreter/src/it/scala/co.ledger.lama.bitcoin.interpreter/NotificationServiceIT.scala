@@ -47,13 +47,17 @@ class NotificationServiceIT extends AnyFlatSpecLike with Matchers {
               .consume[OperationsComputedNotification](rabbitClient, qName)
           } yield consumer
 
-        val accountId: UUID    = UUID.randomUUID()
+        val identifier         = UUID.randomUUID().toString
         val computedOperations = 4
+        val account = Account(
+          identifier,
+          CoinFamily.Bitcoin,
+          Coin.Btc,
+          AccountGroup("group")
+        )
         val operationsComputedNotification =
           OperationsComputedNotification(
-            accountId,
-            CoinFamily.Bitcoin,
-            Coin.Btc,
+            account,
             computedOperations
           )
 
@@ -66,7 +70,7 @@ class NotificationServiceIT extends AnyFlatSpecLike with Matchers {
           receivedNotification <- consumeNotification[OperationsComputedNotification](notifications)
         } yield {
           it should "contain the pushed notification" in {
-            receivedNotification.accountId shouldBe accountId
+            receivedNotification.account.id shouldBe account.id
             receivedNotification.operationsCount shouldBe computedOperations
           }
         }

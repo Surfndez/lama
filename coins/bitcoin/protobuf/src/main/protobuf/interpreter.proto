@@ -28,6 +28,13 @@ enum SortingOrder {
   ASC = 1;
 }
 
+message Account {
+  string identifier = 1;
+  string coinFamily = 2;
+  string coin = 3;
+  string group = 4;
+}
+
 message SaveTransactionRequest {
   bytes account_id = 1;
   TransactionView transaction = 2;
@@ -42,9 +49,8 @@ message GetLastBlocksResult {
 }
 
 message ComputeRequest {
-  bytes account_id = 1;
+  Account account = 1;
   repeated AccountAddress addresses = 2;
-  string coinId = 3;
 }
 
 message DeleteTransactionsRequest {

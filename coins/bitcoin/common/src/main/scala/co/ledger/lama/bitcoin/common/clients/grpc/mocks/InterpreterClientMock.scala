@@ -3,12 +3,11 @@ package co.ledger.lama.bitcoin.common.clients.grpc.mocks
 import cats.effect.IO
 import co.ledger.lama.bitcoin.common.clients.grpc.InterpreterClient
 import co.ledger.lama.bitcoin.common.models.interpreter._
-import co.ledger.lama.common.models.{Coin, Sort}
+import co.ledger.lama.common.models.{Account, Sort}
 import java.time.Instant
 import java.util.UUID
 
 import scala.collection.mutable
-
 import fs2._
 
 class InterpreterClientMock extends InterpreterClient {
@@ -79,13 +78,12 @@ class InterpreterClientMock extends InterpreterClient {
   }
 
   def compute(
-      accountId: UUID,
-      coin: Coin,
+      account: Account,
       addresses: List[AccountAddress]
   ): IO[Int] = {
 
     val txViews = savedTransactions
-      .getOrElse(accountId, List.empty)
+      .getOrElse(account.id, List.empty)
 
     val computedTxViews = txViews.map { tx =>
       tx.copy(
@@ -105,11 +103,11 @@ class InterpreterClientMock extends InterpreterClient {
     }
 
     transactions.update(
-      accountId,
+      account.id,
       computedTxViews
     )
 
-    val operationToSave = transactions(accountId).flatMap { tx =>
+    val operationToSave = transactions(account.id).flatMap { tx =>
       val inputAmount =
         tx.inputs.filter(i => addresses.exists(_.accountAddress == i.address)).map(_.value).sum
       val outputAmount = tx.outputs
@@ -124,15 +122,15 @@ class InterpreterClientMock extends InterpreterClient {
       (inputAmount > 0, outputAmount > 0) match {
         // only input, consider changeAmount as deducted from spent
         case (true, false) =>
-          List(makeOperation(accountId, tx, inputAmount - changeAmount, OperationType.Send))
+          List(makeOperation(account.id, tx, inputAmount - changeAmount, OperationType.Send))
         // only output, consider changeAmount as received
         case (false, true) =>
-          List(makeOperation(accountId, tx, outputAmount + changeAmount, OperationType.Receive))
+          List(makeOperation(account.id, tx, outputAmount + changeAmount, OperationType.Receive))
         // both input and output, consider change as deducted from spend
         case (true, true) =>
           List(
-            makeOperation(accountId, tx, inputAmount - changeAmount, OperationType.Send),
-            makeOperation(accountId, tx, outputAmount, OperationType.Receive)
+            makeOperation(account.id, tx, inputAmount - changeAmount, OperationType.Send),
+            makeOperation(account.id, tx, outputAmount, OperationType.Receive)
           )
         case _ => Nil
       }
@@ -140,7 +138,7 @@ class InterpreterClientMock extends InterpreterClient {
     }
 
     operations.update(
-      accountId,
+      account.id,
       operationToSave
     )
 

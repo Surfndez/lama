@@ -108,8 +108,7 @@ class Worker(
       _ <- log.info(s"New cursor state: ${lastMinedBlock.block}")
 
       opsCount <- interpreterClient.compute(
-        account.id,
-        account.coin,
+        account,
         (addresses ++ addressesUsedByMempool).distinct
       )
 
