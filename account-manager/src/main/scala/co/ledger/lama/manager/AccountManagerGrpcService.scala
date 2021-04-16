@@ -2,7 +2,7 @@ package co.ledger.lama.manager
 
 import cats.effect.{ConcurrentEffect, IO}
 import co.ledger.lama.common.logging.DefaultContextLogging
-import co.ledger.lama.common.models.{AccountGroup, Coin, CoinFamily, Sort}
+import co.ledger.lama.common.models.{Account, AccountGroup, Sort}
 import co.ledger.lama.common.utils.UuidUtils
 import co.ledger.lama.manager.protobuf.{ResyncAccountRequest, SyncEventResult}
 import com.google.protobuf.empty.Empty
@@ -36,20 +36,19 @@ class AccountManagerGrpcService(accountManager: AccountManager)
     // TODO: make Option in request
     val syncFrequencyO = if (request.syncFrequency == 0L) None else Some(request.syncFrequency)
 
-    request.group.map(_.value) match {
-      case Some(group) =>
+    request.account match {
+
+      case Some(account) =>
         accountManager
           .registerAccount(
-            request.key,
-            CoinFamily.fromProto(request.coinFamily),
-            Coin.fromProto(request.coin),
+            Account.fromProto(account),
             syncFrequencyO,
-            request.label.map(_.value),
-            AccountGroup(group)
+            request.label.map(_.value)
           )
           .map(_.toProto)
-      // TODO: Add metadata about the actual INVALID_ARGUMENT in the IO
+
       case None =>
+        // TODO: Add metadata about the actual INVALID_ARGUMENT in the IO
         log.error("received an account registration without group field.") *> IO.raiseError(
           Status.INVALID_ARGUMENT.asException()
         )

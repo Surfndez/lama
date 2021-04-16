@@ -261,16 +261,16 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
               accountRegistered.extendedPublicKey shouldBe account.expected.extendedPublicKey
             }
 
-            it should "emit a balance notification" in {
+            it should s"have a balance of ${account.expected.balance}" in {
+              accountInfoAfterSync.balance shouldBe BigInt(account.expected.balance)
+              accountInfoAfterSync.lastSyncEvent.map(_.status) should contain(Synchronized)
+            }
+
+            it should s"emit a balance notification of ${balances.last.balance}" in {
               balanceNotification.account.id shouldBe accountRegistered.accountId
               val Right(notificationBalance) =
                 balanceNotification.currentBalance.as[CurrentBalance]
               notificationBalance.balance shouldBe balances.last.balance
-            }
-
-            it should s"have a balance of ${account.expected.balance}" in {
-              accountInfoAfterSync.balance shouldBe BigInt(account.expected.balance)
-              accountInfoAfterSync.lastSyncEvent.map(_.status) should contain(Synchronized)
             }
 
             it should s"have ${account.expected.utxosSize} utxos in AccountInfo API" in {

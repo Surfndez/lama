@@ -11,12 +11,9 @@ import java.util.UUID
 
 trait AccountManagerClient {
   def registerAccount(
-      keychainId: UUID,
-      coinFamily: CoinFamily,
-      coin: Coin,
+      account: Account,
       syncFrequency: Option[Long],
-      label: Option[String],
-      group: String
+      label: Option[String]
   ): IO[SyncEventResult]
 
   def updateSyncFrequency(accountId: UUID, frequency: Long): IO[Unit]
@@ -56,22 +53,16 @@ class AccountManagerGrpcClient(
     )
 
   def registerAccount(
-      keychainId: UUID,
-      coinFamily: CoinFamily,
-      coin: Coin,
+      account: Account,
       syncFrequency: Option[Long],
-      label: Option[String],
-      group: String
+      label: Option[String]
   ): IO[SyncEventResult] =
     client
       .registerAccount(
         protobuf.RegisterAccountRequest(
-          keychainId.toString,
-          coinFamily.toProto,
-          coin.toProto,
+          Some(account.toProto),
           syncFrequency.getOrElse(0L), // if 0, will use default conf in account manager
-          label.map(protobuf.AccountLabel(_)),
-          Some(protobuf.GroupLabel(group))
+          label.map(protobuf.AccountLabel(_))
         ),
         new Metadata
       )

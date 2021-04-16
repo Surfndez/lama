@@ -28,30 +28,19 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
     } yield ()).transact(db).void
 
   def registerAccount(
-      key: String,
-      coinFamily: CoinFamily,
-      coin: Coin,
+      account: Account,
       syncFrequencyO: Option[Long],
-      label: Option[String],
-      group: AccountGroup
-  ): IO[SyncEventResult] = {
-
-    val account = Account(
-      key,
-      coinFamily,
-      coin,
-      group
-    )
-
+      label: Option[String]
+  ): IO[SyncEventResult] =
     for {
       // Get the sync frequency from the request
       // or fallback to the default one from the coin configuration.
       syncFrequency <- IO.fromOption {
         syncFrequencyO orElse
           coinConfigs
-            .find(c => c.coinFamily == coinFamily && c.coin == coin)
+            .find(c => c.coinFamily == account.coinFamily && c.coin == account.coin)
             .map(_.syncFrequency.toSeconds)
-      }(CoinConfigurationException(coinFamily, coin))
+      }(CoinConfigurationException(account.coinFamily, account.coin))
 
       // Build queries.
       queries = for {
@@ -87,7 +76,6 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
             SyncEventResult(accountId, syncId)
           }
     } yield response
-  }
 
   def resyncAccount(accountId: UUID, wipe: Boolean): IO[SyncEventResult] =
     for {

@@ -38,17 +38,16 @@ class AccountManagerIT
         )
 
         val nbEvents = 15
+        val account =
+          Account(accountTest.identifier, CoinFamily.Bitcoin, Coin.Btc, AccountGroup("TestGroup"))
 
         def runTests(): IO[Unit] =
           for {
             // Register an account.
             registeredResult <- service.registerAccount(
-              accountTest.identifier,
-              CoinFamily.Bitcoin,
-              Coin.Btc,
+              account,
               None,
-              None,
-              AccountGroup("TestGroup")
+              None
             )
 
             registeredAccountId = registeredResult.accountId

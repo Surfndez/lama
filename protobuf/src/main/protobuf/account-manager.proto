@@ -31,12 +31,9 @@ message AccountsResult {
 
 message RegisterAccountRequest {
     // KeychainId for Bitcoin or PublicKey for account based coins
-    string key = 1;
-    CoinFamily coin_family = 2;
-    Coin coin = 3;
-    uint64 sync_frequency = 4;
-    AccountLabel label = 5;
-    GroupLabel group = 6;
+    Account account = 1;
+    uint64 sync_frequency = 2;
+    AccountLabel label = 3;
 }
 
 message AccountLabel {

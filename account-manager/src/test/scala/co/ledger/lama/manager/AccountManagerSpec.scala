@@ -64,9 +64,10 @@ class AccountManagerSpec extends AnyFlatSpecLike with Matchers with BeforeAndAft
   it should "register a new account" in IOAssertion {
     transactor.use { db =>
       val service = new AccountManager(db, conf.coins)
+      val account = Account(testKey, coinFamily, coin, testGroup)
 
       for {
-        response <- service.registerAccount(testKey, coinFamily, coin, None, None, testGroup)
+        response <- service.registerAccount(account, None, None)
         event    <- getLastEvent(service, response.accountId)
       } yield {
         registeredAccountId = response.accountId
@@ -106,37 +107,33 @@ class AccountManagerSpec extends AnyFlatSpecLike with Matchers with BeforeAndAft
     }
   }
 
-  it should "prevent the registration of an already existing account in the same    group" in {
+  it should "prevent the registration of an already existing account in the same group" in {
     an[PSQLException] should be thrownBy IOAssertion {
       transactor.use { db =>
         val service = new AccountManager(db, conf.coins)
+        val account = Account(testKey, coinFamily, coin, testGroup)
 
         service
           .registerAccount(
-            testKey,
-            coinFamily,
-            coin,
+            account,
             Some(updatedSyncFrequency),
-            None,
-            testGroup
+            None
           )
       }
     }
   }
 
-  it should "allow   the registration of an already existing account in a different group" in IOAssertion {
+  it should "allow the registration of an already existing account in a different group" in IOAssertion {
     transactor.use { db =>
       val service  = new AccountManager(db, conf.coins)
       val newGroup = AccountGroup("AccountManagerSpec:129")
+      val account  = Account(testKey, coinFamily, coin, newGroup)
 
       for {
         response <- service.registerAccount(
-          testKey,
-          coinFamily,
-          coin,
+          account,
           Some(alternateUpdatedSyncFrequency),
-          None,
-          newGroup
+          None
         )
       } yield {
 
@@ -229,10 +226,10 @@ class AccountManagerSpec extends AnyFlatSpecLike with Matchers with BeforeAndAft
       val accountIdC2 = Account(keyC, coinFamily, coin, group2).id
 
       for {
-        _ <- service.registerAccount(keyA, coinFamily, coin, None, None, group1)
-        _ <- service.registerAccount(keyB, coinFamily, coin, None, None, group1)
-        _ <- service.registerAccount(keyA, coinFamily, coin, None, None, group2)
-        _ <- service.registerAccount(keyC, coinFamily, coin, None, None, group2)
+        _ <- service.registerAccount(Account(keyA, coinFamily, coin, group1), None, None)
+        _ <- service.registerAccount(Account(keyB, coinFamily, coin, group1), None, None)
+        _ <- service.registerAccount(Account(keyA, coinFamily, coin, group2), None, None)
+        _ <- service.registerAccount(Account(keyC, coinFamily, coin, group2), None, None)
         listGroup1 <- service
           .getAccounts(Some(group1), 0, 0)
           .map(_.accounts)

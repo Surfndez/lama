@@ -305,12 +305,9 @@ object AccountControllerSpec {
       var resyncAccountCount = 0
 
       override def registerAccount(
-          keychainId: UUID,
-          coinFamily: CoinFamily,
-          coin: Coin,
+          account: Account,
           syncFrequency: Option[Long],
-          label: Option[String],
-          group: String
+          label: Option[String]
       ): IO[SyncEventResult] = ???
 
       override def updateSyncFrequency(accountId: UUID, frequency: Long): IO[Unit] = ???
