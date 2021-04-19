@@ -108,7 +108,7 @@ paths:
           schema:
             type: string
             enum: [ASC, DESC]
-            default: ASC
+            default: DESC
       responses:
         200:
           description: OK
@@ -133,18 +133,17 @@ paths:
             minimum: 1
             maximum: 1000
             default: 100
-        - name: offset
-          in: query
-          schema:
-            type: number
-            minimum: 0
-            default: 0
         - name: sort
           in: query
           schema:
             type: string
             enum: [ASC, DESC]
-            default: ASC
+            default: DESC
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            example: 'eyJzdGF0ZSI6eyJ1aWQiOiIxODk2MDM4Mjc0MWE4MjhkYzZjM2JkMzUwNDI5OTA4MjcwY2U5NmRjMWQ2NWVhOTc4ZTllYjA5ZDAwNGUwYTY0MmJhYzZiZjI2NjAiLCJibG9ja19oZWlnaHQiOjE4OTYwMzh9LCJpc19uZXh0Ijp0cnVlfQ=='
       responses:
         200:
           description: OK
@@ -490,19 +489,18 @@ components:
           example: 'new label'
     GetOperationsResult:
       required:
-        - truncated
+        - cursor
         - operations
         - total
       type: object
       properties:
-        truncated:
-          type: boolean
-          example: false
         operations:
           $ref: '#/components/schemas/Operation'
         total:
           type: number
           example: 1
+        cursor:
+          $ref: '#/components/schemas/CursorPagination'
     CreateTransactionRequest:
       required:
         - coin_selection
@@ -657,6 +655,15 @@ components:
           type: object
           example:
             address2: "blablabla"
+    CursorPagination:
+      type: object
+      properties:
+        previous:
+          type: string
+          example: 'eyJzdGF0ZSI6eyJ1aWQiOiIxODk2MTM4YmJlNmMzYzFlMDI3OTZlYzI2OGQ4NTNhZTRiODBkNzA0OTlhNzY0MTIwMDAzZWRjZmUwYzYzNGYxMjdiYjFkM2UyYmYiLCJibG9ja19oZWlnaHQiOjE4OTYxMzh9LCJpc19uZXh0IjpmYWxzZX0='
+        next:
+          type: string
+          example: 'eyJzdGF0ZSI6eyJ1aWQiOiIxODk2MDM4Mjc0MWE4MjhkYzZjM2JkMzUwNDI5OTA4MjcwY2U5NmRjMWQ2NWVhOTc4ZTllYjA5ZDAwNGUwYTY0MmJhYzZiZjI2NjAiLCJibG9ja19oZWlnaHQiOjE4OTYwMzh9LCJpc19uZXh0Ijp0cnVlfQ=='
     Coin:
       type: string
       enum: [ btc, btc_testnet, btc_regtest, ltc ]
