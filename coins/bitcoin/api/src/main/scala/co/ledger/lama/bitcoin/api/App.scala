@@ -4,7 +4,7 @@ import cats.effect.{ExitCode, IO, IOApp}
 import cats.implicits._
 import co.ledger.lama.bitcoin.api.Config.Config
 import co.ledger.lama.bitcoin.api.middlewares.LoggingMiddleware._
-import co.ledger.lama.bitcoin.api.routes.{AccountController, HealthController, VersionController}
+import co.ledger.lama.bitcoin.api.routes.{AccountController, HealthController}
 import co.ledger.lama.bitcoin.common.clients.grpc.{
   InterpreterGrpcClient,
   KeychainGrpcClient,
@@ -89,8 +89,7 @@ object App extends IOApp {
             HealthFs2Grpc.stub[IO](res.keychainGrpcChannel)
           ),
           methodConfig
-        ),
-        "_version" -> CORS(VersionController.routes(), methodConfig)
+        )
       ).orNotFound
 
       BlazeServerBuilder[IO](ExecutionContext.global)

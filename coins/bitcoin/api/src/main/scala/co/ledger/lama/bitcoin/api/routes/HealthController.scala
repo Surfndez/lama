@@ -1,5 +1,6 @@
 package co.ledger.lama.bitcoin.api.routes
 
+import buildinfo.BuildInfo
 import cats.effect.{ContextShift, IO, Timer}
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.protobuf.lama.common.HealthCheckResponse.ServingStatus
@@ -39,11 +40,11 @@ object HealthController extends Http4sDsl[IO] with DefaultContextLogging {
 
   implicit val componentInfoEncoder: Encoder[ComponentInfo] =
     (info: ComponentInfo) =>
-      Json.fromJsonObject(
-        JsonObject("version" -> info.version.asJson, "status" -> info.status.asJson)
-      )
+      Json
+        .fromJsonObject(JsonObject("status" -> info.status.asJson))
+        .deepMerge(info.version.asJson)
 
-  private def getServingStatus(client: HealthFs2Grpc[IO, Metadata]): IO[ServingStatus] =
+  private def getComponentServingStatus(client: HealthFs2Grpc[IO, Metadata]): IO[ServingStatus] =
     client
       .check(new HealthCheckRequest(), new Metadata)
       .timeout(5.seconds)
@@ -54,7 +55,7 @@ object HealthController extends Http4sDsl[IO] with DefaultContextLogging {
   // (keychain for example uses a google-provided proto)
   // Having the correct status but no version MUST NOT be an error,
   // so the error is dealt with
-  private def getVersion(client: HealthFs2Grpc[IO, Metadata]): IO[VersionResponse] =
+  private def getComponentVersion(client: HealthFs2Grpc[IO, Metadata]): IO[VersionResponse] =
     client
       .version(new Empty(), new Metadata)
       .timeout(5.seconds)
@@ -62,8 +63,8 @@ object HealthController extends Http4sDsl[IO] with DefaultContextLogging {
 
   private def getComponentInfo(client: HealthFs2Grpc[IO, Metadata]): IO[ComponentInfo] = {
     for {
-      status  <- getServingStatus(client)
-      version <- getVersion(client)
+      status  <- getComponentServingStatus(client)
+      version <- getComponentVersion(client)
     } yield ComponentInfo(status, version)
   }
 
@@ -76,6 +77,15 @@ object HealthController extends Http4sDsl[IO] with DefaultContextLogging {
   ): HttpRoutes[IO] =
     HttpRoutes.of[IO] { case GET -> Root =>
       Map(
+        "api" -> IO.pure(
+          ComponentInfo(
+            ServingStatus.SERVING,
+            VersionResponse(
+              version = BuildInfo.version,
+              sha1 = BuildInfo.gitHeadCommit.getOrElse("n/a")
+            )
+          )
+        ),
         "interpreter"     -> getComponentInfo(interpreterHealthClient),
         "account_manager" -> getComponentInfo(accountManagerHealthClient),
         "transactor"      -> getComponentInfo(transactorHealthClient),
