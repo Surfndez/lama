@@ -16,7 +16,7 @@
     </appender>
 
     <root level="${LOG_LEVEL:-INFO}">
-        <appender-ref ref="${LOG_APPENDER:-Datadog}"/>
+        <appender-ref ref="${LOG_APPENDER:-STDOUT}"/>
     </root>
 
 </configuration>
