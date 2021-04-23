@@ -19,7 +19,7 @@ object App extends IOApp {
 
       channel <- rabbit.createConnectionChannel
 
-      publisher <- Resource.liftF(
+      publisher <- Resource.eval(
         RabbitNotificationService.publisher(
           conf.lamaNotificationsExchangeName,
           RabbitNotificationService.routingKey

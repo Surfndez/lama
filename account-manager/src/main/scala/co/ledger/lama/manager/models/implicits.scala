@@ -1,6 +1,5 @@
 package co.ledger.lama.manager.models
 
-import java.sql.Timestamp
 import java.time.Instant
 import java.util.UUID
 
@@ -8,7 +7,6 @@ import co.ledger.lama.common.models._
 import co.ledger.lama.common.models.implicits._
 import doobie.util.meta.Meta
 import doobie.postgres.implicits._
-import doobie.implicits.javasql._
 import doobie.util.{Get, Put, Read}
 import io.circe.{Decoder, Encoder, Json, JsonObject}
 import io.circe.syntax._
@@ -17,11 +15,6 @@ object implicits {
 
   implicit val uuidEncoder: Encoder[UUID] = Encoder.encodeString.contramap(_.toString)
   implicit val uuidDecoder: Decoder[UUID] = Decoder.decodeString.map(UUID.fromString)
-
-  implicit val instantType: Meta[Instant] =
-    TimestampMeta.imap[Instant] { ts =>
-      Instant.ofEpochMilli(ts.getTime)
-    }(Timestamp.from)
 
   implicit val jsonObjectGet: Get[Option[JsonObject]] =
     jsonMeta.get.map(_.asObject)
@@ -93,9 +86,7 @@ object implicits {
     }
 
   implicit val accountGroupRead: Read[AccountGroup] =
-    Read[String].map { case group =>
-      AccountGroup(group)
-    }
+    Read[String].map(AccountGroup(_))
 
   implicit val accountInfoRead: Read[AccountInfo] =
     Read[(Account, Long, Option[String])].map { case (account, syncFrequency, label) =>

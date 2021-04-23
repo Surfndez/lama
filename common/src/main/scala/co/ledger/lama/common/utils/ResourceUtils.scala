@@ -2,6 +2,7 @@ package co.ledger.lama.common.utils
 
 import cats.effect.{Async, Blocker, ContextShift, IO, Resource, Timer}
 import co.ledger.lama.common.logging.DefaultContextLogging
+import com.zaxxer.hikari.HikariConfig
 import doobie.ExecutionContexts
 import doobie.hikari.HikariTransactor
 import fs2.Stream
@@ -43,13 +44,20 @@ object ResourceUtils extends DefaultContextLogging {
 
       _ = log.logger.info("Creating postgres client")
 
+      hikariConf = {
+        val hc = new HikariConfig()
+        hc.setDriverClassName(conf.driver) // driver classname
+        hc.setJdbcUrl(conf.url)            // connect URL
+        hc.setUsername(conf.user)          // username
+        hc.setPassword(conf.password)      // password
+        hc.setAutoCommit(false)            // doobie uses `.transact(db)` for commit
+        hc
+      }
+
       db <- retriableResource(
         "Create postgres client",
-        HikariTransactor.newHikariTransactor[IO](
-          conf.driver,                     // driver classname
-          conf.url,                        // connect URL
-          conf.user,                       // username
-          conf.password,                   // password
+        HikariTransactor.fromHikariConfig[IO](
+          hikariConf,
           ce,                              // await connection here
           Blocker.liftExecutionContext(te) // execute JDBC operations here
         )

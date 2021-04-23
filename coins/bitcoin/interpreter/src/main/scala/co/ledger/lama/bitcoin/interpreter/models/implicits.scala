@@ -1,6 +1,5 @@
 package co.ledger.lama.bitcoin.interpreter.models
 
-import java.sql.Timestamp
 import java.time.Instant
 import java.util.UUID
 
@@ -8,7 +7,6 @@ import cats.data.NonEmptyList
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import doobie._
 import doobie.postgres.implicits._
-import doobie.implicits.javasql._
 
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 
@@ -22,11 +20,6 @@ object implicits {
 
   implicit val bigIntType: Meta[BigInt] =
     Meta.BigDecimalMeta.imap[BigInt](_.toBigInt)(BigDecimal(_).bigDecimal)
-
-  implicit val instantType: Meta[Instant] =
-    TimestampMeta.imap[Instant] { ts =>
-      Instant.ofEpochMilli(ts.getTime)
-    }(Timestamp.from)
 
   implicit val operationTypeMeta: Meta[OperationType] =
     pgEnumStringOpt("operation_type", OperationType.fromKey, _.toString.toLowerCase())
