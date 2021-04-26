@@ -27,8 +27,9 @@ RUN cd / \
 
 WORKDIR /xpub-scan
 
-RUN npm install
-RUN tsc -p .
+RUN mkdir -p /xpub-scan/report
+
+RUN npm install && tsc -p .
 
 COPY . .
 
