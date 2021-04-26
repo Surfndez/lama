@@ -13,3 +13,5 @@ project/project
 project/target
 project/metals.sbt
 /.ivy2/
+
+tooling/xpub-scan/.env
