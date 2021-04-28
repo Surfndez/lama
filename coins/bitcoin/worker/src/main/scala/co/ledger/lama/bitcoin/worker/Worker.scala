@@ -1,6 +1,6 @@
 package co.ledger.lama.bitcoin.worker
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import cats.implicits._
 import co.ledger.lama.bitcoin.common.clients.grpc.{InterpreterClient, KeychainClient}
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
@@ -12,11 +12,11 @@ import co.ledger.lama.bitcoin.common.models.explorer.{
 import co.ledger.lama.bitcoin.worker.services._
 import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import co.ledger.lama.common.models.Status.{Registered, Unregistered}
-import co.ledger.lama.common.models.{Account, Coin, ReportError, ReportableEvent, WorkableEvent}
+import co.ledger.lama.common.models._
 import fs2.Stream
 import io.circe.syntax._
-import java.util.UUID
 
+import java.util.UUID
 import scala.math.Ordering.Implicits._
 import scala.util.Try
 
@@ -28,7 +28,7 @@ class Worker(
     cursorService: Coin => CursorStateService[IO]
 ) extends ContextLogging {
 
-  def run(implicit cs: ContextShift[IO], t: Timer[IO]): Stream[IO, Unit] =
+  def run: Stream[IO, Unit] =
     syncEventService.consumeWorkerEvents
       .evalMap { autoAckMsg =>
         autoAckMsg.unwrap { event =>
@@ -60,7 +60,7 @@ class Worker(
 
   def synchronizeAccount(
       workerEvent: WorkableEvent[Block]
-  )(implicit cs: ContextShift[IO], t: Timer[IO], lc: LamaLogContext): IO[ReportableEvent[Block]] = {
+  )(implicit lc: LamaLogContext): IO[ReportableEvent[Block]] = {
 
     val bookkeeper = Bookkeeper(
       new Keychain(keychainClient),

@@ -82,7 +82,7 @@ lazy val bitcoinProtobuf = (project in file("coins/bitcoin/protobuf"))
     name := "lama-bitcoin-protobuf",
     scalapbCodeGeneratorOptions += CodeGeneratorOption.FlatPackage,
     libraryDependencies ++= Dependencies.commonProtos,
-    PB.protoSources in Compile ++= Seq(
+    Compile / PB.protoSources ++= Seq(
       file("coins/bitcoin/keychain/pb/keychain")
     )
   )
@@ -124,7 +124,7 @@ lazy val bitcoinInterpreter = (project in file("coins/bitcoin/interpreter"))
     name := "lama-bitcoin-interpreter",
     sharedSettings,
     libraryDependencies ++= (Dependencies.btcInterpreter ++ Dependencies.test),
-    parallelExecution in IntegrationTest := false
+    IntegrationTest / parallelExecution := false
   )
   .dependsOn(common, bitcoinCommon)
 
@@ -137,7 +137,7 @@ lazy val bitcoinTransactor = (project in file("coins/bitcoin/transactor"))
     libraryDependencies ++= (Dependencies.btcCommon ++ Dependencies.commonProtos ++ Dependencies.test),
     // Proto config
     scalapbCodeGeneratorOptions += CodeGeneratorOption.FlatPackage,
-    PB.protoSources in Compile := Seq(
+    Compile / PB.protoSources := Seq(
       file("coins/bitcoin/lib-grpc/pb/bitcoin")
     )
   )

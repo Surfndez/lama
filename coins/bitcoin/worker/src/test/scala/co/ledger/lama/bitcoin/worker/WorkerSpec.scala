@@ -1,39 +1,28 @@
 package co.ledger.lama.bitcoin.worker
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
+import cats.effect.std.Queue
 import co.ledger.lama.bitcoin.common.clients.grpc.InterpreterClient
 import co.ledger.lama.bitcoin.common.clients.grpc.mocks.InterpreterClientMock
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
 import co.ledger.lama.bitcoin.common.clients.http.mocks.ExplorerClientMock
 import co.ledger.lama.bitcoin.common.models.explorer.Block
+import co.ledger.lama.bitcoin.common.models.interpreter.TransactionView
 import co.ledger.lama.bitcoin.worker.SyncEventServiceFixture.{End, QueueInputOps, registered}
 import co.ledger.lama.bitcoin.worker.services.{CursorStateService, SyncEventService}
 import co.ledger.lama.common.models.Status.Registered
-import co.ledger.lama.common.models.{
-  Account,
-  AccountGroup,
-  Coin,
-  CoinFamily,
-  ReportableEvent,
-  WorkableEvent
-}
+import co.ledger.lama.common.models._
 import co.ledger.lama.common.utils.IOAssertion
-import fs2.concurrent.Queue
+import co.ledger.lama.common.utils.rabbitmq.AutoAckMessage
+import fs2.Stream
+import dev.profunktor.fs2rabbit.model.DeliveryTag
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+
 import java.time.Instant
 import java.util.UUID
 
-import co.ledger.lama.bitcoin.common.models.interpreter.TransactionView
-import co.ledger.lama.common.utils.rabbitmq.AutoAckMessage
-import dev.profunktor.fs2rabbit.model.DeliveryTag
-
-import scala.concurrent.ExecutionContext
-
 class WorkerSpec extends AnyFlatSpec with Matchers {
-
-  implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)
 
   val accountIdentifier =
     Account(
@@ -169,9 +158,7 @@ class WorkerSpec extends AnyFlatSpec with Matchers {
 
 object SyncEventServiceFixture {
 
-  def workableEvents(implicit
-      cs: ContextShift[IO]
-  ): IO[Queue[IO, Option[WorkableEvent[Block]]]] =
+  def workableEvents: IO[Queue[IO, Option[WorkableEvent[Block]]]] =
     Queue.bounded[IO, Option[WorkableEvent[Block]]](5)
 
   def registered(
@@ -192,7 +179,8 @@ object SyncEventServiceFixture {
   ): SyncEventService = {
     new SyncEventService {
       override def consumeWorkerEvents: fs2.Stream[IO, AutoAckMessage[WorkableEvent[Block]]] = {
-        receiving.dequeue.unNoneTerminate
+        Stream
+          .fromQueueNoneTerminated(receiving)
           .evalMap { event =>
             AutoAckMessage.wrap(event, DeliveryTag(0L))(_ => IO.unit)
           }
@@ -203,10 +191,10 @@ object SyncEventServiceFixture {
   }
 
   object End {
-    def >>[T](queue: Queue[IO, Option[T]]): IO[Unit] = queue.enqueue1(None)
+    def >>[T](queue: Queue[IO, Option[T]]): IO[Unit] = queue.offer(None)
   }
   implicit class QueueInputOps[M](e: M) {
-    def >>(queue: Queue[IO, Option[M]]): IO[Unit] = queue.enqueue1(Some(e))
+    def >>(queue: Queue[IO, Option[M]]): IO[Unit] = queue.offer(Some(e))
   }
 
 }

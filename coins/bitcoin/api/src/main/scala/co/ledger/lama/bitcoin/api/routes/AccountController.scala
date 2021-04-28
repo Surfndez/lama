@@ -2,7 +2,7 @@ package co.ledger.lama.bitcoin.api.routes
 
 import cats.Monoid
 import cats.data.NonEmptyList
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import cats.implicits._
 import co.ledger.lama.bitcoin.api.models.BalancePreset
 import co.ledger.lama.bitcoin.api.models.accountManager._
@@ -33,8 +33,6 @@ import java.util.UUID
 import co.ledger.lama.common.models.{Account, AccountGroup}
 
 object AccountController extends Http4sDsl[IO] with ContextLogging {
-
-  implicit val cs: ContextShift[IO] = IO.contextShift(scala.concurrent.ExecutionContext.global)
 
   def transactionsRoutes(
       keychainClient: KeychainClient,

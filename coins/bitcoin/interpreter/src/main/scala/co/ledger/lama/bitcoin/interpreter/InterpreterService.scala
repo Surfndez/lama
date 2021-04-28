@@ -1,18 +1,18 @@
 package co.ledger.lama.bitcoin.interpreter
 
-import cats.effect.{ConcurrentEffect, IO}
+import cats.effect.{IO, Resource}
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.common.utils.BtcProtoUtils._
 import co.ledger.lama.bitcoin.interpreter.models.AccountTxView
 import co.ledger.lama.bitcoin.interpreter.protobuf.SaveTransactionRequest
 import co.ledger.lama.common.models.PaginationToken
 import co.ledger.lama.common.utils.{TimestampProtoUtils, UuidUtils}
-import io.grpc.{Metadata, ServerServiceDefinition}
 import fs2.Stream
+import io.grpc.{Metadata, ServerServiceDefinition}
 
 trait InterpreterService extends protobuf.BitcoinInterpreterServiceFs2Grpc[IO, Metadata] {
-  def definition(implicit ce: ConcurrentEffect[IO]): ServerServiceDefinition =
-    protobuf.BitcoinInterpreterServiceFs2Grpc.bindService(this)
+  def definition: Resource[IO, ServerServiceDefinition] =
+    protobuf.BitcoinInterpreterServiceFs2Grpc.bindServiceResource(this)
 }
 
 class InterpreterGrpcService(

@@ -3,6 +3,7 @@ package co.ledger.lama.bitcoin.api.routes
 import cats.Show
 import cats.data.{NonEmptyList, OptionT}
 import cats.effect.IO
+import cats.effect.unsafe.implicits.global
 import cats.implicits._
 import co.ledger.lama.bitcoin.api.models.transactor.BroadcastTransactionRequest
 import co.ledger.lama.bitcoin.common.clients.grpc.TransactorClient
@@ -32,8 +33,6 @@ import scala.language.reflectiveCalls
 
 class AccountControllerSpec extends AnyFlatSpec with Matchers {
   import AccountControllerSpec._
-
-  implicit val sc = IO.contextShift(scala.concurrent.ExecutionContext.global)
 
   val accoundId = UUID.randomUUID()
   val broadcastEndpoint = Request[IO](

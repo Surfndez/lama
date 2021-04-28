@@ -1,17 +1,17 @@
 package co.ledger.lama.bitcoin.common.clients.grpc
 
-import java.time.Instant
-import java.util.UUID
-
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.common.utils.BtcProtoUtils._
 import co.ledger.lama.bitcoin.interpreter.protobuf
-import co.ledger.lama.common.clients.grpc.GrpcClient
+import co.ledger.lama.common.clients.grpc.{GrpcClient, GrpcClientResource}
 import co.ledger.lama.common.models.{Account, Sort}
 import co.ledger.lama.common.utils.{TimestampProtoUtils, UuidUtils}
-import io.grpc.{ManagedChannel, Metadata}
+import io.grpc.Metadata
 import fs2._
+
+import java.time.Instant
+import java.util.UUID
 
 trait InterpreterClient {
   def saveTransactions(accountId: UUID): Pipe[IO, TransactionView, Unit]
@@ -64,15 +64,13 @@ trait InterpreterClient {
 
 }
 
-class InterpreterGrpcClient(
-    val managedChannel: ManagedChannel
-)(implicit val cs: ContextShift[IO])
-    extends InterpreterClient {
+class InterpreterGrpcClient(grpcClientResource: GrpcClientResource) extends InterpreterClient {
 
   val client: protobuf.BitcoinInterpreterServiceFs2Grpc[IO, Metadata] =
     GrpcClient.resolveClient(
       protobuf.BitcoinInterpreterServiceFs2Grpc.stub[IO],
-      managedChannel,
+      grpcClientResource.dispatcher,
+      grpcClientResource.channel,
       "InterpreterClient"
     )
 

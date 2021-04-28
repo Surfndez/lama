@@ -1,6 +1,6 @@
 package co.ledger.lama.manager
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import cats.implicits.showInterpolator
 import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import co.ledger.lama.common.models._
@@ -27,8 +27,9 @@ trait SyncEventTask {
   def publishWorkerEventsPipe: Pipe[IO, WorkableEvent[JsonObject], Unit]
 
   // Awake every tick, source worker events then publish.
-  def publishWorkerEvents(tick: FiniteDuration, stopAtNbTick: Option[Long] = None)(implicit
-      t: Timer[IO]
+  def publishWorkerEvents(
+      tick: FiniteDuration,
+      stopAtNbTick: Option[Long] = None
   ): Stream[IO, Unit] =
     tickerStream(tick, stopAtNbTick) >> publishableWorkerEvents.through(publishWorkerEventsPipe)
 
@@ -51,13 +52,12 @@ trait SyncEventTask {
   def triggerEventsPipe: Pipe[IO, TriggerableEvent[JsonObject], Unit]
 
   // Awake every tick, source triggerable events then trigger.
-  def trigger(tick: FiniteDuration)(implicit
-      t: Timer[IO]
-  ): Stream[IO, Unit] =
+  def trigger(tick: FiniteDuration): Stream[IO, Unit] =
     tickerStream(tick) >> triggerableEvents.through(triggerEventsPipe)
 
-  private def tickerStream(tick: FiniteDuration, stopAtNbTick: Option[Long] = None)(implicit
-      t: Timer[IO]
+  private def tickerStream(
+      tick: FiniteDuration,
+      stopAtNbTick: Option[Long] = None
   ): Stream[IO, FiniteDuration] = {
     val stream = Stream.awakeEvery[IO](tick)
     stopAtNbTick match {
@@ -75,8 +75,7 @@ class CoinSyncEventTask(
     db: Transactor[IO],
     rabbit: RabbitClient[IO],
     redis: RedisClient
-)(implicit cs: ContextShift[IO])
-    extends SyncEventTask
+) extends SyncEventTask
     with ContextLogging {
 
   // Fetch worker events ready to publish from database.

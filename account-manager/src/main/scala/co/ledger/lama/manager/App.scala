@@ -1,6 +1,7 @@
 package co.ledger.lama.manager
 
-import cats.effect.{ExitCode, IO, IOApp}
+import cats.effect.{IO, IOApp}
+import cats.implicits._
 import co.ledger.lama.common.services.grpc.HealthService
 import co.ledger.lama.common.utils.DbUtils
 import co.ledger.lama.common.utils.ResourceUtils.{grpcServer, postgresTransactor}
@@ -11,9 +12,9 @@ import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.ExchangeType
 import pureconfig.ConfigSource
 
-object App extends IOApp {
+object App extends IOApp.Simple {
 
-  def run(args: List[String]): IO[ExitCode] = {
+  def run: IO[Unit] = {
     val conf = ConfigSource.default.loadOrThrow[Config]
 
     val resources = for {
@@ -30,12 +31,13 @@ object App extends IOApp {
       accountManager = new AccountManager(db, conf.orchestrator.coins)
 
       // define rpc service definitions
-      serviceDefinitions = List(
-        new AccountManagerGrpcService(
-          accountManager
-        ).definition,
-        new HealthService().definition
-      )
+      serviceDefinitions <-
+        List(
+          new AccountManagerGrpcService(
+            accountManager
+          ).definition,
+          new HealthService().definition
+        ).sequence
 
       // create the grpc server
       grpcServer <- grpcServer(conf.grpcServer, serviceDefinitions)
@@ -45,7 +47,6 @@ object App extends IOApp {
     // start the grpc server and run the orchestrator stream
     resources
       .use { case (db, rabbitClient, redisClient, server) =>
-        // create the orchestrator
         val orchestrator = new CoinOrchestrator(
           conf.orchestrator,
           db,
@@ -56,9 +57,8 @@ object App extends IOApp {
         declareExchangesAndBindings(rabbitClient, conf.orchestrator) *>
           DbUtils.flywayMigrate(conf.postgres) *>
           IO(server.start()) *>
-          orchestrator.run().compile.drain
+          orchestrator.run().compile.lastOrError
       }
-      .as(ExitCode.Success)
   }
 
   // Declare rabbitmq exchanges and bindings used by workers and the orchestrator.

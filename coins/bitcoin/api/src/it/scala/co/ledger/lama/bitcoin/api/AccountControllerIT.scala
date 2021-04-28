@@ -1,17 +1,17 @@
 package co.ledger.lama.bitcoin.api
 
-import cats.effect.{ContextShift, IO, Resource, Timer}
+import cats.effect.{IO, Resource}
 import cats.implicits._
 import co.ledger.lama.bitcoin.api.ConfigSpec.ConfigSpec
 import co.ledger.lama.bitcoin.api.models.accountManager._
-import co.ledger.lama.bitcoin.api.{models => apiModels}
 import co.ledger.lama.bitcoin.api.routes.ValidationResult
+import co.ledger.lama.bitcoin.api.{models => apiModels}
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.common.models.Notification.BalanceUpdated
 import co.ledger.lama.common.models.Status.{Deleted, Published, Registered, Synchronized}
 import co.ledger.lama.common.models.{BalanceUpdatedNotification, Sort}
-import co.ledger.lama.common.utils.{IOAssertion, IOUtils}
 import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
+import co.ledger.lama.common.utils.{IOAssertion, IOUtils}
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.{AMQPChannel, ExchangeName, QueueName, RoutingKey}
 import fs2.Stream
@@ -26,7 +26,6 @@ import org.scalatest.matchers.should.Matchers
 import pureconfig.ConfigSource
 
 import java.util.UUID
-
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
@@ -43,8 +42,6 @@ class AccountControllerIT_Ltc extends AccountControllerIT {
 }
 
 trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
-  implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)
 
   val conf      = ConfigSource.default.loadOrThrow[ConfigSpec]
   val serverUrl = s"http://${conf.server.host}:${conf.server.port}"
@@ -356,7 +353,7 @@ object AccountNotifications {
 
   def waitBalanceUpdated(
       notifications: Stream[IO, BalanceUpdatedNotification]
-  )(implicit cs: ContextShift[IO], t: Timer[IO]): IO[BalanceUpdatedNotification] =
+  ): IO[BalanceUpdatedNotification] =
     notifications
       .find(_.status == BalanceUpdated)
       .timeout(1.minute)

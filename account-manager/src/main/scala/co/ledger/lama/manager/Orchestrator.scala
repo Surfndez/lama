@@ -1,6 +1,6 @@
 package co.ledger.lama.manager
 
-import cats.effect.{Concurrent, ContextShift, IO, Timer}
+import cats.effect.IO
 import co.ledger.lama.manager.config.OrchestratorConfig
 import com.redis.RedisClient
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
@@ -18,7 +18,7 @@ trait Orchestrator {
 
   def run(
       stopAtNbTick: Option[Long] = None
-  )(implicit c: Concurrent[IO], t: Timer[IO]): Stream[IO, Unit] =
+  ): Stream[IO, Unit] =
     Stream
       .emits(tasks)
       .map { task =>
@@ -40,8 +40,7 @@ class CoinOrchestrator(
     val db: Transactor[IO],
     val rabbit: RabbitClient[IO],
     val redis: RedisClient
-)(implicit cs: ContextShift[IO])
-    extends Orchestrator {
+) extends Orchestrator {
 
   val tasks: List[CoinSyncEventTask] =
     conf.coins

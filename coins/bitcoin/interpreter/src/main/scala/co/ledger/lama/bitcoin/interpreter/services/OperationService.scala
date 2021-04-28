@@ -1,7 +1,7 @@
 package co.ledger.lama.bitcoin.interpreter.services
 
 import cats.data.{NonEmptyList, OptionT}
-import cats.effect.{Clock, ContextShift, IO}
+import cats.effect.{Clock, IO}
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.interpreter.Config.Db
 import co.ledger.lama.bitcoin.interpreter.models.OperationToSave
@@ -15,7 +15,6 @@ import doobie._
 import doobie.implicits._
 import fs2._
 import java.util.UUID
-import java.util.concurrent.TimeUnit
 
 class OperationService(
     db: Transactor[IO],
@@ -29,7 +28,7 @@ class OperationService(
       limit: Int,
       sort: Sort,
       cursor: Option[PaginationToken[OperationPaginationState]]
-  )(implicit cs: ContextShift[IO]): IO[GetOperationsResult] = {
+  ): IO[GetOperationsResult] = {
     for {
       operations <-
         Stream
@@ -137,7 +136,7 @@ class OperationService(
   def getOperation(
       accountId: Operation.AccountId,
       operationId: Operation.UID
-  )(implicit cs: ContextShift[IO]): IO[Option[Operation]] = {
+  ): IO[Option[Operation]] = {
 
     val o = for {
       opWithTx <- OptionT(OperationQueries.findOperation(accountId, operationId))
@@ -224,7 +223,6 @@ class OperationService(
   def compute(
       accountId: UUID
   )(implicit
-      cs: ContextShift[IO],
       clock: Clock[IO],
       lc: LamaLogContext
   ): Stream[IO, Operation.UID] =
@@ -240,7 +238,6 @@ class OperationService(
       .transact(db)
 
   private def saveOperationSink(implicit
-      cs: ContextShift[IO],
       clock: Clock[IO],
       lc: LamaLogContext
   ): Pipe[IO, OperationToSave, Operation.UID] = {
@@ -251,9 +248,9 @@ class OperationService(
       in.chunkN(batchSize)
         .parEvalMap(batchConcurrency.value) { operations =>
           for {
-            start    <- clock.monotonic(TimeUnit.MILLISECONDS)
+            start    <- clock.monotonic
             savedOps <- OperationQueries.saveOperations(operations).transact(db)
-            end      <- clock.monotonic(TimeUnit.MILLISECONDS)
+            end      <- clock.monotonic
             _ <- log.debug(
               s"${operations.head.map(_.uid)}: $savedOps operations saved in ${end - start} ms"
             )

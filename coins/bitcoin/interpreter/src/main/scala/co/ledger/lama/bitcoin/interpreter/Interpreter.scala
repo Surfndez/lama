@@ -1,9 +1,10 @@
 package co.ledger.lama.bitcoin.interpreter
 
 import cats.data.OptionT
-import cats.effect.{Clock, ContextShift, IO}
+import cats.effect.{Clock, IO}
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.interpreter.Config.Db
+import co.ledger.lama.bitcoin.interpreter.models.AccountTxView
 import co.ledger.lama.bitcoin.interpreter.services._
 import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import co.ledger.lama.common.models._
@@ -12,16 +13,13 @@ import fs2._
 import doobie.Transactor
 import java.time.Instant
 import java.util.UUID
-import java.util.concurrent.TimeUnit
-
-import co.ledger.lama.bitcoin.interpreter.models.AccountTxView
 
 class Interpreter(
     publish: Notification => IO[Unit],
     db: Transactor[IO],
     maxConcurrent: Int,
     batchConcurrency: Db.BatchConcurrency
-)(implicit cs: ContextShift[IO], clock: Clock[IO])
+)(implicit clock: Clock[IO])
     extends ContextLogging {
 
   val transactionService = new TransactionService(db, maxConcurrent)
@@ -122,12 +120,12 @@ class Interpreter(
 
     for {
       balanceHistoryCount <- balanceService.getBalanceHistoryCount(account.id)
-      start               <- clock.monotonic(TimeUnit.MILLISECONDS)
+      start               <- clock.monotonic
       _                   <- log.info(s"Flagging inputs and outputs belong")
       _                   <- flaggingService.flagInputsAndOutputs(account.id, addresses)
-      flaggingEnd         <- clock.monotonic(TimeUnit.MILLISECONDS)
+      flaggingEnd         <- clock.monotonic
       _                   <- operationService.deleteUnconfirmedOperations(account.id)
-      cleanUnconfirmedEnd <- clock.monotonic(TimeUnit.MILLISECONDS)
+      cleanUnconfirmedEnd <- clock.monotonic
 
       _ <- log.info(s"Computing operations")
       nbSavedOps <- operationService
@@ -142,12 +140,12 @@ class Interpreter(
         .compile
         .foldMonoid
 
-      computeOperationEnd <- clock.monotonic(TimeUnit.MILLISECONDS)
+      computeOperationEnd <- clock.monotonic
 
       _ <- log.info(s"Computing balance history")
       _ <- balanceService.computeNewBalanceHistory(account.id)
 
-      end <- clock.monotonic(TimeUnit.MILLISECONDS)
+      end <- clock.monotonic
 
       _ <- log.info(s"$nbSavedOps operations saved in ${end - start}ms ")
       _ <- log.info(

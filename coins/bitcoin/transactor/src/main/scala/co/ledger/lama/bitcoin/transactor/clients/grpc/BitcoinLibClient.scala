@@ -1,17 +1,17 @@
 package co.ledger.lama.bitcoin.transactor.clients.grpc
 
 import cats.data.Validated
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import cats.implicits._
-import co.ledger.lama.bitcoin.common.models.{Address, BitcoinLikeNetwork, InvalidAddress}
 import co.ledger.lama.bitcoin.common.models.interpreter.Utxo
 import co.ledger.lama.bitcoin.common.models.transactor.{PrepareTxOutput, RawTransaction}
+import co.ledger.lama.bitcoin.common.models.{Address, BitcoinLikeNetwork, InvalidAddress}
 import co.ledger.lama.bitcoin.transactor.models.bitcoinLib._
 import co.ledger.lama.bitcoin.transactor.models.implicits._
-import co.ledger.lama.common.clients.grpc.GrpcClient
+import co.ledger.lama.common.clients.grpc.{GrpcClient, GrpcClientResource}
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.protobuf.bitcoin.libgrpc
-import io.grpc.{ManagedChannel, Metadata}
+import io.grpc.Metadata
 
 trait BitcoinLibClient {
 
@@ -42,14 +42,15 @@ trait BitcoinLibClient {
   ): IO[RawTransactionResponse]
 }
 
-class BitcoinLibGrpcClient(val managedChannel: ManagedChannel)(implicit val cs: ContextShift[IO])
+class BitcoinLibGrpcClient(grpcClientResource: GrpcClientResource)
     extends BitcoinLibClient
     with DefaultContextLogging {
 
   val client: libgrpc.CoinServiceFs2Grpc[IO, Metadata] =
     GrpcClient.resolveClient(
       libgrpc.CoinServiceFs2Grpc.stub[IO],
-      managedChannel,
+      grpcClientResource.dispatcher,
+      grpcClientResource.channel,
       "BitcoinLibClient"
     )
 

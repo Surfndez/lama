@@ -1,20 +1,20 @@
 package co.ledger.lama.bitcoin.interpreter.services
 
-import java.util.UUID
-
 import cats.data.NonEmptyList
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import cats.implicits._
 import co.ledger.lama.bitcoin.common.models.interpreter.{AccountAddress, ChangeType}
 import doobie._
 import doobie.implicits._
+
+import java.util.UUID
 
 class FlaggingService(db: Transactor[IO]) {
 
   def flagInputsAndOutputs(
       accountId: UUID,
       accountAddresses: List[AccountAddress]
-  )(implicit cs: ContextShift[IO]): IO[Unit] = {
+  ): IO[Unit] = {
     val (internalAddresses, externalAddresses) =
       accountAddresses
         .partition(_.changeType == ChangeType.Internal)

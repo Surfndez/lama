@@ -1,14 +1,14 @@
 package co.ledger.lama.common.services.grpc
 
 import buildinfo.BuildInfo
-import cats.effect.{ConcurrentEffect, IO}
+import cats.effect.{IO, Resource}
 import co.ledger.protobuf.lama.common.HealthCheckResponse._
 import co.ledger.protobuf.lama.common._
 import io.grpc.{Metadata, ServerServiceDefinition}
 
 class HealthService extends HealthFs2Grpc[IO, Metadata] {
-  def definition(implicit ce: ConcurrentEffect[IO]): ServerServiceDefinition =
-    HealthFs2Grpc.bindService(this)
+  def definition: Resource[IO, ServerServiceDefinition] =
+    HealthFs2Grpc.bindServiceResource(this)
 
   def check(request: HealthCheckRequest, ctx: Metadata): IO[HealthCheckResponse] =
     IO.pure(HealthCheckResponse(ServingStatus.SERVING))

@@ -1,6 +1,6 @@
 package co.ledger.lama.bitcoin.interpreter.services
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import co.ledger.lama.bitcoin.common.models.interpreter.BlockView
 import co.ledger.lama.bitcoin.interpreter.models.AccountTxView
 import co.ledger.lama.common.logging.DefaultContextLogging
@@ -11,7 +11,7 @@ import java.util.UUID
 
 class TransactionService(db: Transactor[IO], maxConcurrent: Int) extends DefaultContextLogging {
 
-  def saveTransactions(implicit cs: ContextShift[IO]): Pipe[IO, AccountTxView, Int] =
+  def saveTransactions: Pipe[IO, AccountTxView, Int] =
     _.chunkN(100)
       .parEvalMapUnordered(maxConcurrent) { chunk =>
         Stream

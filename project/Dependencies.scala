@@ -2,7 +2,7 @@ import sbt.librarymanagement.{DependencyBuilders, LibraryManagementSyntax, Modul
 
 object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
 
-  val http4sVersion = "0.21.22"
+  val http4sVersion = "1.0.0-M21"
   val http4s: Seq[ModuleID] = Seq(
     "org.http4s" %% "http4s-blaze-server"       % http4sVersion,
     "org.http4s" %% "http4s-blaze-client"       % http4sVersion,
@@ -21,7 +21,7 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
 
   val H2Version     = "1.4.200"
   val flywayVersion = "7.8.1"
-  val doobieVersion = "0.13.1"
+  val doobieVersion = "1.0.0-M1"
   val postgres: Seq[ModuleID] = Seq(
     "com.h2database" % "h2"              % H2Version,
     "org.flywaydb"   % "flyway-core"     % flywayVersion,
@@ -34,22 +34,20 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
   val pureconfigVersion   = "0.15.0"
   val logbackVersion      = "1.2.3"
   val logbackJsonVersion  = "6.6"
-  val fs2Version          = "2.5.5"
-  val fs2GrpcVersion      = "0.9.0"
+  val fs2Version          = "3.0.1"
   val protobufJava        = "3.15.8"
   val scalaLoggingVersion = "3.9.3"
 
   val utilities: Seq[ModuleID] = Seq(
     "com.typesafe.scala-logging" %% "scala-logging"            % scalaLoggingVersion,
     "co.fs2"                     %% "fs2-core"                 % fs2Version,
-    "org.lyranthe.fs2-grpc"      %% "java-runtime"             % fs2GrpcVersion,
     "ch.qos.logback"              % "logback-classic"          % logbackVersion,
     "net.logstash.logback"        % "logstash-logback-encoder" % logbackJsonVersion,
     "com.github.pureconfig"      %% "pureconfig"               % pureconfigVersion,
     "com.github.pureconfig"      %% "pureconfig-cats"          % pureconfigVersion
   )
 
-  val fs2RabbitVersion = "3.0.1"
+  val fs2RabbitVersion = "4.0.0-RC1"
   val rabbit: Seq[ModuleID] = Seq(
     "dev.profunktor" %% "fs2-rabbit" % fs2RabbitVersion
   )

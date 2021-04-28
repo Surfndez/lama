@@ -1,13 +1,18 @@
 package co.ledger.lama.common.utils
 
-import cats.effect.{Async, Blocker, ContextShift, IO, Resource, Timer}
+import cats.effect.std.Dispatcher
+import cats.effect.{Async, IO, Resource}
+import co.ledger.lama.common.clients.grpc.GrpcClientResource
 import co.ledger.lama.common.logging.DefaultContextLogging
 import com.zaxxer.hikari.HikariConfig
 import doobie.ExecutionContexts
 import doobie.hikari.HikariTransactor
 import fs2.Stream
 import io.grpc._
-import org.lyranthe.fs2_grpc.java_runtime.implicits._
+import fs2.grpc.syntax.all._
+
+import java.util.concurrent.TimeUnit
+import scala.concurrent.blocking
 
 object ResourceUtils extends DefaultContextLogging {
 
@@ -16,7 +21,6 @@ object ResourceUtils extends DefaultContextLogging {
       resource: Resource[F, O],
       policy: RetryPolicy = RetryPolicy.linear()
   )(implicit
-      T: Timer[F],
       F: Async[F]
   ): Resource[F, O] =
     Stream
@@ -36,13 +40,12 @@ object ResourceUtils extends DefaultContextLogging {
 
   def postgresTransactor(
       conf: PostgresConfig
-  )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): Resource[IO, HikariTransactor[IO]] =
+  ): Resource[IO, HikariTransactor[IO]] =
     for {
+
       ce <- ExecutionContexts.fixedThreadPool[IO](conf.poolSize)
 
-      te <- ExecutionContexts.cachedThreadPool[IO]
-
-      _ = log.logger.info("Creating postgres client")
+      _ <- Resource.eval(log.info("Creating postgres client"))
 
       hikariConf = {
         val hc = new HikariConfig()
@@ -58,33 +61,50 @@ object ResourceUtils extends DefaultContextLogging {
         "Create postgres client",
         HikariTransactor.fromHikariConfig[IO](
           hikariConf,
-          ce,                              // await connection here
-          Blocker.liftExecutionContext(te) // execute JDBC operations here
+          ce
         )
       )
 
-      _ = log.logger.info("Postgres client created")
+      _ <- Resource.eval(log.info("Postgres client created"))
     } yield db
 
   def grpcServer(
       conf: GrpcServerConfig,
       services: List[ServerServiceDefinition]
   ): Resource[IO, Server] =
-    services
-      .foldLeft(ServerBuilder.forPort(conf.port)) { case (builder, service) =>
-        builder.addService(service)
+    Resource.make {
+      IO.delay {
+        services
+          .foldLeft(ServerBuilder.forPort(conf.port)) { case (builder, service) =>
+            builder.addService(service)
+          }
+          .build()
       }
-      .resource[IO]
-
-  def grpcManagedChannel(conf: GrpcClientConfig): Resource[IO, ManagedChannel] =
-    if (conf.ssl) {
-      ManagedChannelBuilder
-        .forAddress(conf.host, conf.port)
-        .resource[IO]
-    } else {
-      ManagedChannelBuilder
-        .forAddress(conf.host, conf.port)
-        .usePlaintext()
-        .resource[IO]
+    } { server =>
+      IO.delay {
+        server.shutdown()
+        if (!blocking(server.awaitTermination(30, TimeUnit.SECONDS))) {
+          server.shutdownNow()
+          ()
+        }
+      }
     }
+
+  def grpcClientResource(conf: GrpcClientConfig): Resource[IO, GrpcClientResource] =
+    for {
+      dispatcher <- Dispatcher[IO]
+      channel <-
+        if (conf.ssl) {
+          ManagedChannelBuilder
+            .forAddress(conf.host, conf.port)
+            .useTransportSecurity()
+            .resource[IO]
+        } else {
+          ManagedChannelBuilder
+            .forAddress(conf.host, conf.port)
+            .usePlaintext()
+            .resource[IO]
+        }
+    } yield GrpcClientResource(dispatcher, channel)
+
 }

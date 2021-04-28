@@ -1,7 +1,7 @@
 package co.ledger.lama.bitcoin.common.clients.grpc
 
 import cats.data.NonEmptyList
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import co.ledger.lama.bitcoin.common.clients.grpc.TransactorClient.{
   Accepted,
   Address,
@@ -11,11 +11,11 @@ import co.ledger.lama.bitcoin.common.clients.grpc.TransactorClient.{
 import co.ledger.lama.bitcoin.common.models.interpreter.Utxo
 import co.ledger.lama.bitcoin.common.models.transactor._
 import co.ledger.lama.bitcoin.transactor.protobuf
-import co.ledger.lama.common.clients.grpc.GrpcClient
+import co.ledger.lama.common.clients.grpc.{GrpcClient, GrpcClientResource}
 import co.ledger.lama.common.models.Coin
 import co.ledger.lama.common.utils.{HexUtils, UuidUtils}
 import com.google.protobuf.ByteString
-import io.grpc.{ManagedChannel, Metadata}
+import io.grpc.Metadata
 
 import java.util.UUID
 
@@ -61,15 +61,13 @@ object TransactorClient {
   case class Rejected(address: Address, reason: String) extends AddressValidation
 }
 
-class TransactorGrpcClient(
-    val managedChannel: ManagedChannel
-)(implicit val cs: ContextShift[IO])
-    extends TransactorClient {
+class TransactorGrpcClient(grpcClientResource: GrpcClientResource) extends TransactorClient {
 
   val client: protobuf.BitcoinTransactorServiceFs2Grpc[IO, Metadata] =
     GrpcClient.resolveClient(
       protobuf.BitcoinTransactorServiceFs2Grpc.stub[IO],
-      managedChannel,
+      grpcClientResource.dispatcher,
+      grpcClientResource.channel,
       "TransactorClient"
     )
 

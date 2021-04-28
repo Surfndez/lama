@@ -1,7 +1,7 @@
 package co.ledger.lama.common.utils.rabbitmq
 
 import cats.effect.IO
-import cats.effect.concurrent.Ref
+import cats.effect.kernel.Ref
 import co.ledger.lama.common.utils.IOAssertion
 import dev.profunktor.fs2rabbit.model.{AckResult, DeliveryTag}
 import org.scalatest.funsuite.AnyFunSuite

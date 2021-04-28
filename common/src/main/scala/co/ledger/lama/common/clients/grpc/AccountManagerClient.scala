@@ -1,11 +1,11 @@
 package co.ledger.lama.common.clients.grpc
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import co.ledger.lama.common.models._
 import co.ledger.lama.common.utils.UuidUtils
 import co.ledger.lama.manager.protobuf
 import io.circe.JsonObject
-import io.grpc.{ManagedChannel, Metadata}
+import io.grpc.Metadata
 
 import java.util.UUID
 
@@ -40,15 +40,14 @@ trait AccountManagerClient {
   ): IO[SyncEventsResult[JsonObject]]
 }
 
-class AccountManagerGrpcClient(
-    val managedChannel: ManagedChannel
-)(implicit val cs: ContextShift[IO])
+class AccountManagerGrpcClient(grpcClientResource: GrpcClientResource)
     extends AccountManagerClient {
 
   val client: protobuf.AccountManagerServiceFs2Grpc[IO, Metadata] =
     GrpcClient.resolveClient(
       protobuf.AccountManagerServiceFs2Grpc.stub[IO],
-      managedChannel,
+      grpcClientResource.dispatcher,
+      grpcClientResource.channel,
       "AccountManagerClient"
     )
 
@@ -68,7 +67,7 @@ class AccountManagerGrpcClient(
       )
       .map(SyncEventResult.fromProto)
 
-  private def update(accountId: UUID, field: protobuf.UpdateAccountRequest.Field) =
+  private def update(accountId: UUID, field: protobuf.UpdateAccountRequest.Field): IO[Unit] =
     client
       .updateAccount(
         protobuf.UpdateAccountRequest(

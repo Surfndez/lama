@@ -1,23 +1,23 @@
 package co.ledger.lama.bitcoin.transactor
 
 import cats.data.Validated
-import cats.effect.{ConcurrentEffect, IO}
+import cats.effect.{IO, Resource}
 import co.ledger.lama.bitcoin.common.models.interpreter.Utxo
-import co.ledger.lama.bitcoin.common.models.{Address, InvalidAddress}
 import co.ledger.lama.bitcoin.common.models.transactor.{
   CoinSelectionStrategy,
   FeeLevel,
   PrepareTxOutput,
   RawTransaction
 }
+import co.ledger.lama.bitcoin.common.models.{Address, InvalidAddress}
 import co.ledger.lama.common.models.{BitcoinLikeCoin, Coin}
 import co.ledger.lama.common.utils.UuidUtils
 import com.google.protobuf.ByteString
 import io.grpc.{Metadata, ServerServiceDefinition}
 
 trait TransactorService extends protobuf.BitcoinTransactorServiceFs2Grpc[IO, Metadata] {
-  def definition(implicit ce: ConcurrentEffect[IO]): ServerServiceDefinition =
-    protobuf.BitcoinTransactorServiceFs2Grpc.bindService(this)
+  def definition: Resource[IO, ServerServiceDefinition] =
+    protobuf.BitcoinTransactorServiceFs2Grpc.bindServiceResource(this)
 }
 
 class TransactorGrpcService(transactor: Transactor) extends TransactorService {

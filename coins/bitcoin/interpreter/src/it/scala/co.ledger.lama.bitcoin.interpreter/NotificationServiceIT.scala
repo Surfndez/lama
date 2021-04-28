@@ -1,7 +1,6 @@
 package co.ledger.lama.bitcoin.interpreter
 
-import java.util.UUID
-import cats.effect.{ContextShift, IO, Resource, Timer}
+import cats.effect.{IO, Resource}
 import co.ledger.lama.common.models._
 import co.ledger.lama.common.services.RabbitNotificationService
 import co.ledger.lama.common.services.RabbitNotificationService.NotificationPublisher
@@ -14,15 +13,12 @@ import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 import pureconfig.ConfigSource
 
-import scala.concurrent.ExecutionContext
+import java.util.UUID
 
 class NotificationServiceIT extends AnyFlatSpecLike with Matchers {
 
   def consumeNotification[T <: Notification](consumer: Stream[IO, T]): IO[T] =
     consumer.take(1).compile.last.map(_.get)
-
-  implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)
 
   val conf: Config = ConfigSource.default.loadOrThrow[Config]
   val rabbit: Resource[IO, (RabbitClient[IO], AMQPChannel)] = for {

@@ -1,15 +1,15 @@
 package co.ledger.lama.manager
 
-import java.util.UUID
+import cats.effect.unsafe.implicits.global
 
-import cats.effect.{Blocker, ContextShift, IO, Resource}
+import java.util.UUID
+import cats.effect.{IO, Resource}
 import co.ledger.lama.common.models._
-import co.ledger.lama.common.utils.{DbUtils, IOAssertion, PostgresConfig}
+import co.ledger.lama.common.utils.{DbUtils, IOAssertion, PostgresConfig, ResourceUtils}
 import co.ledger.lama.manager.Exceptions.AccountNotFoundException
 import co.ledger.lama.manager.config.CoinConfig
 import com.opentable.db.postgres.embedded.EmbeddedPostgres
 import doobie.hikari.HikariTransactor
-import doobie.util.ExecutionContexts
 import io.circe.JsonObject
 import org.postgresql.util.PSQLException
 import org.scalatest.BeforeAndAfterAll
@@ -18,34 +18,19 @@ import org.scalatest.matchers.should.Matchers
 import pureconfig.ConfigSource
 import pureconfig.generic.auto._
 
-import scala.concurrent.ExecutionContext
-
 class AccountManagerSpec extends AnyFlatSpecLike with Matchers with BeforeAndAfterAll {
 
   val db: EmbeddedPostgres =
     EmbeddedPostgres.start()
-
-  implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
   val conf: TestServiceConfig = ConfigSource.default.loadOrThrow[TestServiceConfig]
 
   val dbUser     = "postgres"
   val dbPassword = ""
   val dbUrl      = db.getJdbcUrl(dbUser, "postgres")
+  val pgConfig   = PostgresConfig(dbUrl, dbUser, dbPassword)
 
-  val transactor: Resource[IO, HikariTransactor[IO]] =
-    for {
-      ce <- ExecutionContexts.fixedThreadPool[IO](32) // our connect EC
-      te <- ExecutionContexts.cachedThreadPool[IO] // our transaction EC
-      xa <- HikariTransactor.newHikariTransactor[IO](
-        "org.postgresql.Driver",         // driver classname
-        dbUrl,                           // connect URL
-        dbUser,                          // username
-        dbPassword,                      // password
-        ce,                              // await connection here
-        Blocker.liftExecutionContext(te) // execute JDBC operations here
-      )
-    } yield xa
+  val transactor: Resource[IO, HikariTransactor[IO]] = ResourceUtils.postgresTransactor(pgConfig)
 
   var registeredAccountId: UUID = _
   var registeredSyncId: UUID    = _
@@ -269,7 +254,7 @@ class AccountManagerSpec extends AnyFlatSpecLike with Matchers with BeforeAndAft
       .getAccountInfo(accountId)
       .map(_.lastSyncEvent)
 
-  private val migrateDB: IO[Unit] = DbUtils.flywayMigrate(PostgresConfig(dbUrl, dbUrl, dbPassword))
+  private val migrateDB: IO[Unit] = DbUtils.flywayMigrate(pgConfig)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

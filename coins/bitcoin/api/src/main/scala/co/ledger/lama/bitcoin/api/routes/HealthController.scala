@@ -1,26 +1,23 @@
 package co.ledger.lama.bitcoin.api.routes
 
 import buildinfo.BuildInfo
-import cats.effect.{ContextShift, IO, Timer}
+import cats.implicits._
+import cats.effect._
+import cats.effect.implicits._
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.protobuf.lama.common.HealthCheckResponse.ServingStatus
 import co.ledger.protobuf.lama.common.HealthFs2Grpc
 import co.ledger.protobuf.lama.common._
-import io.circe.{Encoder, Json}
+import io.circe.{Encoder, Json, JsonObject}
 import io.circe.syntax._
 import io.grpc.Metadata
 import org.http4s.HttpRoutes
 import org.http4s.dsl.Http4sDsl
 import org.http4s.circe.CirceEntityCodec._
-import cats.syntax.all._
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
-import io.circe.JsonObject
 
 object HealthController extends Http4sDsl[IO] with DefaultContextLogging {
-  implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)
 
   case class HealthStatus(service: String, status: ServingStatus)
 

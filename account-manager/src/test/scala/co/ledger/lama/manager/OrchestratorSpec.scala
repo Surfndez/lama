@@ -2,7 +2,7 @@ package co.ledger.lama.manager
 
 import java.time.Instant
 import java.util.UUID
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import co.ledger.lama.common.models._
 import co.ledger.lama.common.utils.IOAssertion
 import co.ledger.lama.common.utils.rabbitmq.AutoAckMessage
@@ -13,13 +13,9 @@ import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 class OrchestratorSpec extends AnyFlatSpecLike with Matchers {
-
-  implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)
 
   it should "succeed" in IOAssertion {
     val nbAccounts: Int            = 10

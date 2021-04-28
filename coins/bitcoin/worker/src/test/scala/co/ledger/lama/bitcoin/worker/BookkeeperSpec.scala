@@ -1,6 +1,6 @@
 package co.ledger.lama.bitcoin.worker
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.unsafe.implicits.global
 import co.ledger.lama.bitcoin.common.clients.grpc.mocks.InterpreterClientMock
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient.Address
@@ -16,12 +16,7 @@ import java.util.UUID
 
 import co.ledger.lama.common.logging.DefaultContextLogging
 
-import scala.concurrent.ExecutionContext
-
 class BookkeeperSpec extends AnyFlatSpec with Matchers with DefaultContextLogging {
-
-  implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)
 
   def explorerClient(
       mempool: Map[Address, List[UnconfirmedTransaction]]

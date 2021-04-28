@@ -1,6 +1,6 @@
 package co.ledger.lama.bitcoin.worker
 
-import cats.effect.{ContextShift, IO, Resource, Timer}
+import cats.effect.{IO, Resource}
 import co.ledger.lama.bitcoin.common.clients.grpc.mocks.{InterpreterClientMock, KeychainClientMock}
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerHttpClient
 import co.ledger.lama.bitcoin.common.models.explorer.Block
@@ -19,12 +19,8 @@ import pureconfig.ConfigSource
 
 import java.time.Instant
 import java.util.UUID
-import scala.concurrent.ExecutionContext
 
 class WorkerIT extends AnyFlatSpecLike with Matchers {
-
-  implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)
 
   val conf: Config = ConfigSource.default.loadOrThrow[Config]
 

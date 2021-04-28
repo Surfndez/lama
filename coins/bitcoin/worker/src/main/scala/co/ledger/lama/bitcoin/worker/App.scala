@@ -5,16 +5,17 @@ import co.ledger.lama.bitcoin.common.clients.grpc.{InterpreterGrpcClient, Keycha
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerHttpClient
 import co.ledger.lama.bitcoin.worker.config.Config
 import co.ledger.lama.bitcoin.worker.services._
+import co.ledger.lama.common.clients.grpc.GrpcClientResource
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.services.Clients
 import co.ledger.lama.common.services.grpc.HealthService
 import co.ledger.lama.common.models.Coin
 import co.ledger.lama.common.utils.ResourceUtils
-import co.ledger.lama.common.utils.ResourceUtils.grpcManagedChannel
+import co.ledger.lama.common.utils.ResourceUtils.grpcClientResource
 import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.ExchangeType
-import io.grpc.{ManagedChannel, Server}
+import io.grpc.Server
 import org.http4s.client.Client
 import pureconfig.ConfigSource
 
@@ -23,8 +24,8 @@ object App extends IOApp with DefaultContextLogging {
   case class WorkerResources(
       rabbitClient: RabbitClient[IO],
       httpClient: Client[IO],
-      keychainGrpcChannel: ManagedChannel,
-      interpreterGrpcChannel: ManagedChannel,
+      keychainClientRes: GrpcClientResource,
+      interpreterClientRes: GrpcClientResource,
       server: Server
   )
 
@@ -32,20 +33,20 @@ object App extends IOApp with DefaultContextLogging {
     val conf = ConfigSource.default.loadOrThrow[Config]
 
     val resources = for {
-      httpClient             <- Clients.htt4s
-      keychainGrpcChannel    <- grpcManagedChannel(conf.keychain)
-      interpreterGrpcChannel <- grpcManagedChannel(conf.interpreter)
-      rabbitClient           <- Clients.rabbit(conf.rabbit)
+      httpClient         <- Clients.htt4s
+      keychainClientRes  <- grpcClientResource(conf.keychain)
+      interpreterGrpcRes <- grpcClientResource(conf.interpreter)
+      rabbitClient       <- Clients.rabbit(conf.rabbit)
 
-      serviceDefinitions = List(new HealthService().definition)
+      healthServiceDefinition <- new HealthService().definition
 
-      grcpService <- ResourceUtils.grpcServer(conf.grpcServer, serviceDefinitions)
+      grcpService <- ResourceUtils.grpcServer(conf.grpcServer, List(healthServiceDefinition))
 
     } yield WorkerResources(
       rabbitClient,
       httpClient,
-      keychainGrpcChannel,
-      interpreterGrpcChannel,
+      keychainClientRes,
+      interpreterGrpcRes,
       grcpService
     )
 
@@ -57,8 +58,8 @@ object App extends IOApp with DefaultContextLogging {
         conf.routingKey
       )
 
-      val keychainClient    = new KeychainGrpcClient(res.keychainGrpcChannel)
-      val interpreterClient = new InterpreterGrpcClient(res.interpreterGrpcChannel)
+      val keychainClient    = new KeychainGrpcClient(res.keychainClientRes)
+      val interpreterClient = new InterpreterGrpcClient(res.interpreterClientRes)
       val explorerClient    = new ExplorerHttpClient(res.httpClient, conf.explorer, _)
 
       val cursorStateService: Coin => CursorStateService[IO] =

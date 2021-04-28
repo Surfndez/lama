@@ -1,6 +1,6 @@
 package co.ledger.lama.manager
 
-import cats.effect.{ConcurrentEffect, IO}
+import cats.effect.{IO, Resource}
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.{Account, AccountGroup, Sort}
 import co.ledger.lama.common.utils.UuidUtils
@@ -10,8 +10,8 @@ import io.grpc.{Metadata, ServerServiceDefinition, Status}
 
 trait AccountManagerService extends protobuf.AccountManagerServiceFs2Grpc[IO, Metadata] {
 
-  def definition(implicit ce: ConcurrentEffect[IO]): ServerServiceDefinition =
-    protobuf.AccountManagerServiceFs2Grpc.bindService(this)
+  def definition: Resource[IO, ServerServiceDefinition] =
+    protobuf.AccountManagerServiceFs2Grpc.bindServiceResource(this)
 
 }
 

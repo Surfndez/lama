@@ -1,49 +1,27 @@
 package co.ledger.lama.manager
 
-import cats.effect.{Blocker, ContextShift, IO, Resource, Timer}
+import cats.effect.{IO, Resource}
 import cats.implicits._
-import co.ledger.lama.common.models.{AccountGroup, Account, Coin, CoinFamily}
-import co.ledger.lama.common.utils.DbUtils
+import co.ledger.lama.common.models.{Account, AccountGroup, Coin, CoinFamily}
+import co.ledger.lama.common.utils.{DbUtils, ResourceUtils}
 import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import co.ledger.lama.manager.config.Config
 import co.ledger.lama.manager.utils.RedisUtils
 import com.redis.RedisClient
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.ExchangeType
-import doobie.hikari.HikariTransactor
-import doobie.util.ExecutionContexts
 import doobie.util.transactor.Transactor
 import org.flywaydb.core.Flyway
 import pureconfig.ConfigSource
 
-import scala.concurrent.ExecutionContext
-
 trait TestResources {
-
-  implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)
 
   val conf: Config = ConfigSource.default.loadOrThrow[Config]
 
   val accountTest: Account =
     Account("12345", CoinFamily.Bitcoin, Coin.Btc, AccountGroup("TestGroup"))
 
-  private val dbUrl      = conf.postgres.url
-  private val dbUser     = conf.postgres.user
-  private val dbPassword = conf.postgres.password
-
-  val transactor: Resource[IO, Transactor[IO]] = for {
-    ce <- ExecutionContexts.fixedThreadPool[IO](conf.postgres.poolSize)
-    te <- ExecutionContexts.cachedThreadPool[IO]
-    db <- HikariTransactor.newHikariTransactor[IO](
-      conf.postgres.driver,
-      dbUrl,
-      dbUser,
-      dbPassword,
-      ce,
-      Blocker.liftExecutionContext(te)
-    )
-  } yield db
+  val transactor: Resource[IO, Transactor[IO]] = ResourceUtils.postgresTransactor(conf.postgres)
 
   val rabbit: Resource[IO, RabbitClient[IO]] = RabbitUtils.createClient(conf.rabbit)
 

@@ -1,6 +1,6 @@
 package co.ledger.lama.bitcoin.common.clients.http.mocks
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient.Address
 import co.ledger.lama.bitcoin.common.models.explorer._
@@ -29,20 +29,15 @@ class ExplorerClientMock(
 
   def getUnconfirmedTransactions(
       addresses: Set[Address]
-  )(implicit
-      cs: ContextShift[IO],
-      t: Timer[IO],
-      lc: LamaLogContext
-  ): Stream[IO, UnconfirmedTransaction] = {
+  )(implicit lc: LamaLogContext): Stream[IO, UnconfirmedTransaction] = {
     getUnConfirmedTransactionsCount += 1
     Stream.emits(addresses.flatMap(mempool.get).flatten.toSeq)
   }
 
-  def getConfirmedTransactions(addresses: Seq[String], blockHash: Option[String])(implicit
-      cs: ContextShift[IO],
-      t: Timer[IO],
-      lc: LamaLogContext
-  ): fs2.Stream[IO, ConfirmedTransaction] = {
+  def getConfirmedTransactions(
+      addresses: Seq[String],
+      blockHash: Option[String]
+  )(implicit lc: LamaLogContext): fs2.Stream[IO, ConfirmedTransaction] = {
     getConfirmedTransactionsCount += 1
     Stream.emits(addresses.flatMap(blockchain.get).flatten)
   }

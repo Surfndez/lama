@@ -1,14 +1,15 @@
 package co.ledger.lama.bitcoin.common.clients.grpc
 
-import java.util.UUID
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import co.ledger.lama.bitcoin.common.models.interpreter.{AccountAddress, ChangeType}
 import co.ledger.lama.bitcoin.common.models.keychain.{AccountKey, KeychainInfo}
 import co.ledger.lama.bitcoin.common.models.{BitcoinLikeNetwork, Scheme}
-import co.ledger.lama.common.clients.grpc.GrpcClient
+import co.ledger.lama.common.clients.grpc.{GrpcClient, GrpcClientResource}
 import co.ledger.lama.common.utils.UuidUtils
 import co.ledger.protobuf.bitcoin.keychain
 import io.grpc._
+
+import java.util.UUID
 
 trait KeychainClient {
   def create(
@@ -41,15 +42,13 @@ trait KeychainClient {
   def deleteKeychain(keychainId: UUID): IO[Unit]
 }
 
-class KeychainGrpcClient(
-    val managedChannel: ManagedChannel
-)(implicit val cs: ContextShift[IO])
-    extends KeychainClient {
+class KeychainGrpcClient(grpcClientResource: GrpcClientResource) extends KeychainClient {
 
   val client: keychain.KeychainServiceFs2Grpc[IO, Metadata] =
     GrpcClient.resolveClient(
       keychain.KeychainServiceFs2Grpc.stub[IO],
-      managedChannel,
+      grpcClientResource.dispatcher,
+      grpcClientResource.channel,
       "keychainClient"
     )
 

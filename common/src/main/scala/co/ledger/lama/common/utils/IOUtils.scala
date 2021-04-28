@@ -1,6 +1,6 @@
 package co.ledger.lama.common.utils
 
-import cats.effect.{IO, Timer}
+import cats.effect.IO
 import fs2.{Chunk, Pull, Stream}
 
 object IOUtils {
@@ -47,9 +47,7 @@ object IOUtils {
       }
   }
 
-  def retry[T](io: IO[T], policy: RetryPolicy = RetryPolicy.linear())(implicit
-      t: Timer[IO]
-  ): IO[T] = {
+  def retry[T](io: IO[T], policy: RetryPolicy = RetryPolicy.linear()): IO[T] = {
     Stream
       .eval(io)
       .attempts(policy)
@@ -60,8 +58,10 @@ object IOUtils {
       .lastOrError
   }
 
-  def retryIf[T](io: IO[T], success: T => Boolean, policy: RetryPolicy = RetryPolicy.linear())(
-      implicit t: Timer[IO]
+  def retryIf[T](
+      io: IO[T],
+      success: T => Boolean,
+      policy: RetryPolicy = RetryPolicy.linear()
   ): IO[T] =
     retry(
       io.flatMap { res =>

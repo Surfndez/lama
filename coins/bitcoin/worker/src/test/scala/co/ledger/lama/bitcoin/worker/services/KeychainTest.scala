@@ -1,6 +1,7 @@
 package co.ledger.lama.bitcoin.worker.services
 
 import cats.Id
+import cats.effect.unsafe.implicits.global
 import co.ledger.lama.bitcoin.worker.KeychainFixture
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers

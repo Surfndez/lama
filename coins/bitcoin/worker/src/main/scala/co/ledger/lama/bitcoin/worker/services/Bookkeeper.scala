@@ -1,6 +1,6 @@
 package co.ledger.lama.bitcoin.worker.services
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import co.ledger.lama.bitcoin.common.clients.grpc.InterpreterClient
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
 import co.ledger.lama.bitcoin.common.models.explorer.{
@@ -35,8 +35,7 @@ object Bookkeeper {
       keychain: Keychain,
       explorerClient: Coin => ExplorerClient,
       interpreterClient: InterpreterClient
-  )(implicit cs: ContextShift[IO]): Bookkeeper[IO] = new Bookkeeper[IO] {
-
+  ): Bookkeeper[IO] = new Bookkeeper[IO] {
     override def record[Tx <: Transaction: Recordable](
         coin: Coin,
         accountId: AccountId,
@@ -68,10 +67,7 @@ object Bookkeeper {
   def fetchTransactionRecords[Tx <: Transaction](
       explorer: ExplorerClient,
       blockHash: Option[BlockHash]
-  )(implicit
-      cs: ContextShift[IO],
-      recordable: Recordable[Tx]
-  ): Pipe[IO, List[AccountAddress], TransactionRecord[Tx]] =
+  )(implicit recordable: Recordable[Tx]): Pipe[IO, List[AccountAddress], TransactionRecord[Tx]] =
     _.prefetch
       .flatMap { addresses =>
         recordable
@@ -120,8 +116,6 @@ object Bookkeeper {
   }
 
   implicit def confirmed(implicit
-      cs: ContextShift[IO],
-      t: Timer[IO],
       lc: LamaLogContext
   ): Recordable[ConfirmedTransaction] =
     new Recordable[ConfirmedTransaction] {
@@ -132,8 +126,6 @@ object Bookkeeper {
     }
 
   implicit def unconfirmedTransaction(implicit
-      cs: ContextShift[IO],
-      t: Timer[IO],
       lc: LamaLogContext
   ): Recordable[UnconfirmedTransaction] =
     new Recordable[UnconfirmedTransaction] {

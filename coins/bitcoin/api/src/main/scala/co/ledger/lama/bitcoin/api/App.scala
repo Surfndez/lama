@@ -10,14 +10,14 @@ import co.ledger.lama.bitcoin.common.clients.grpc.{
   KeychainGrpcClient,
   TransactorGrpcClient
 }
-import co.ledger.lama.common.clients.grpc.AccountManagerGrpcClient
-import co.ledger.lama.common.utils.ResourceUtils.grpcManagedChannel
+import co.ledger.lama.common.clients.grpc.{AccountManagerGrpcClient, GrpcClientResource}
+import co.ledger.lama.common.utils.ResourceUtils.grpcClientResource
 import co.ledger.protobuf.lama.common.HealthFs2Grpc
-import io.grpc.ManagedChannel
-import org.http4s.implicits.http4sKleisliResponseSyntaxOptionT
+import io.grpc.Metadata
 import org.http4s.server.Router
 import org.http4s.server.blaze.BlazeServerBuilder
 import org.http4s.server.middleware._
+import org.http4s.implicits._
 import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext
@@ -25,31 +25,29 @@ import scala.concurrent.duration._
 
 object App extends IOApp {
 
-  case class ServiceResources(
-      accountManagerGrpcChannel: ManagedChannel,
-      interpreterGrpcChannel: ManagedChannel,
-      transactorGrpcChannel: ManagedChannel,
-      workerGrpcChannel: ManagedChannel,
-      keychainGrpcChannel: ManagedChannel
+  case class ClientResources(
+      accountManagerGrpcRes: GrpcClientResource,
+      interpreterGrpcRes: GrpcClientResource,
+      transactorGrpcRes: GrpcClientResource,
+      workerGrpcRes: GrpcClientResource,
+      keychainGrpcRes: GrpcClientResource
   )
 
   def run(args: List[String]): IO[ExitCode] = {
     val conf = ConfigSource.default.loadOrThrow[Config]
 
     val resources = for {
-
-      accountManagerGrpcChannel <- grpcManagedChannel(conf.accountManager)
-      interpreterGrpcChannel    <- grpcManagedChannel(conf.bitcoin.interpreter)
-      transactorGrpcChannel     <- grpcManagedChannel(conf.bitcoin.transactor)
-      workerGrpcChannel         <- grpcManagedChannel(conf.bitcoin.worker)
-      keychainGrpcChannel       <- grpcManagedChannel(conf.bitcoin.keychain)
-
-    } yield ServiceResources(
-      accountManagerGrpcChannel = accountManagerGrpcChannel,
-      interpreterGrpcChannel = interpreterGrpcChannel,
-      transactorGrpcChannel = transactorGrpcChannel,
-      workerGrpcChannel = workerGrpcChannel,
-      keychainGrpcChannel = keychainGrpcChannel
+      accountManagerGrpcChannel <- grpcClientResource(conf.accountManager)
+      interpreterGrpcChannel    <- grpcClientResource(conf.bitcoin.interpreter)
+      transactorGrpcChannel     <- grpcClientResource(conf.bitcoin.transactor)
+      workerGrpcChannel         <- grpcClientResource(conf.bitcoin.worker)
+      keychainGrpcChannel       <- grpcClientResource(conf.bitcoin.keychain)
+    } yield ClientResources(
+      accountManagerGrpcRes = accountManagerGrpcChannel,
+      interpreterGrpcRes = interpreterGrpcChannel,
+      transactorGrpcRes = transactorGrpcChannel,
+      workerGrpcRes = workerGrpcChannel,
+      keychainGrpcRes = keychainGrpcChannel
     )
 
     resources.use { res =>
@@ -60,8 +58,8 @@ object App extends IOApp {
         maxAge = 1.day.toSeconds
       )
 
-      val accountManager = new AccountManagerGrpcClient(res.accountManagerGrpcChannel)
-      val keychainClient = new KeychainGrpcClient(res.keychainGrpcChannel)
+      val accountManager = new AccountManagerGrpcClient(res.accountManagerGrpcRes)
+      val keychainClient = new KeychainGrpcClient(res.keychainGrpcRes)
 
       val httpRoutes = Router[IO](
         "accounts" -> CORS(
@@ -70,23 +68,23 @@ object App extends IOApp {
               .routes(
                 keychainClient,
                 accountManager,
-                new InterpreterGrpcClient(res.interpreterGrpcChannel)
+                new InterpreterGrpcClient(res.interpreterGrpcRes)
               ) <+> AccountController
               .transactionsRoutes(
                 keychainClient,
                 accountManager,
-                new TransactorGrpcClient(res.transactorGrpcChannel)
+                new TransactorGrpcClient(res.transactorGrpcRes)
               )
           ),
           methodConfig
         ),
         "_health" -> CORS(
           HealthController.routes(
-            HealthFs2Grpc.stub[IO](res.accountManagerGrpcChannel),
-            HealthFs2Grpc.stub[IO](res.interpreterGrpcChannel),
-            HealthFs2Grpc.stub[IO](res.transactorGrpcChannel),
-            HealthFs2Grpc.stub[IO](res.workerGrpcChannel),
-            HealthFs2Grpc.stub[IO](res.keychainGrpcChannel)
+            getHealthFs2GrpcStub(res.accountManagerGrpcRes),
+            getHealthFs2GrpcStub(res.interpreterGrpcRes),
+            getHealthFs2GrpcStub(res.transactorGrpcRes),
+            getHealthFs2GrpcStub(res.workerGrpcRes),
+            getHealthFs2GrpcStub(res.keychainGrpcRes)
           ),
           methodConfig
         )
@@ -101,5 +99,10 @@ object App extends IOApp {
         .as(ExitCode.Success)
     }
   }
+
+  private def getHealthFs2GrpcStub(
+      clientResource: GrpcClientResource
+  ): HealthFs2Grpc[IO, Metadata] =
+    HealthFs2Grpc.stub[IO](clientResource.dispatcher, clientResource.channel)
 
 }

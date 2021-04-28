@@ -1,8 +1,8 @@
 package co.ledger.lama.common.utils.rabbitmq
 
 import cats.data.Kleisli
-import cats.effect.{Blocker, ContextShift, IO, Resource, Timer}
-import cats.effect.ExitCase.{Canceled, Completed, Error}
+import cats.effect.kernel.Outcome.{Canceled, Errored, Succeeded}
+import cats.effect.{IO, Resource}
 import cats.implicits._
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.utils.ResourceUtils.retriableResource
@@ -19,17 +19,13 @@ import io.circe.parser.parse
 import io.circe.syntax._
 
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.Executors
 
 object RabbitUtils extends DefaultContextLogging {
   def createClient(
       conf: Fs2RabbitConfig
-  )(implicit cs: ContextShift[IO], t: Timer[IO]): Resource[IO, RabbitClient[IO]] = {
+  ): Resource[IO, RabbitClient[IO]] = {
     for {
-      client <- Resource
-        .make(IO(Executors.newCachedThreadPool()))(es => IO(es.shutdown()))
-        .map(Blocker.liftExecutorService)
-        .evalMap(blocker => RabbitClient[IO](conf, blocker))
+      client <- RabbitClient.resource[IO](conf)
 
       _ = log.logger.info("Creating rabbitmq client")
 
@@ -71,9 +67,7 @@ object RabbitUtils extends DefaultContextLogging {
         .void
     }
 
-  def deleteBindings(R: RabbitClient[IO], queues: List[QueueName])(implicit
-      cs: ContextShift[IO]
-  ): IO[Unit] =
+  def deleteBindings(R: RabbitClient[IO], queues: List[QueueName]): IO[Unit] =
     Stream
       .resource(R.createConnectionChannel)
       .flatMap { implicit channel =>
@@ -95,9 +89,7 @@ object RabbitUtils extends DefaultContextLogging {
       .compile
       .drain
 
-  def deleteExchanges(R: RabbitClient[IO], exchanges: List[ExchangeName])(implicit
-      cs: ContextShift[IO]
-  ): IO[Unit] =
+  def deleteExchanges(R: RabbitClient[IO], exchanges: List[ExchangeName]): IO[Unit] =
     Stream
       .resource(R.createConnectionChannel)
       .flatMap { implicit channel =>
@@ -153,8 +145,8 @@ object RabbitUtils extends DefaultContextLogging {
             .liftTo[IO]
             .flatMap(AutoAckMessage.wrap(_, message.deliveryTag)(acker))
             .guaranteeCase {
-              case Canceled | Error(_) => acker(AckResult.NAck(message.deliveryTag))
-              case Completed           => IO.unit
+              case Canceled() | Errored(_) => acker(AckResult.NAck(message.deliveryTag))
+              case Succeeded(_)            => IO.unit
             }
         }
       }
