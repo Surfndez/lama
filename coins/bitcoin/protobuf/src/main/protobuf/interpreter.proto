@@ -50,12 +50,14 @@ message GetLastBlocksResult {
 
 message ComputeRequest {
   Account account = 1;
-  repeated AccountAddress addresses = 2;
+  bytes sync_id = 2;
+  repeated AccountAddress addresses = 3;
 }
 
 message DeleteTransactionsRequest {
   bytes account_id = 1;
   int64 block_height = 2;
+  bytes follow_up_id = 3;
 }
 
 message GetOperationsRequest {

@@ -16,12 +16,17 @@ import fs2._
 trait InterpreterClient {
   def saveTransactions(accountId: UUID): Pipe[IO, TransactionView, Unit]
 
-  def removeDataFromCursor(accountId: UUID, blockHeightCursor: Option[Long]): IO[Int]
+  def removeDataFromCursor(
+      accountId: UUID,
+      blockHeightCursor: Option[Long],
+      followUpId: UUID
+  ): IO[Int]
 
   def getLastBlocks(accountId: UUID): IO[List[BlockView]]
 
   def compute(
       account: Account,
+      syncId: UUID,
       addresses: List[AccountAddress]
   ): IO[Int]
 
@@ -79,12 +84,17 @@ class InterpreterGrpcClient(
       )
     }.through(client.saveTransactions(_, new Metadata()).as(()))
 
-  def removeDataFromCursor(accountId: UUID, blockHeightCursor: Option[Long]): IO[Int] =
+  def removeDataFromCursor(
+      accountId: UUID,
+      blockHeightCursor: Option[Long],
+      followUpId: UUID
+  ): IO[Int] =
     client
       .removeDataFromCursor(
         protobuf.DeleteTransactionsRequest(
           UuidUtils uuidToBytes accountId,
-          blockHeightCursor.getOrElse(0)
+          blockHeightCursor.getOrElse(0),
+          UuidUtils.uuidToBytes(followUpId)
         ),
         new Metadata()
       )
@@ -102,12 +112,14 @@ class InterpreterGrpcClient(
 
   def compute(
       account: Account,
+      syncId: UUID,
       addresses: List[AccountAddress]
   ): IO[Int] =
     client
       .compute(
         protobuf.ComputeRequest(
           Some(account.toBtcProto),
+          UuidUtils.uuidToBytes(syncId),
           addresses.map(_.toProto)
         ),
         new Metadata()

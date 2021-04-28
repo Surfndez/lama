@@ -3,7 +3,6 @@ package co.ledger.lama.bitcoin.interpreter
 import cats.effect.{ConcurrentEffect, IO}
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.common.utils.BtcProtoUtils._
-import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.bitcoin.interpreter.models.AccountTxView
 import co.ledger.lama.bitcoin.interpreter.protobuf.SaveTransactionRequest
 import co.ledger.lama.common.models.PaginationToken
@@ -18,8 +17,7 @@ trait InterpreterService extends protobuf.BitcoinInterpreterServiceFs2Grpc[IO, M
 
 class InterpreterGrpcService(
     interpreter: Interpreter
-) extends InterpreterService
-    with DefaultContextLogging {
+) extends InterpreterService {
 
   def saveTransactions(
       request: Stream[IO, SaveTransactionRequest],
@@ -43,9 +41,6 @@ class InterpreterGrpcService(
   ): IO[protobuf.GetLastBlocksResult] = {
     for {
       accountId <- UuidUtils.bytesToUuidIO(request.accountId)
-      _         <- log.info(s"""Getting blocks for account:
-                               - accountId: $accountId
-                               """)
       blocks    <- interpreter.getLastBlocks(accountId)
     } yield protobuf.GetLastBlocksResult(blocks.map(_.toProto))
   }
@@ -58,11 +53,6 @@ class InterpreterGrpcService(
       accountId <- UuidUtils.bytesToUuidIO(request.accountId)
       sort   = Sort.fromProto(request.sort)
       cursor = PaginationToken.fromBase64[OperationPaginationState](request.cursor)
-      _ <- log.info(s"""Getting operations with parameters:
-                  - accountId: $accountId
-                  - limit: ${request.limit}
-                  - sort: $sort
-                  - cursor: $cursor""")
       opResult <- interpreter.getOperations(
         accountId,
         request.limit,
@@ -87,11 +77,6 @@ class InterpreterGrpcService(
     for {
       accountId <- UuidUtils.bytesToUuidIO(request.accountId)
       sort = Sort.fromProto(request.sort)
-      _   <- log.info(s"""Getting UTXOs with parameters:
-                               - accountId: $accountId
-                               - limit: ${request.limit}
-                               - offset: ${request.offset}
-                               - sort: $sort""")
       res <- interpreter.getUtxos(accountId, request.limit, request.offset, sort)
     } yield {
       res.toProto
@@ -104,8 +89,6 @@ class InterpreterGrpcService(
   ): IO[protobuf.GetUnconfirmedUtxosResult] =
     for {
       accountId        <- UuidUtils.bytesToUuidIO(request.accountId)
-      _                <- log.info(s"""Getting UTXOs with parameters:
-                         - accountId: $accountId""")
       unconfirmedUtxos <- interpreter.getUnconfirmedUtxos(accountId)
     } yield {
       protobuf.GetUnconfirmedUtxosResult(unconfirmedUtxos.map(_.toProto))
@@ -116,12 +99,10 @@ class InterpreterGrpcService(
       ctx: Metadata
   ): IO[protobuf.ResultCount] = {
     for {
-      accountId <- UuidUtils.bytesToUuidIO(request.accountId)
+      accountId  <- UuidUtils.bytesToUuidIO(request.accountId)
+      followUpId <- UuidUtils.bytesToUuidIO(request.followUpId)
       blockHeight = request.blockHeight
-      _     <- log.info(s"""Deleting data with parameters:
-                      - accountId: $accountId
-                      - blockHeight: $blockHeight""")
-      txRes <- interpreter.removeDataFromCursor(accountId, blockHeight)
+      txRes <- interpreter.removeDataFromCursor(accountId, blockHeight, followUpId)
     } yield protobuf.ResultCount(txRes)
   }
 
@@ -131,8 +112,9 @@ class InterpreterGrpcService(
   ): IO[protobuf.ResultCount] =
     for {
       account   <- IO(BtcAccount.fromBtcProto(request.account.get))
+      syncId    <- UuidUtils.bytesToUuidIO(request.syncId)
       addresses <- IO(request.addresses.map(AccountAddress.fromProto).toList)
-      nbOps     <- interpreter.compute(account, addresses)
+      nbOps     <- interpreter.compute(account, syncId, addresses)
     } yield protobuf.ResultCount(nbOps)
 
   def getBalance(
@@ -152,13 +134,6 @@ class InterpreterGrpcService(
       accountId <- UuidUtils.bytesToUuidIO(request.accountId)
       start = request.start.map(TimestampProtoUtils.deserialize)
       end   = request.end.map(TimestampProtoUtils.deserialize)
-
-      _ <- log.info(s"""Getting balances with parameters:
-                       - accountId: $accountId
-                       - start: $start
-                       - end: $end
-                       - interval: ${request.interval}""")
-
       balances <- interpreter.getBalanceHistory(accountId, start, end, request.interval)
     } yield protobuf.GetBalanceHistoryResult(balances.map(_.toProto))
 }

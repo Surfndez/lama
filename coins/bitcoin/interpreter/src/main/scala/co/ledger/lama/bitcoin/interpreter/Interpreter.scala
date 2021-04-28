@@ -5,15 +5,15 @@ import cats.effect.{Clock, ContextShift, IO}
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.interpreter.Config.Db
 import co.ledger.lama.bitcoin.interpreter.services._
-import co.ledger.lama.common.logging.DefaultContextLogging
+import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import co.ledger.lama.common.models._
 import io.circe.syntax._
 import fs2._
 import doobie.Transactor
-
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+
 import co.ledger.lama.bitcoin.interpreter.models.AccountTxView
 
 class Interpreter(
@@ -22,7 +22,7 @@ class Interpreter(
     maxConcurrent: Int,
     batchConcurrency: Db.BatchConcurrency
 )(implicit cs: ContextShift[IO], clock: Clock[IO])
-    extends DefaultContextLogging {
+    extends ContextLogging {
 
   val transactionService = new TransactionService(db, maxConcurrent)
   val operationService   = new OperationService(db, batchConcurrency)
@@ -34,11 +34,15 @@ class Interpreter(
 
   def getLastBlocks(
       accountId: UUID
-  ): IO[List[BlockView]] =
-    transactionService
-      .getLastBlocks(accountId)
-      .compile
-      .toList
+  ): IO[List[BlockView]] = {
+    implicit val lc: LamaLogContext = LamaLogContext().withAccountId(accountId)
+
+    log.info(s"Getting last known blocks") *>
+      transactionService
+        .getLastBlocks(accountId)
+        .compile
+        .toList
+  }
 
   def getOperations(
       accountId: UUID,
@@ -46,8 +50,14 @@ class Interpreter(
       sort: Sort,
       cursor: Option[PaginationToken[OperationPaginationState]]
   ): IO[GetOperationsResult] = {
+    implicit val lc: LamaLogContext = LamaLogContext().withAccountId(accountId)
+
     val limit = if (requestLimit <= 0) 20 else requestLimit
-    operationService.getOperations(accountId, limit, sort, cursor)
+    log.info(s"""Getting operations with parameters:
+                  - limit: $limit
+                  - sort: $sort
+                  - cursor: $cursor""") *>
+      operationService.getOperations(accountId, limit, sort, cursor)
   }
 
   def getOperation(
@@ -62,21 +72,37 @@ class Interpreter(
       requestOffset: Int,
       sort: Sort
   ): IO[GetUtxosResult] = {
+    implicit val lc: LamaLogContext = LamaLogContext().withAccountId(accountId)
+
     val limit  = if (requestLimit <= 0) 20 else requestLimit
     val offset = if (requestOffset < 0) 0 else requestOffset
-    operationService.getUtxos(accountId, sort, limit, offset)
+    log.info(s"""Getting UTXOs with parameters:
+                               - limit: $limit
+                               - offset: $offset
+                               - sort: $sort""") *>
+      operationService.getUtxos(accountId, sort, limit, offset)
   }
 
   def getUnconfirmedUtxos(
       accountId: UUID
-  ): IO[List[Utxo]] =
-    operationService.getUnconfirmedUtxos(accountId)
+  ): IO[List[Utxo]] = {
+    implicit val lc: LamaLogContext = LamaLogContext().withAccountId(accountId)
+
+    log.info(s"""Getting UTXOs""") *>
+      operationService.getUnconfirmedUtxos(accountId)
+  }
 
   def removeDataFromCursor(
       accountId: UUID,
-      blockHeight: Long
+      blockHeight: Long,
+      followUpId: UUID
   ): IO[Int] = {
+    implicit val lc: LamaLogContext =
+      LamaLogContext().withAccountId(accountId).withFollowUpId(followUpId)
+
     for {
+      _     <- log.info(s"""Deleting data with parameters:
+                      - blockHeight: $blockHeight""")
       txRes <- transactionService.removeFromCursor(accountId, blockHeight)
       _     <- log.info(s"Deleted $txRes operations")
       balancesRes <- balanceService.removeBalanceHistoryFromCursor(
@@ -89,29 +115,27 @@ class Interpreter(
 
   def compute(
       account: Account,
+      syncId: UUID,
       addresses: List[AccountAddress]
-  ): IO[Int] =
+  ): IO[Int] = {
+    implicit val lc: LamaLogContext = LamaLogContext().withAccount(account).withFollowUpId(syncId)
+
     for {
       balanceHistoryCount <- balanceService.getBalanceHistoryCount(account.id)
-
-      start <- clock.monotonic(TimeUnit.MILLISECONDS)
-
-      _ <- log.info(s"[${account.id}] Flagging inputs and outputs belong")
-
-      _ <- flaggingService.flagInputsAndOutputs(account.id, addresses)
-
-      flaggingEnd <- clock.monotonic(TimeUnit.MILLISECONDS)
-
-      _ <- operationService.deleteUnconfirmedOperations(account.id)
-
+      start               <- clock.monotonic(TimeUnit.MILLISECONDS)
+      _                   <- log.info(s"Flagging inputs and outputs belong")
+      _                   <- flaggingService.flagInputsAndOutputs(account.id, addresses)
+      flaggingEnd         <- clock.monotonic(TimeUnit.MILLISECONDS)
+      _                   <- operationService.deleteUnconfirmedOperations(account.id)
       cleanUnconfirmedEnd <- clock.monotonic(TimeUnit.MILLISECONDS)
 
-      _ <- log.info(s"[${account.id}] Computing operations")
+      _ <- log.info(s"Computing operations")
       nbSavedOps <- operationService
         .compute(account.id)
         .through(
           notify(
             account,
+            syncId,
             balanceHistoryCount > 0
           )
         )
@@ -120,31 +144,35 @@ class Interpreter(
 
       computeOperationEnd <- clock.monotonic(TimeUnit.MILLISECONDS)
 
-      _ <- log.info(s"[${account.id}] Computing balance history")
+      _ <- log.info(s"Computing balance history")
       _ <- balanceService.computeNewBalanceHistory(account.id)
 
       end <- clock.monotonic(TimeUnit.MILLISECONDS)
 
-      _ <- log.info(s"[${account.id}] $nbSavedOps operations saved in ${end - start}ms ")
+      _ <- log.info(s"$nbSavedOps operations saved in ${end - start}ms ")
       _ <- log.info(
-        s"[${account.id}] flagging: ${flaggingEnd - start}ms, cleaning: ${cleanUnconfirmedEnd - flaggingEnd}ms, compute operations: ${computeOperationEnd - cleanUnconfirmedEnd}ms"
+        s"flagging: ${flaggingEnd - start}ms, cleaning: ${cleanUnconfirmedEnd - flaggingEnd}ms, compute operations: ${computeOperationEnd - cleanUnconfirmedEnd}ms"
       )
 
       currentBalance <- balanceService.getCurrentBalance(account.id)
 
+      _ <- log.info(s"Notifying computation end with balance $currentBalance")
       _ <- publish(
         BalanceUpdatedNotification(
           account = account,
+          syncId = syncId,
           currentBalance = currentBalance.asJson
         )
       )
 
     } yield nbSavedOps
+  }
 
-  def notify(
+  private def notify(
       account: Account,
+      syncId: UUID,
       shouldNotify: Boolean
-  ): Pipe[IO, Operation.UID, Int] =
+  ): Pipe[IO, Operation.UID, Int] = {
     _.parEvalMap(maxConcurrent) { opId =>
       OptionT
         .whenF(shouldNotify)(
@@ -154,11 +182,13 @@ class Interpreter(
           publish(
             OperationNotification(
               account = account,
+              syncId = syncId,
               operation = operation.asJson
             )
           )
         } *> IO.pure(1)
     }
+  }
 
   def getBalance(
       accountId: UUID
@@ -171,20 +201,32 @@ class Interpreter(
       endO: Option[Instant],
       interval: Int
   ): IO[List[BalanceHistory]] = {
+    implicit val lc: LamaLogContext = LamaLogContext().withAccountId(accountId)
 
     if (startO.forall(start => endO.forall(end => start.isBefore(end))) && interval >= 0)
-      balanceService.getBalanceHistory(
-        accountId,
-        startO,
-        endO,
-        if (interval > 0) Some(interval) else None
-      )
-    else
-      IO.raiseError(
-        new Exception(
-          "Invalid parameters : 'start' should not be after 'end' and 'interval' should be positive"
+      log.info(s"""Getting balances with parameters:
+                       - start: $startO
+                       - end: $endO
+                       - interval: $interval""") *>
+        balanceService.getBalanceHistory(
+          accountId,
+          startO,
+          endO,
+          if (interval > 0) Some(interval) else None
         )
+    else {
+      val e = new Exception(
+        "Invalid parameters : 'start' should not be after 'end' and 'interval' should be positive"
       )
+      log.error(
+        s"""GetBalanceHistory error with parameters : 
+           start    : $startO
+           end      : $endO
+           interval : $interval""",
+        e
+      )
+      IO.raiseError(e)
+    }
   }
 
 }

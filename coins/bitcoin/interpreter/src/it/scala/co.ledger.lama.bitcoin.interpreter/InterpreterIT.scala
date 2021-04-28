@@ -113,6 +113,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
           _ <- interpreter.compute(
             account,
+            UUID.randomUUID(),
             List(inputAddress, outputAddress2)
           )
 
@@ -149,7 +150,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
             0
           )
 
-          _ <- interpreter.removeDataFromCursor(accountId, block.height)
+          _ <- interpreter.removeDataFromCursor(accountId, block.height, UUID.randomUUID())
 
           resOpsAfterDeletion <- interpreter.getOperations(
             accountId,
@@ -219,6 +220,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
           _ <- interpreter.compute(
             account,
+            UUID.randomUUID(),
             List(outputAddress1)
           )
           res <- interpreter.getOperations(accountId, 20, Sort.Descending, None)
@@ -272,6 +274,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
           _ <- interpreter.compute(
             account,
+            UUID.randomUUID(),
             List(outputAddress1)
           )
           res <- interpreter.getOperations(accountId, 20, Sort.Descending, None)
@@ -333,7 +336,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
         for {
           _             <- saveTxs(interpreter, List(uTx1))
-          _             <- interpreter.compute(account, List(outputAddress1))
+          _             <- interpreter.compute(account, UUID.randomUUID(), List(outputAddress1))
           firstBalance  <- interpreter.getBalance(accountId)
           firstBalanceH <- interpreter.getBalanceHistory(accountId, None, None, 0)
           r1            <- interpreter.getOperations(accountId, 20, Sort.Descending, None)
@@ -346,7 +349,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
               uTx2
             )
           )
-          _              <- interpreter.compute(account, List(outputAddress1, outputAddress2))
+          _              <- interpreter.compute(account, UUID.randomUUID(), List(outputAddress1, outputAddress2))
           secondBalance  <- interpreter.getBalance(accountId)
           secondBalanceH <- interpreter.getBalanceHistory(accountId, None, None, 0)
           r2             <- interpreter.getOperations(accountId, 20, Sort.Descending, None)
@@ -361,7 +364,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
               uTx3
             )
           )
-          _            <- interpreter.compute(account, List(outputAddress1, outputAddress2))
+          _            <- interpreter.compute(account, UUID.randomUUID(), List(outputAddress1, outputAddress2))
           lastBalance  <- interpreter.getBalance(accountId)
           lastBalanceH <- interpreter.getBalanceHistory(accountId, None, None, 0)
           r3           <- interpreter.getOperations(accountId, 20, Sort.Descending, None)

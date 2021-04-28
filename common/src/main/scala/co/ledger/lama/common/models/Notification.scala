@@ -1,5 +1,7 @@
 package co.ledger.lama.common.models
 
+import java.util.UUID
+
 import co.ledger.lama.common.models.implicits._
 import io.circe.{Decoder, Encoder, Json}
 import io.circe.generic.extras.semiauto._
@@ -7,12 +9,14 @@ import io.circe.syntax._
 
 trait Notification {
   val account: Account
+  val syncId: UUID
   val status: Notification.Status
   val payload: Json
 }
 
 case class OperationNotification(
     account: Account,
+    syncId: UUID,
     operation: Json
 ) extends Notification {
   val status: Notification.Status = Notification.Operation
@@ -28,6 +32,7 @@ object OperationNotification {
 
 case class OperationsComputedNotification(
     account: Account,
+    syncId: UUID,
     operationsCount: Int
 ) extends Notification {
   val status: Notification.Status = Notification.OperationsComputed
@@ -43,6 +48,7 @@ object OperationsComputedNotification {
 
 case class BalanceUpdatedNotification(
     account: Account,
+    syncId: UUID,
     currentBalance: Json
 ) extends Notification {
   val status: Notification.Status = Notification.BalanceUpdated

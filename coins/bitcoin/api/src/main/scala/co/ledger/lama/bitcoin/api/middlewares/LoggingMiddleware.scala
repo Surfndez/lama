@@ -13,8 +13,8 @@ object LoggingMiddleware extends DefaultContextLogging {
           resp
         case resp =>
           log.error(s"""
-               |A ${resp.status} error occurred: ${resp.body}
-               |Request was : $req""".stripMargin)
+               A ${resp.status} error occurred: ${resp.body}
+               Request was : $req""")
           resp
       }
     }

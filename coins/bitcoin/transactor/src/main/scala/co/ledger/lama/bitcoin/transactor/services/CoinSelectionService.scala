@@ -7,14 +7,14 @@ import scala.annotation.tailrec
 
 object CoinSelectionService {
 
-  sealed trait CoinSerlectionError extends Throwable
+  sealed trait CoinSelectionError extends Throwable
 
-  case class NotEnoughUtxos(maxUtxos: Int, maxAmount: BigInt) extends CoinSerlectionError {
+  case class NotEnoughUtxos(maxUtxos: Int, maxAmount: BigInt) extends CoinSelectionError {
     override def getMessage: String =
       s"Couldn't fill transactions with the max number of utxos. Available amount for $maxUtxos utxos is $maxAmount Satoshis minus fees"
   }
 
-  case class NotEnoughFunds(maxAmount: BigInt) extends CoinSerlectionError {
+  case class NotEnoughFunds(maxAmount: BigInt) extends CoinSelectionError {
     override def getMessage: String =
       s"Not enough funds to pay for transaction amount, total sum available: $maxAmount Satoshis minus fees"
   }
@@ -25,7 +25,7 @@ object CoinSelectionService {
       amount: BigInt,
       feesPerUtxo: BigInt,
       maxUtxos: Int
-  ): Either[CoinSerlectionError, List[Utxo]] =
+  ): Either[CoinSelectionError, List[Utxo]] =
     coinSelection match {
       case CoinSelectionStrategy.OptimizeSize =>
         optimizeSizePicking(utxos, amount, maxUtxos, feesPerUtxo)
@@ -40,7 +40,7 @@ object CoinSelectionService {
       targetAmount: BigInt,
       maxUtxos: Int,
       feesPerUtxo: BigInt
-  ): Either[CoinSerlectionError, List[Utxo]] =
+  ): Either[CoinSelectionError, List[Utxo]] =
     depthFirstPicking(
       utxos.sortWith(_.value > _.value),
       targetAmount,
@@ -53,14 +53,14 @@ object CoinSelectionService {
       targetAmount: BigInt,
       maxUtxos: Int,
       feesPerUtxo: BigInt
-  ): Either[CoinSerlectionError, List[Utxo]] = {
+  ): Either[CoinSelectionError, List[Utxo]] = {
 
     @tailrec
     def depthFirstPickingRec(
         utxos: List[Utxo],
         sum: BigInt,
         chosenUtxos: List[Utxo]
-    ): Either[CoinSerlectionError, List[Utxo]] =
+    ): Either[CoinSelectionError, List[Utxo]] =
       if (sum > targetAmount)
         Right(chosenUtxos.reverse)
       else if (chosenUtxos.size == maxUtxos)
@@ -88,13 +88,13 @@ object CoinSelectionService {
       targetAmount: BigInt,
       maxUtxos: Int,
       feesPerUtxo: BigInt
-  ): Either[CoinSerlectionError, List[Utxo]] = {
+  ): Either[CoinSelectionError, List[Utxo]] = {
 
     @tailrec
     def mergeOutputsPickingRec(
         utxos: List[Utxo],
         chosenUtxos: List[Utxo]
-    ): Either[CoinSerlectionError, List[Utxo]] =
+    ): Either[CoinSelectionError, List[Utxo]] =
       if (
         chosenUtxos.map(_.value).sum >= targetAmount ||
         chosenUtxos.size == maxUtxos ||

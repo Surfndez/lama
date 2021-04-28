@@ -5,7 +5,7 @@ import cats.effect.IO
 import cats.implicits._
 import co.ledger.lama.bitcoin.common.clients.grpc.{InterpreterClient, KeychainClient}
 import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
-import co.ledger.lama.bitcoin.common.models.interpreter.{ChangeType, Utxo, SpendableTxo}
+import co.ledger.lama.bitcoin.common.models.interpreter.{ChangeType, SpendableTxo, Utxo}
 import co.ledger.lama.bitcoin.common.models.transactor._
 import co.ledger.lama.bitcoin.common.models.{Address, BitcoinLikeNetwork, InvalidAddress}
 import co.ledger.lama.bitcoin.common.utils.CoinImplicits._
@@ -14,10 +14,9 @@ import co.ledger.lama.bitcoin.transactor.clients.grpc.BitcoinLibClient
 import co.ledger.lama.bitcoin.transactor.models.RawTxWithChangeFeesAndUtxos
 import co.ledger.lama.bitcoin.transactor.models.bitcoinLib.SignatureMetadata
 import co.ledger.lama.bitcoin.transactor.services.{CoinSelectionService, TransactionBytes}
-import co.ledger.lama.common.logging.DefaultContextLogging
+import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import co.ledger.lama.common.models.{BitcoinLikeCoin, Coin, Sort}
 import fs2.{Chunk, Stream}
-
 import java.util.UUID
 
 class Transactor(
@@ -26,7 +25,7 @@ class Transactor(
     keychainClient: KeychainClient,
     interpreterClient: InterpreterClient,
     conf: TransactorConfig
-) extends DefaultContextLogging {
+) extends ContextLogging {
 
   def createTransaction(
       accountId: UUID,
@@ -37,8 +36,25 @@ class Transactor(
       feeLevel: FeeLevel,
       customFeePerKb: Option[Long],
       maxUtxos: Int
-  ): IO[CreateTransactionResponse] =
+  ): IO[CreateTransactionResponse] = {
+
+    implicit val lc: LamaLogContext = LamaLogContext()
+      .withAccountId(accountId)
+      .withIdentifier(keychainId.toString)
+      .withCoin(coin)
+      .withCoinFamily(coin.coinFamily)
+
     for {
+
+      _ <- log.info(
+        s"""Preparing transaction:
+            - strategy: ${coinSelection.name}
+            - feeLevel: $feeLevel
+            - customFeePerKb: $customFeePerKb
+            - feeLevel: $feeLevel
+            - maxUtxos: $maxUtxos
+         """
+      )
 
       accountInfo <- keychainClient.getKeychainInfo(keychainId)
 
@@ -127,17 +143,31 @@ class Transactor(
         estimatedFeePerKb
       )
     }
+  }
 
   def generateSignatures(
       rawTransaction: RawTransaction,
       utxos: List[Utxo],
       privKey: String
-  ): IO[List[Array[Byte]]] =
-    bitcoinLibClient.generateSignatures(
-      rawTransaction,
-      utxos,
-      privKey
-    )
+  ): IO[List[Array[Byte]]] = {
+    implicit val lc: LamaLogContext = LamaLogContext()
+    for {
+
+      _ <- log.info(
+        s"""Transaction to sign:
+            - hex: ${rawTransaction.hex}
+            - tx hash: ${rawTransaction.hash}
+         """
+      )
+
+      signatures <- bitcoinLibClient.generateSignatures(
+        rawTransaction,
+        utxos,
+        privKey
+      )
+      _ <- log.info(s"Get ${signatures.size} signatures")
+    } yield signatures
+  }
 
   def broadcastTransaction(
       keychainId: UUID,
@@ -146,6 +176,12 @@ class Transactor(
       signatures: List[Array[Byte]],
       coin: Coin
   ): IO[RawTransaction] = {
+
+    implicit val lc: LamaLogContext = LamaLogContext()
+      .withIdentifier(keychainId.toString)
+      .withCoin(coin)
+      .withCoinFamily(coin.coinFamily)
+
     for {
       pubKeys <- keychainClient.getAddressesPublicKeys(
         keychainId,
@@ -169,7 +205,6 @@ class Transactor(
 
       _ <- log.info(
         s"""Signed transaction:
-            - coin: ${coin.name}
             - signed hex: ${signedRawTx.hex}
             - tx hash: ${signedRawTx.hash}
          """
@@ -219,7 +254,7 @@ class Transactor(
       feesPerUtxo: BigInt,
       maxUtxos: Int,
       retryCount: Int = 5
-  ): IO[RawTxWithChangeFeesAndUtxos] =
+  )(implicit lc: LamaLogContext): IO[RawTxWithChangeFeesAndUtxos] =
     for {
       _ <-
         if (retryCount <= 0)

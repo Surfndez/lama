@@ -12,11 +12,13 @@ import co.ledger.lama.common.models.Coin
 import co.ledger.lama.common.models.Coin.Btc
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
 import java.util.UUID
+
+import co.ledger.lama.common.logging.DefaultContextLogging
+
 import scala.concurrent.ExecutionContext
 
-class BookkeeperSpec extends AnyFlatSpec with Matchers {
+class BookkeeperSpec extends AnyFlatSpec with Matchers with DefaultContextLogging {
 
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val t: Timer[IO]         = IO.timer(ExecutionContext.global)

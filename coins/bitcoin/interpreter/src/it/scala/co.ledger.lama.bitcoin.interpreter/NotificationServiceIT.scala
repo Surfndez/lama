@@ -58,6 +58,7 @@ class NotificationServiceIT extends AnyFlatSpecLike with Matchers {
         val operationsComputedNotification =
           OperationsComputedNotification(
             account,
+            UUID.randomUUID(),
             computedOperations
           )
 

@@ -1,8 +1,9 @@
 package co.ledger.lama.manager
 
 import java.util.UUID
+
 import cats.effect.IO
-import co.ledger.lama.common.logging.DefaultContextLogging
+import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import co.ledger.lama.common.models.{WithBusinessId, WorkableEvent}
 import co.ledger.lama.manager.Exceptions.RedisUnexpectedException
@@ -126,11 +127,15 @@ class WorkableEventPublisher(
     routingKey: RoutingKey
 )(implicit val enc: Encoder[WorkableEvent[JsonObject]], val dec: Decoder[WorkableEvent[JsonObject]])
     extends Publisher[UUID, WorkableEvent[JsonObject]]
-    with DefaultContextLogging {
+    with ContextLogging {
 
   def publish(event: WorkableEvent[JsonObject]): IO[Unit] =
     publisher
-      .evalMap(p => p(event) *> log.info(s"Published event to worker: ${event.asJson.toString}"))
+      .evalMap(p =>
+        p(event) *> log.info(s"Published event to worker: ${event.asJson.toString}")(
+          LamaLogContext().withAccount(event.account).withFollowUpId(event.syncId)
+        )
+      )
       .compile
       .drain
 

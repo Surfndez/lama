@@ -5,6 +5,7 @@ import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 import cats.data.NonEmptyList
+import co.ledger.lama.common.logging.LamaLogContext
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.common.utils.IOAssertion
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -24,6 +25,8 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
   val block3: BlockView = BlockView("block3", 570155, time.plus(2, ChronoUnit.SECONDS))
 
   val accountId: UUID = UUID.fromString("b723c553-3a9a-4130-8883-ee2f6c2f9201")
+
+  implicit val lc: LamaLogContext = LamaLogContext().withAccountId(accountId)
 
   val address1: AccountAddress =
     AccountAddress("address1", ChangeType.External, NonEmptyList.of(1, 0))

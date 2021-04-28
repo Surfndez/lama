@@ -6,13 +6,13 @@ import org.slf4j.MDC
 trait ContextLogging {
 
   implicit case object CanLogContext extends CanLog[LogContext] {
-    override def logMessage(originalMsg: String, context: LogContext): String = {
-      context.asMap().foreach { case (key, value) => MDC.put(key, value) }
+    override def logMessage(originalMsg: String, lc: LogContext): String = {
+      lc.asMap().foreach { case (key, value) => MDC.put(key, value) }
       originalMsg
     }
 
-    override def afterLog(context: LogContext): Unit = {
-      context.asMap().keys.foreach(MDC.remove)
+    override def afterLog(lc: LogContext): Unit = {
+      lc.asMap().keys.foreach(MDC.remove)
     }
   }
 

@@ -4,7 +4,7 @@ import java.time.Instant
 
 import cats.effect.IO
 import cats.implicits._
-import co.ledger.lama.common.logging.DefaultContextLogging
+import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import co.ledger.lama.manager.config.CoinConfig
 import doobie.implicits._
 import doobie.util.transactor.Transactor
@@ -15,7 +15,7 @@ import co.ledger.lama.manager.Exceptions._
 import io.circe.JsonObject
 
 class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
-    extends DefaultContextLogging {
+    extends ContextLogging {
 
   def updateAccount(
       accountId: UUID,
@@ -31,16 +31,29 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
       account: Account,
       syncFrequencyO: Option[Long],
       label: Option[String]
-  ): IO[SyncEventResult] =
+  ): IO[SyncEventResult] = {
+
+    implicit val lc: LamaLogContext = LamaLogContext().withAccount(account)
+
     for {
+
+      _ <- log.info("Registering Account")
+
       // Get the sync frequency from the request
       // or fallback to the default one from the coin configuration.
-      syncFrequency <- IO.fromOption {
-        syncFrequencyO orElse
-          coinConfigs
-            .find(c => c.coinFamily == account.coinFamily && c.coin == account.coin)
-            .map(_.syncFrequency.toSeconds)
-      }(CoinConfigurationException(account.coinFamily, account.coin))
+      syncFrequency <- IO
+        .fromOption {
+          syncFrequencyO orElse
+            coinConfigs
+              .find(c => c.coinFamily == account.coinFamily && c.coin == account.coin)
+              .map(_.syncFrequency.toSeconds)
+        }(CoinConfigurationException(account.coinFamily, account.coin))
+        .handleErrorWith(e =>
+          log
+            .error(
+              s"Error while registering account : no configuration found for coin family ${account.coinFamily} coin ${account.coin}"
+            ) *> IO.raiseError(e)
+        )
 
       // Build queries.
       queries = for {
@@ -76,6 +89,7 @@ class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
             SyncEventResult(accountId, syncId)
           }
     } yield response
+  }
 
   def resyncAccount(accountId: UUID, wipe: Boolean): IO[SyncEventResult] =
     for {

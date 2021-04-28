@@ -62,7 +62,7 @@ object App extends IOApp with DefaultContextLogging {
       val explorerClient    = new ExplorerHttpClient(res.httpClient, conf.explorer, _)
 
       val cursorStateService: Coin => CursorStateService[IO] =
-        c => CursorStateService(explorerClient(c), interpreterClient).getLastValidState(_, _)
+        c => CursorStateService(explorerClient(c), interpreterClient).getLastValidState(_, _, _)
 
       val worker = new Worker(
         syncEventService,

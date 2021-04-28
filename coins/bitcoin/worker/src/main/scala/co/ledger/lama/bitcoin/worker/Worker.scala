@@ -9,9 +9,8 @@ import co.ledger.lama.bitcoin.common.models.explorer.{
   ConfirmedTransaction,
   UnconfirmedTransaction
 }
-import co.ledger.lama.bitcoin.worker.services.CursorStateService.AccountId
 import co.ledger.lama.bitcoin.worker.services._
-import co.ledger.lama.common.logging.DefaultContextLogging
+import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import co.ledger.lama.common.models.Status.{Registered, Unregistered}
 import co.ledger.lama.common.models.{Account, Coin, ReportError, ReportableEvent, WorkableEvent}
 import fs2.Stream
@@ -27,12 +26,15 @@ class Worker(
     explorerClient: Coin => ExplorerClient,
     interpreterClient: InterpreterClient,
     cursorService: Coin => CursorStateService[IO]
-) extends DefaultContextLogging {
+) extends ContextLogging {
 
   def run(implicit cs: ContextShift[IO], t: Timer[IO]): Stream[IO, Unit] =
     syncEventService.consumeWorkerEvents
       .evalMap { autoAckMsg =>
         autoAckMsg.unwrap { event =>
+          implicit val lc: LamaLogContext =
+            LamaLogContext().withAccount(event.account).withFollowUpId(event.syncId)
+
           val reportableEvent = event.status match {
             case Registered   => synchronizeAccount(event)
             case Unregistered => deleteAccount(event)
@@ -58,7 +60,7 @@ class Worker(
 
   def synchronizeAccount(
       workerEvent: WorkableEvent[Block]
-  )(implicit cs: ContextShift[IO], t: Timer[IO]): IO[ReportableEvent[Block]] = {
+  )(implicit cs: ContextShift[IO], t: Timer[IO], lc: LamaLogContext): IO[ReportableEvent[Block]] = {
 
     val bookkeeper = Bookkeeper(
       new Keychain(keychainClient),
@@ -91,7 +93,7 @@ class Worker(
           case None           => true
         }
         .evalTap(b => log.info(s"Syncing from cursor state: $b"))
-        .evalMap(b => b.map(rewindToLastValidBlock(account, _)).sequence)
+        .evalMap(b => b.map(rewindToLastValidBlock(account, _, workerEvent.syncId)).sequence)
         .evalMap { lastValidBlock =>
           bookkeeper
             .record[ConfirmedTransaction](
@@ -109,6 +111,7 @@ class Worker(
 
       opsCount <- interpreterClient.compute(
         account,
+        workerEvent.syncId,
         (addresses ++ addressesUsedByMempool).distinct
       )
 
@@ -122,13 +125,17 @@ class Worker(
 
   case class LastMinedBlock(block: Block)
 
-  def lastMinedBlock(coin: Coin): IO[LastMinedBlock] =
+  def lastMinedBlock(coin: Coin)(implicit lc: LamaLogContext): IO[LastMinedBlock] =
     explorerClient(coin).getCurrentBlock.map(LastMinedBlock)
 
-  private def rewindToLastValidBlock(account: Account, lastKnownBlock: Block): IO[Block] =
+  private def rewindToLastValidBlock(account: Account, lastKnownBlock: Block, syncId: UUID)(implicit
+      lc: LamaLogContext
+  ): IO[Block] =
     for {
-      lvb <- cursorService(account.coin).getLastValidState(AccountId(account.id), lastKnownBlock)
-      _   <- log.info(s"Last valid block : $lvb")
+
+      lvb <- cursorService(account.coin).getLastValidState(account, lastKnownBlock, syncId)
+
+      _ <- log.info(s"Last valid block : $lvb")
       _ <-
         if (lvb.hash == lastKnownBlock.hash)
           // If the previous block is still valid, do not reorg
@@ -137,12 +144,16 @@ class Worker(
           // remove all transactions and operations up until last valid block
           log.info(
             s"${lastKnownBlock.hash} is different than ${lvb.hash}, reorg is happening"
-          ) *> interpreterClient.removeDataFromCursor(account.id, Some(lvb.height))
+          ) *> interpreterClient.removeDataFromCursor(account.id, Some(lvb.height), syncId)
         }
     } yield lvb
 
-  def deleteAccount(event: WorkableEvent[Block]): IO[ReportableEvent[Block]] =
-    interpreterClient
-      .removeDataFromCursor(event.account.id, None)
-      .map(_ => event.asReportableSuccessEvent(None))
+  def deleteAccount(
+      event: WorkableEvent[Block]
+  )(implicit lc: LamaLogContext): IO[ReportableEvent[Block]] = {
+    log.info("Delete Account") *>
+      interpreterClient
+        .removeDataFromCursor(event.account.id, None, event.syncId)
+        .map(_ => event.asReportableSuccessEvent(None))
+  }
 }

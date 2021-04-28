@@ -2,7 +2,7 @@ package co.ledger.lama.manager
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits.showInterpolator
-import co.ledger.lama.common.logging.DefaultContextLogging
+import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import co.ledger.lama.common.models._
 import co.ledger.lama.common.utils.rabbitmq.{AutoAckMessage, RabbitUtils}
 import co.ledger.lama.manager.config.CoinConfig
@@ -77,7 +77,7 @@ class CoinSyncEventTask(
     redis: RedisClient
 )(implicit cs: ContextShift[IO])
     extends SyncEventTask
-    with DefaultContextLogging {
+    with ContextLogging {
 
   // Fetch worker events ready to publish from database.
   def publishableWorkerEvents: Stream[IO, WorkableEvent[JsonObject]] =
@@ -116,6 +116,8 @@ class CoinSyncEventTask(
   def reportEventPipe: Pipe[IO, AutoAckMessage[ReportableEvent[JsonObject]], Unit] =
     _.evalMap { autoAckMessage =>
       autoAckMessage.unwrap { event =>
+        implicit val lc: LamaLogContext =
+          LamaLogContext().withAccount(event.account).withFollowUpId(event.syncId)
         Queries.insertSyncEvent(event).transact(db).void *>
           publisher.dequeue(event.account.id) *>
           log.info(show"Reported event: $event")
@@ -130,9 +132,11 @@ class CoinSyncEventTask(
 
   // From triggerable events, construct next events then insert.
   def triggerEventsPipe: Pipe[IO, TriggerableEvent[JsonObject], Unit] =
-    _.evalMap { e =>
-      Queries.insertSyncEvent(e.nextWorkable).transact(db).void *>
-        log.info(s"Next event: ${e.nextWorkable.asJson.toString}")
+    _.evalMap { event =>
+      implicit val lc: LamaLogContext =
+        LamaLogContext().withAccount(event.account).withFollowUpId(event.syncId)
+      Queries.insertSyncEvent(event.nextWorkable).transact(db).void *>
+        log.info(s"Next event: ${event.nextWorkable.asJson.toString}")
     }
 
 }

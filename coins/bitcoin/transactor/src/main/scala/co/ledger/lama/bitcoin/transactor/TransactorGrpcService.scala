@@ -10,7 +10,6 @@ import co.ledger.lama.bitcoin.common.models.transactor.{
   PrepareTxOutput,
   RawTransaction
 }
-import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.models.{BitcoinLikeCoin, Coin}
 import co.ledger.lama.common.utils.UuidUtils
 import com.google.protobuf.ByteString
@@ -21,9 +20,7 @@ trait TransactorService extends protobuf.BitcoinTransactorServiceFs2Grpc[IO, Met
     protobuf.BitcoinTransactorServiceFs2Grpc.bindService(this)
 }
 
-class TransactorGrpcService(transactor: Transactor)
-    extends TransactorService
-    with DefaultContextLogging {
+class TransactorGrpcService(transactor: Transactor) extends TransactorService {
 
   def createTransaction(
       request: protobuf.CreateTransactionRequest,
@@ -38,18 +35,6 @@ class TransactorGrpcService(transactor: Transactor)
       coinSelection     = CoinSelectionStrategy.fromProto(request.coinSelection)
       feeLevel          = FeeLevel.fromProto(request.feeLevel)
       optCustomFeePerKb = if (request.customFeePerKb > 0L) Some(request.customFeePerKb) else None
-
-      _ <- log.info(
-        s"""Preparing transaction:
-            - accountId: $accountId
-            - strategy: ${coinSelection.name}
-            - coin: ${coin.name}
-            - feeLevel: $feeLevel
-            - customFeePerKb: $optCustomFeePerKb
-            - feeLevel: $feeLevel
-            - maxUtxos: ${request.maxUtxos}
-         """
-      )
 
       txRes <- transactor.createTransaction(
         accountId,
@@ -75,17 +60,8 @@ class TransactorGrpcService(transactor: Transactor)
 
       utxos = request.utxos.map(Utxo.fromProto).toList
 
-      _ <- log.info(
-        s"""Transaction to sign:
-            - hex: ${rawTransaction.hex}
-            - tx hash: ${rawTransaction.hash}
-         """
-      )
-
       signatures <- transactor
         .generateSignatures(rawTransaction, utxos, request.privKey)
-
-      _ <- log.info(s"Get ${signatures.size} signatures")
 
     } yield protobuf.GenerateSignaturesResponse(
       signatures.map(signature => ByteString.copyFrom(signature))
@@ -102,14 +78,6 @@ class TransactorGrpcService(transactor: Transactor)
       rawTransaction <- IO.fromOption(
         request.rawTransaction.map(RawTransaction.fromProto)
       )(new Exception("Raw Transaction : bad format"))
-
-      _ <- log.info(
-        s"""Transaction to sign:
-            - coin: ${coin.name}
-            - hex: ${rawTransaction.hex}
-            - tx hash: ${rawTransaction.hash}
-         """
-      )
 
       rawTx <- transactor.broadcastTransaction(
         keychainId,

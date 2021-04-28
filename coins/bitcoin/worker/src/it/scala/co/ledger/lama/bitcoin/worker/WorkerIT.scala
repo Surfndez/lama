@@ -53,7 +53,7 @@ class WorkerIT extends AnyFlatSpecLike with Matchers {
           val interpreterClient = new InterpreterClientMock
 
           val cursorStateService: Coin => CursorStateService[IO] =
-            c => CursorStateService(explorerClient(c), interpreterClient).getLastValidState(_, _)
+            c => CursorStateService(explorerClient(c), interpreterClient).getLastValidState(_, _, _)
 
           val worker = new Worker(
             syncEventService,

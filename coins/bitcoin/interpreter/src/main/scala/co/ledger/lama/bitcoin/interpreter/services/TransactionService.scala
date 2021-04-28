@@ -7,7 +7,6 @@ import co.ledger.lama.common.logging.DefaultContextLogging
 import doobie.Transactor
 import doobie.implicits._
 import fs2._
-
 import java.util.UUID
 
 class TransactionService(db: Transactor[IO], maxConcurrent: Int) extends DefaultContextLogging {

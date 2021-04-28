@@ -40,7 +40,11 @@ class InterpreterClientMock extends InterpreterClient {
       IO.unit
     }
 
-  def removeDataFromCursor(accountId: UUID, blockHeightCursor: Option[Long]): IO[Int] = {
+  def removeDataFromCursor(
+      accountId: UUID,
+      blockHeightCursor: Option[Long],
+      followUpId: UUID
+  ): IO[Int] = {
     savedTransactions.update(
       accountId,
       savedTransactions(accountId)
@@ -79,6 +83,7 @@ class InterpreterClientMock extends InterpreterClient {
 
   def compute(
       account: Account,
+      syncId: UUID,
       addresses: List[AccountAddress]
   ): IO[Int] = {
 

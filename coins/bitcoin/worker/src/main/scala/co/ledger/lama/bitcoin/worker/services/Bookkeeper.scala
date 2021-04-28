@@ -13,8 +13,9 @@ import co.ledger.lama.bitcoin.common.models.interpreter.AccountAddress
 import co.ledger.lama.bitcoin.worker.services.Keychain.KeychainId
 import co.ledger.lama.common.models.Coin
 import fs2.{Pipe, Stream}
-
 import java.util.UUID
+
+import co.ledger.lama.common.logging.LamaLogContext
 
 trait Bookkeeper[F[_]] {
   def record[Tx <: Transaction: Bookkeeper.Recordable](
@@ -35,6 +36,7 @@ object Bookkeeper {
       explorerClient: Coin => ExplorerClient,
       interpreterClient: InterpreterClient
   )(implicit cs: ContextShift[IO]): Bookkeeper[IO] = new Bookkeeper[IO] {
+
     override def record[Tx <: Transaction: Recordable](
         coin: Coin,
         accountId: AccountId,
@@ -119,7 +121,8 @@ object Bookkeeper {
 
   implicit def confirmed(implicit
       cs: ContextShift[IO],
-      t: Timer[IO]
+      t: Timer[IO],
+      lc: LamaLogContext
   ): Recordable[ConfirmedTransaction] =
     new Recordable[ConfirmedTransaction] {
       override def fetch(
@@ -130,7 +133,8 @@ object Bookkeeper {
 
   implicit def unconfirmedTransaction(implicit
       cs: ContextShift[IO],
-      t: Timer[IO]
+      t: Timer[IO],
+      lc: LamaLogContext
   ): Recordable[UnconfirmedTransaction] =
     new Recordable[UnconfirmedTransaction] {
       override def fetch(

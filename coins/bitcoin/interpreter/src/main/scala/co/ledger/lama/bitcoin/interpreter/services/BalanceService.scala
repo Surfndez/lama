@@ -2,20 +2,23 @@ package co.ledger.lama.bitcoin.interpreter.services
 
 import java.time.Instant
 import java.util.UUID
+
 import cats.effect.{Concurrent, IO}
 import cats.implicits._
+import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import co.ledger.lama.bitcoin.common.models.interpreter.{BalanceHistory, CurrentBalance}
 import co.ledger.lama.bitcoin.interpreter.Config.Db
-import co.ledger.lama.common.logging.DefaultContextLogging
 import doobie.Transactor
 import doobie.implicits._
 
 import scala.annotation.tailrec
 
 class BalanceService(db: Transactor[IO], batchConcurrency: Db.BatchConcurrency)
-    extends DefaultContextLogging {
+    extends ContextLogging {
 
-  def computeNewBalanceHistory(accountId: UUID)(implicit concurrent: Concurrent[IO]): IO[Int] =
+  def computeNewBalanceHistory(
+      accountId: UUID
+  )(implicit concurrent: Concurrent[IO], lc: LamaLogContext): IO[Int] =
     for {
       lastBalance <- BalanceQueries
         .getLastBalance(accountId)
@@ -31,18 +34,19 @@ class BalanceService(db: Transactor[IO], batchConcurrency: Db.BatchConcurrency)
 
       nbSaved <- BalanceQueries
         .getUncomputedBalanceHistories(accountId, lastBalance.blockHeight.getOrElse(0))
-        .map(
-          balanceHistory =>
-            BalanceHistory(
-              accountId = balanceHistory.accountId,
-              balance = lastBalance.balance + balanceHistory.balance,
-              blockHeight = balanceHistory.blockHeight,
-              time = balanceHistory.time
-          ))
+        .map(balanceHistory =>
+          BalanceHistory(
+            accountId = balanceHistory.accountId,
+            balance = lastBalance.balance + balanceHistory.balance,
+            blockHeight = balanceHistory.blockHeight,
+            time = balanceHistory.time
+          )
+        )
         .transact(db)
         .chunkN(maxSavedBalanceHistoriesPerBatch)
         .parEvalMapUnordered(batchConcurrency.value)(balances =>
-          BalanceQueries.saveBalanceHistory(balances.toList).transact(db))
+          BalanceQueries.saveBalanceHistory(balances.toList).transact(db)
+        )
         .compile
         .foldMonoid
 
@@ -90,12 +94,12 @@ class BalanceService(db: Transactor[IO], batchConcurrency: Db.BatchConcurrency)
       lastBalance = balances.lastOption.orElse(previousBalance).map(_.balance).getOrElse(BigInt(0))
 
       // Add mempool balance to the last balance
-      withMempoolBalance <- if (mempoolIsInTimeRange) {
-        BalanceQueries
-          .getUnconfirmedBalance(accountId)
-          .transact(db)
-          .map(
-            amount =>
+      withMempoolBalance <-
+        if (mempoolIsInTimeRange) {
+          BalanceQueries
+            .getUnconfirmedBalance(accountId)
+            .transact(db)
+            .map(amount =>
               balances.appended(
                 BalanceHistory(
                   accountId,
@@ -103,14 +107,14 @@ class BalanceService(db: Transactor[IO], batchConcurrency: Db.BatchConcurrency)
                   None,
                   Instant.now()
                 )
-            ))
-      } else
-        IO.pure(balances)
+              )
+            )
+        } else
+          IO.pure(balances)
 
-    } yield
-      intervalO
-        .map(getBalancesAtInterval(accountId, withMempoolBalance, previousBalance, _, startO, endO))
-        .getOrElse(withMempoolBalance)
+    } yield intervalO
+      .map(getBalancesAtInterval(accountId, withMempoolBalance, previousBalance, _, startO, endO))
+      .getOrElse(withMempoolBalance)
 
   def getBalanceHistoryCount(accountId: UUID): IO[Int] =
     BalanceQueries.getBalanceHistoryCount(accountId).transact(db)

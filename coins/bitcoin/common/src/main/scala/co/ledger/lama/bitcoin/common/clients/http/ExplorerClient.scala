@@ -6,7 +6,7 @@ import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient.Address
 import co.ledger.lama.bitcoin.common.config.ExplorerConfig
 import co.ledger.lama.bitcoin.common.models.explorer._
 import co.ledger.lama.bitcoin.common.models.transactor.FeeInfo
-import co.ledger.lama.common.logging.DefaultContextLogging
+import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import co.ledger.lama.common.models.Coin
 import co.ledger.lama.common.models.Coin.{Btc, BtcRegtest, BtcTestnet, Ltc}
 import co.ledger.lama.common.models.implicits._
@@ -31,26 +31,34 @@ object TransactionHex {
 
 trait ExplorerClient {
 
-  def getCurrentBlock: IO[Block]
+  def getCurrentBlock(implicit lc: LamaLogContext): IO[Block]
 
-  def getBlock(hash: String): IO[Option[Block]]
+  def getBlock(hash: String)(implicit lc: LamaLogContext): IO[Option[Block]]
 
-  def getBlock(height: Long): IO[Block]
+  def getBlock(height: Long)(implicit lc: LamaLogContext): IO[Block]
 
   def getConfirmedTransactions(
       addresses: Seq[Address],
       blockHash: Option[String]
-  )(implicit cs: ContextShift[IO], t: Timer[IO]): Stream[IO, ConfirmedTransaction]
+  )(implicit
+      cs: ContextShift[IO],
+      t: Timer[IO],
+      lc: LamaLogContext
+  ): Stream[IO, ConfirmedTransaction]
 
   def getUnconfirmedTransactions(
       addresses: Set[Address]
-  )(implicit cs: ContextShift[IO], t: Timer[IO]): Stream[IO, UnconfirmedTransaction]
+  )(implicit
+      cs: ContextShift[IO],
+      t: Timer[IO],
+      lc: LamaLogContext
+  ): Stream[IO, UnconfirmedTransaction]
 
-  def getSmartFees: IO[FeeInfo]
+  def getSmartFees(implicit lc: LamaLogContext): IO[FeeInfo]
 
-  def broadcastTransaction(tx: String): IO[String]
+  def broadcastTransaction(tx: String)(implicit lc: LamaLogContext): IO[String]
 
-  def getRawTransactionHex(transactionHash: String): IO[String]
+  def getRawTransactionHex(transactionHash: String)(implicit lc: LamaLogContext): IO[String]
 }
 
 object ExplorerClient {
@@ -59,7 +67,7 @@ object ExplorerClient {
 
 class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coin)
     extends ExplorerClient
-    with DefaultContextLogging {
+    with ContextLogging {
 
   private val coinBasePath = coin match {
     case Btc        => "/blockchain/v3/btc"
@@ -68,21 +76,30 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
     case Ltc        => "/blockchain/v3/ltc"
   }
 
-  private def callExpect[A](uri: Uri)(implicit d: EntityDecoder[IO, A]): IO[A] =
-    log.debug(uri.toString()) *>
+  private def callExpect[A](
+      uri: Uri
+  )(implicit d: EntityDecoder[IO, A], lc: LamaLogContext): IO[A] =
+    log.debug(s"call explorer with uri : ${uri.toString()}") *>
       httpClient
         .expect[A](uri)
         .handleErrorWith(e => IO.raiseError(ExplorerClientException(uri, e)))
 
-  private def callExpect[A](req: Request[IO])(implicit c: EntityDecoder[IO, A]): IO[A] =
-    log.debug(req.toString()) *>
+  private def callExpect[A](
+      req: Request[IO]
+  )(implicit c: EntityDecoder[IO, A], lc: LamaLogContext): IO[A] =
+    log.debug(s"call explorer with request : ${req.toString()}") *>
       httpClient
         .expect[A](req)
         .handleErrorWith(e => IO.raiseError(ExplorerClientException(req.uri, e)))
 
   private def callExpectWithRetry[A](
       req: Request[IO]
-  )(implicit cs: ContextShift[IO], c: EntityDecoder[IO, A], t: Timer[IO]): IO[A] =
+  )(implicit
+      cs: ContextShift[IO],
+      c: EntityDecoder[IO, A],
+      t: Timer[IO],
+      lc: LamaLogContext
+  ): IO[A] =
     IOUtils
       .retry(
         callExpect(req).timeout(conf.timeout),
@@ -94,20 +111,24 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
           IO.raiseError(explorerException)
       }
 
-  def getCurrentBlock: IO[Block] =
+  def getCurrentBlock(implicit lc: LamaLogContext): IO[Block] =
     callExpect[Block](conf.uri.withPath(s"$coinBasePath/blocks/current"))
 
-  def getBlock(hash: String): IO[Option[Block]] =
+  def getBlock(hash: String)(implicit lc: LamaLogContext): IO[Option[Block]] =
     callExpect[List[Block]](conf.uri.withPath(s"$coinBasePath/blocks/$hash"))
       .map(_.headOption)
 
-  def getBlock(height: Long): IO[Block] =
+  def getBlock(height: Long)(implicit lc: LamaLogContext): IO[Block] =
     callExpect[Block](conf.uri.withPath(s"$coinBasePath/blocks/$height"))
 
   def getConfirmedTransactions(
       addresses: Seq[Address],
       blockHash: Option[String]
-  )(implicit cs: ContextShift[IO], t: Timer[IO]): Stream[IO, ConfirmedTransaction] =
+  )(implicit
+      cs: ContextShift[IO],
+      t: Timer[IO],
+      lc: LamaLogContext
+  ): Stream[IO, ConfirmedTransaction] =
     Stream
       .emits(addresses)
       .chunkN(conf.addressesSize)
@@ -125,7 +146,11 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
 
   def getUnconfirmedTransactions(
       addresses: Set[Address]
-  )(implicit cs: ContextShift[IO], t: Timer[IO]): Stream[IO, UnconfirmedTransaction] = {
+  )(implicit
+      cs: ContextShift[IO],
+      t: Timer[IO],
+      lc: LamaLogContext
+  ): Stream[IO, UnconfirmedTransaction] = {
 
     val getPendingTransactionRequest = (as: Chunk[Address]) => {
       val baseUri = conf.uri
@@ -150,7 +175,7 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
       .flatMap(Stream.emits(_))
   }
 
-  def getRawTransactionHex(transactionHash: String): IO[String] =
+  def getRawTransactionHex(transactionHash: String)(implicit lc: LamaLogContext): IO[String] =
     for {
       rawResponse <- callExpect[List[TransactionHex]](
         conf.uri.withPath(s"$coinBasePath/transactions/$transactionHash/hex")
@@ -158,7 +183,7 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
       hex <- IO.fromOption(rawResponse.headOption.map(_.hex))(new Exception(""))
     } yield hex
 
-  def getSmartFees: IO[FeeInfo] = {
+  def getSmartFees(implicit lc: LamaLogContext): IO[FeeInfo] = {
     val feeUri = conf.uri.withPath(s"$coinBasePath/fees")
 
     for {
@@ -194,7 +219,7 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
 
   }
 
-  def broadcastTransaction(tx: String): IO[String] =
+  def broadcastTransaction(tx: String)(implicit lc: LamaLogContext): IO[String] =
     callExpect[SendTransactionResult](
       Request[IO](
         Method.POST,
@@ -225,7 +250,8 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
   )(implicit
       cs: ContextShift[IO],
       t: Timer[IO],
-      decoder: Decoder[GetTransactionsResponse]
+      decoder: Decoder[GetTransactionsResponse],
+      lc: LamaLogContext
   ): Pull[IO, GetTransactionsResponse, Unit] =
     Pull
       .eval(

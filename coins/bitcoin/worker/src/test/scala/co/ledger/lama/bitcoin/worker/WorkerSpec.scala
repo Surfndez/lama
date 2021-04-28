@@ -65,7 +65,7 @@ class WorkerSpec extends AnyFlatSpec with Matchers {
   val defaultExplorer = new ExplorerClientMock(
     blockchain.flatMap(_._2).toMap
   )
-  val alreadyValidBlockCursorService: CursorStateService[IO] = (_, b) => IO.pure(b)
+  val alreadyValidBlockCursorService: CursorStateService[IO] = (_, b, _) => IO.pure(b)
 
   def worker(
       messages: Queue[IO, Option[WorkableEvent[Block]]],

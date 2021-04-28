@@ -9,19 +9,18 @@ import co.ledger.lama.bitcoin.interpreter.services.OperationQueries.{
   OpWithoutDetails,
   OperationDetails
 }
-import co.ledger.lama.common.logging.DefaultContextLogging
+import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import co.ledger.lama.common.models.{PaginationToken, Sort, TxHash}
 import doobie._
 import doobie.implicits._
 import fs2._
-
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 class OperationService(
     db: Transactor[IO],
     batchConcurrency: Db.BatchConcurrency
-) extends DefaultContextLogging {
+) extends ContextLogging {
 
   private val numberOfOperationsToBuildByQuery = 5
 
@@ -224,7 +223,11 @@ class OperationService(
 
   def compute(
       accountId: UUID
-  )(implicit cs: ContextShift[IO], clock: Clock[IO]): Stream[IO, Operation.UID] =
+  )(implicit
+      cs: ContextShift[IO],
+      clock: Clock[IO],
+      lc: LamaLogContext
+  ): Stream[IO, Operation.UID] =
     operationSource(accountId)
       .flatMap { op =>
         op.computeOperations
@@ -238,7 +241,8 @@ class OperationService(
 
   private def saveOperationSink(implicit
       cs: ContextShift[IO],
-      clock: Clock[IO]
+      clock: Clock[IO],
+      lc: LamaLogContext
   ): Pipe[IO, OperationToSave, Operation.UID] = {
 
     val batchSize = Math.max(1000 / batchConcurrency.value, 100)

@@ -10,8 +10,8 @@ import co.ledger.lama.bitcoin.common.clients.http.ExplorerHttpClient
 import co.ledger.lama.bitcoin.common.models.interpreter.{BlockView, TransactionView}
 import co.ledger.lama.bitcoin.worker.config.Config
 import co.ledger.lama.bitcoin.worker.services.CursorStateService
-import co.ledger.lama.bitcoin.worker.services.CursorStateService.AccountId
 import co.ledger.lama.common.logging.DefaultContextLogging
+import co.ledger.lama.common.models.{Account, AccountGroup, Coin, CoinFamily}
 import co.ledger.lama.common.services.Clients
 import co.ledger.lama.common.models.Coin.Btc
 import co.ledger.lama.common.utils.IOAssertion
@@ -21,7 +21,6 @@ import org.scalatest.matchers.should.Matchers
 import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext
-
 import fs2._
 
 class CursorStateServiceIT extends AnyFlatSpecLike with Matchers with DefaultContextLogging {
@@ -39,7 +38,10 @@ class CursorStateServiceIT extends AnyFlatSpecLike with Matchers with DefaultCon
       val interpreterClient  = new InterpreterClientMock
       val cursorStateService = CursorStateService(explorerClient, interpreterClient)
 
-      val accountId = UUID.randomUUID()
+      val account =
+        Account(UUID.randomUUID().toString, CoinFamily.Bitcoin, Coin.Btc, AccountGroup("group"))
+      val accountId = account.id
+      val syncId    = UUID.randomUUID()
 
       val lastValidHash   = "00000000000000000008c76a28e115319fb747eb29a7e0794526d0fe47608379"
       val lastValidHeight = 559033L
@@ -72,8 +74,9 @@ class CursorStateServiceIT extends AnyFlatSpecLike with Matchers with DefaultCon
           ).through(interpreterClient.saveTransactions(accountId)).compile.drain
 
         block <- cursorStateService.getLastValidState(
-          AccountId(accountId),
-          Block(invalidHash, 0L, Instant.now())
+          account,
+          Block(invalidHash, 0L, Instant.now()),
+          syncId
         )
       } yield {
         block.hash shouldBe lastValidHash

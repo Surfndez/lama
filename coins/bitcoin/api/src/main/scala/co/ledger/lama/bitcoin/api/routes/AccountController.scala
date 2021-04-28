@@ -18,7 +18,7 @@ import co.ledger.lama.common.models.implicits.defaultCirceConfig
 import co.ledger.lama.bitcoin.common.models.interpreter.ChangeType
 import co.ledger.lama.bitcoin.common.utils.CoinImplicits._
 import co.ledger.lama.common.clients.grpc.AccountManagerClient
-import co.ledger.lama.common.logging.ContextLogging
+import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import co.ledger.lama.common.utils.UuidUtils
 import io.circe.Json
 import io.circe.generic.extras.auto._
@@ -28,8 +28,8 @@ import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.UUID
 
-import co.ledger.lama.bitcoin.common.logging.BtcLogContext
 import co.ledger.lama.common.models.{Account, AccountGroup}
 
 object AccountController extends Http4sDsl[IO] with ContextLogging {
@@ -46,7 +46,7 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
     case req @ POST -> Root / UUIDVar(
           accountId
         ) / "transactions" =>
-      implicit val context: BtcLogContext = BtcLogContext().withAccountId(accountId)
+      implicit val lc: LamaLogContext = LamaLogContext().withAccountId(accountId)
       (for {
         _                           <- log.info(s"Preparing transaction creation")
         apiCreateTransactionRequest <- req.as[CreateTransactionRequest]
@@ -78,7 +78,7 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
 
     // Sign transaction (only for testing)
     case req @ POST -> Root / "_internal" / "sign" =>
-      implicit val context: BtcLogContext = BtcLogContext()
+      implicit val lc: LamaLogContext = LamaLogContext()
       for {
         _       <- log.info(s"Signing Transaction")
         request <- req.as[GenerateSignaturesRequest]
@@ -97,7 +97,7 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
     case req @ POST -> Root / UUIDVar(
           accountId
         ) / "transactions" / "send" =>
-      implicit val context: BtcLogContext = BtcLogContext().withAccountId(accountId)
+      implicit val lc: LamaLogContext = LamaLogContext().withAccountId(accountId)
       for {
         _       <- log.info(s"Broadcasting transaction for account: $accountId")
         request <- req.as[BroadcastTransactionRequest]
@@ -123,7 +123,7 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
     case req @ POST -> Root / UUIDVar(
           accountId
         ) / "recipients" =>
-      implicit val context: BtcLogContext = BtcLogContext().withAccountId(accountId)
+      implicit val context: LamaLogContext = LamaLogContext().withAccountId(accountId)
       for {
         account   <- accountManagerClient.getAccountInfo(accountId).map(_.account)
         addresses <- req.as[NonEmptyList[String]]
@@ -153,7 +153,7 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
 
       // Register account
       case req @ POST -> Root =>
-        implicit val context: BtcLogContext = BtcLogContext()
+        implicit val lc: LamaLogContext = LamaLogContext()
         val ra = for {
           creationRequest <- req.as[CreationRequest]
           _               <- log.info(s"Creating keychain for account registration")
@@ -171,8 +171,8 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
             creationRequest.coin,
             AccountGroup(creationRequest.group)
           )
-          logContextWithAccount = context.withAccount(account)
 
+          logContextWithAccount = lc.withAccount(account)
           _ <- log.info(s"Keychain created")(logContextWithAccount)
           _ <- log.info("Registering account")(logContextWithAccount)
           syncAccount <- accountManagerClient.registerAccount(
@@ -218,7 +218,7 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
           :? OptionalBoundedLimitQueryParamMatcher(limit)
           +& OptionalOffsetQueryParamMatcher(offset)
           +& OptionalSortQueryParamMatcher(sort) =>
-        implicit val context: BtcLogContext = BtcLogContext().withAccountId(accountId)
+        implicit val lc: LamaLogContext = LamaLogContext().withAccountId(accountId)
         for {
           boundedLimit <- parseBoundedLimit(limit)
           _            <- log.info("Get Events")
@@ -229,7 +229,7 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
 
       // Update account
       case req @ PUT -> Root / UUIDVar(accountId) =>
-        implicit val context: BtcLogContext = BtcLogContext().withAccountId(accountId)
+        implicit val lc: LamaLogContext = LamaLogContext().withAccountId(accountId)
         val r = for {
           updateRequest <- req.as[UpdateRequest]
 
@@ -297,7 +297,7 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
           ) / "operations" :? OptionalCursorQueryParamMatcher(cursor)
           +& OptionalBoundedLimitQueryParamMatcher(limit)
           +& OptionalSortQueryParamMatcher(sort) =>
-        implicit val context: BtcLogContext = BtcLogContext().withAccountId(accountId)
+        implicit val lc: LamaLogContext = LamaLogContext().withAccountId(accountId)
         for {
           boundedLimit <- parseBoundedLimit(limit)
           _            <- log.info(s"Fetching operations for account: $accountId")
@@ -315,7 +315,7 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
       case GET -> Root / UUIDVar(
             accountId
           ) / "operations" / uid =>
-        implicit val context: BtcLogContext = BtcLogContext().withAccountId(accountId)
+        implicit val lc: LamaLogContext = LamaLogContext().withAccountId(accountId)
         log.info(s"Fetching operations for account: $accountId") *>
           interpreterClient
             .getOperation(
@@ -333,7 +333,7 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
           ) / "utxos" :? OptionalBoundedLimitQueryParamMatcher(limit)
           +& OptionalOffsetQueryParamMatcher(offset)
           +& OptionalSortQueryParamMatcher(sort) =>
-        implicit val context: BtcLogContext = BtcLogContext().withAccountId(accountId)
+        implicit val lc: LamaLogContext = LamaLogContext().withAccountId(accountId)
         (for {
           boundedLimit <- parseBoundedLimit(limit)
 
@@ -356,7 +356,7 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
           ) / "balances" :? OptionalStartInstantQueryParamMatcher(start)
           +& OptionalEndInstantQueryParamMatcher(end)
           +& OptionalIntervalQueryParamMatcher(interval) =>
-        implicit val context: BtcLogContext = BtcLogContext().withAccountId(accountId)
+        implicit val lc: LamaLogContext = LamaLogContext().withAccountId(accountId)
         log.info(s"Fetching balances history for account: $accountId") *>
           interpreterClient
             .getBalanceHistory(
@@ -371,7 +371,7 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
       case GET -> Root / UUIDVar(
             accountId
           ) / "balances" / BalancePreset(preset) =>
-        implicit val context: BtcLogContext = BtcLogContext().withAccountId(accountId)
+        implicit val lc: LamaLogContext = LamaLogContext().withAccountId(accountId)
         log.info(s"Fetching balances history for account: $accountId") *>
           interpreterClient
             .getBalanceHistory(
@@ -392,7 +392,7 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
           accountInfo <- accountManagerClient.getAccountInfo(accountId)
 
           _ <- log.info("Get Observable Addresses")(
-            BtcLogContext().withAccount(accountInfo.account)
+            LamaLogContext().withAccount(accountInfo.account)
           )
           keychainId <- UuidUtils.stringToUuidIO(accountInfo.account.identifier)
 
@@ -413,7 +413,7 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
           ) / "addresses" / "fresh" :? OptionalChangeTypeParamMatcher(change) =>
         for {
           accountInfo <- accountManagerClient.getAccountInfo(accountId)
-          _           <- log.info("Get Fresh Addresses")(BtcLogContext().withAccount(accountInfo.account))
+          _           <- log.info("Get Fresh Addresses")(LamaLogContext().withAccount(accountInfo.account))
 
           keychainId   <- UuidUtils.stringToUuidIO(accountInfo.account.identifier)
           keychainInfo <- keychainClient.getKeychainInfo(keychainId)
@@ -431,9 +431,10 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
       // Resync account
       case GET -> Root / UUIDVar(accountId) / "resync"
           :? OptionalWipeQueryParamMatcher(wipe) =>
+        val followUpId = UUID.randomUUID()
         for {
           accountInfo <- accountManagerClient.getAccountInfo(accountId)
-          context = BtcLogContext().withAccount(accountInfo.account)
+          context = LamaLogContext().withAccount(accountInfo.account).withFollowUpId(followUpId)
           _ <- log.info(s"Fetching account informations for id: $accountId")(context)
 
           isWipe = wipe.getOrElse(false)
@@ -447,7 +448,11 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
                 keychainId <- UuidUtils.stringToUuidIO(accountInfo.account.identifier)
                 res        <- keychainClient.resetKeychain(keychainId)
                 _          <- log.info("Removing interpreter data")(context)
-                _          <- interpreterClient.removeDataFromCursor(accountInfo.account.id, None)
+                _ <- interpreterClient.removeDataFromCursor(
+                  accountInfo.account.id,
+                  None,
+                  followUpId
+                )
               } yield res
             } else IO.unit
 
@@ -458,7 +463,7 @@ object AccountController extends Http4sDsl[IO] with ContextLogging {
       case DELETE -> Root / UUIDVar(accountId) =>
         for {
           accountInfo <- accountManagerClient.getAccountInfo(accountId)
-          context = BtcLogContext().withAccount(accountInfo.account)
+          context = LamaLogContext().withAccount(accountInfo.account)
           _ <- log.info(s"Fetching account informations for id: $accountId")(context)
 
           _          <- log.info("Deleting keychain")(context)

@@ -7,11 +7,10 @@ import co.ledger.lama.bitcoin.common.models.interpreter.{AccountAddress, ChangeT
 import co.ledger.lama.bitcoin.common.models.keychain.{AccountKey, KeychainInfo}
 import co.ledger.lama.bitcoin.common.models.{BitcoinLikeNetwork, BitcoinNetwork, Scheme}
 import co.ledger.lama.bitcoin.common.clients.grpc.KeychainClient
-import co.ledger.lama.common.logging.DefaultContextLogging
 
 import scala.collection.mutable
 
-class KeychainClientMock extends KeychainClient with DefaultContextLogging {
+class KeychainClientMock extends KeychainClient {
 
   var usedAddresses: mutable.Seq[String] = mutable.Seq.empty
 

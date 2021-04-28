@@ -3,11 +3,10 @@ package co.ledger.lama.bitcoin.interpreter.models
 import cats.effect.IO
 import co.ledger.lama.common.models.implicits._
 import co.ledger.lama.bitcoin.common.models.interpreter.{Operation, OperationType}
-import co.ledger.lama.common.logging.DefaultContextLogging
+import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import io.circe.generic.extras.semiauto._
 import io.circe.{Decoder, Encoder}
 import fs2.Stream
-
 import java.time.Instant
 import java.util.UUID
 
@@ -40,9 +39,9 @@ case class TransactionAmounts(
     inputAmount: BigInt,
     outputAmount: BigInt,
     changeAmount: BigInt
-) extends DefaultContextLogging {
+) extends ContextLogging {
 
-  def computeOperations: fs2.Stream[IO, OperationToSave] = {
+  def computeOperations(implicit lc: LamaLogContext): fs2.Stream[IO, OperationToSave] = {
     TransactionType.fromAmounts(inputAmount, outputAmount, changeAmount) match {
       case SendType =>
         Stream.emit(makeOperationToSave(inputAmount - changeAmount, OperationType.Send))

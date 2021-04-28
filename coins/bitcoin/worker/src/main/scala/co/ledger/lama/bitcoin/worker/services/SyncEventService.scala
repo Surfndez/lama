@@ -2,7 +2,7 @@ package co.ledger.lama.bitcoin.worker.services
 
 import cats.effect.IO
 import co.ledger.lama.bitcoin.common.models.explorer.Block
-import co.ledger.lama.common.logging.DefaultContextLogging
+import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import co.ledger.lama.common.utils.rabbitmq.{AutoAckMessage, RabbitUtils}
 import co.ledger.lama.common.models.{ReportableEvent, WorkableEvent}
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
@@ -21,7 +21,7 @@ class RabbitSyncEventService(
     lamaExchangeName: ExchangeName,
     lamaRoutingKey: RoutingKey
 ) extends SyncEventService
-    with DefaultContextLogging {
+    with ContextLogging {
 
   def consumeWorkerEvents: Stream[IO, AutoAckMessage[WorkableEvent[Block]]] =
     RabbitUtils.createConsumer[WorkableEvent[Block]](rabbitClient, workerQueueName)
@@ -32,7 +32,11 @@ class RabbitSyncEventService(
 
   def reportEvent(message: ReportableEvent[Block]): IO[Unit] =
     publisher
-      .evalMap(p => p(message) *> log.info(s"Published message: ${message.asJson.toString}"))
+      .evalMap(p =>
+        p(message) *> log.info(s"Published message: ${message.asJson.toString}")(
+          LamaLogContext().withAccount(message.account).withFollowUpId(message.syncId)
+        )
+      )
       .compile
       .drain
 

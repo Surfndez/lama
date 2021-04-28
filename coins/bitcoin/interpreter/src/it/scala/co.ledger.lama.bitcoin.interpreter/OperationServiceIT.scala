@@ -2,7 +2,9 @@ package co.ledger.lama.bitcoin.interpreter
 
 import java.time.Instant
 import java.util.UUID
+
 import cats.data.NonEmptyList
+import co.ledger.lama.common.logging.LamaLogContext
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.interpreter.services.{FlaggingService, OperationService}
 import co.ledger.lama.common.models.{PaginationToken, Sort}
@@ -13,6 +15,8 @@ import org.scalatest.matchers.should.Matchers
 class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResources {
 
   val accountId: UUID = UUID.fromString("b723c553-3a9a-4130-8883-ee2f6c2f9202")
+
+  implicit val lc: LamaLogContext = LamaLogContext().withAccountId(accountId)
 
   private val outputAddress1 =
     AccountAddress("1DtwACvd338XtHBFYJRVKRLxviD7YtYADa", ChangeType.External, NonEmptyList.of(1, 0))

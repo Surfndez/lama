@@ -109,6 +109,7 @@ class TransactorIT extends AnyFlatSpecLike with Matchers {
       // compute to flag utxos as belonging
       _ <- interpreterService.compute(
         account,
+        UUID.randomUUID(),
         List(outputAddress1, outputAddress2, outputAddress3)
       )
 
