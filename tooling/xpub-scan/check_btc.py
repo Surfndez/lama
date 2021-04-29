@@ -59,6 +59,10 @@ def get_operations(limit = 100, next_cursor = None, operations = None):
     r = requests.get(url)
 
     ops = json.loads(r.text)
+
+    if ops['cursor'] is None:
+        return ops
+
     next_cursor = ops['cursor']['next']
 
     if operations is None:
@@ -92,16 +96,26 @@ print(f"Account id: {account_id}")
 
 # polling
 print('Waiting for LaMa to synchronize the operations...')
+expected_statuses = ['registered', 'published', 'synchronized']
+past_statuses = set()
 
 while True:
     r = requests.get(f"{base_url}{account_endpoint}/{account_id}")
 
     status = json.loads(r.text)['last_sync_event']['status']
 
-    if status not in ['registered', 'published', 'synchronized']:
+    # ensure that the status is an expected one
+    if status not in expected_statuses:
         print(f"Synchronization error: {status}")
         exit(1)
 
+    # display new statuses only once
+    for expected in expected_statuses:
+        if status == expected and status not in past_statuses:
+            print(f"\t→ {status}")
+            past_statuses.add(status)
+
+    # synchronized? done
     if status == 'synchronized':
         break
 
@@ -121,12 +135,12 @@ operations_history = get_operations(limit = 20)
 with open(f"{xpub}.json", 'w', encoding='utf-8') as f:
     json.dump(operations_history, f, ensure_ascii=False, indent=4)
 
-os.system(f"cat {xpub}.json")
+# os.system(f"cat {xpub}.json")
 
 # Xpub Scan Analysis
 print('\nRunning Xpub Scan analysis')
 
-cmd = f"node build/scan.js {xpub} --import {xpub}.json --save report --balance {balance} --diff"
+cmd = f"node build/scan.js {xpub} --quiet --import {xpub}.json --save report --balance {balance} --diff"
 
 exit_code = subprocess.call(cmd.split())
 

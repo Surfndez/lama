@@ -154,7 +154,25 @@ jobs:
           && sudo tar -C /usr/local/bin -xzvf dockerize-linux-amd64-v0.6.1.tar.gz \
           && rm dockerize-linux-amd64-v0.6.1.tar.gz
           dockerize -wait http://localhost:8080/_health -timeout 120s
+      - name: Sync Test — Xpub Scan Analysis (prototype)
+        continue-on-error: true
+        run: |
+          mkdir -p ${{ github.workspace }}/xpub_scan_report
+          cd ./tooling/xpub-scan
+          echo "API_URL=https://api.cryptoapis.io/v1/bc/{coin}/mainnet/address/{address}" > .env
+          echo "API_KEY=${{ secrets.XPUB_SCAN_API_KEY }}" >> .env
+          docker login
+          docker build -t xpub-scan .
+          docker run --network=host -v ${{ github.workspace }}/xpub_scan_report:/xpub-scan/report xpub-scan --xpub ${{ secrets.XPUB_TEST_BIP44 }} --scheme BIP44 --base-url http://localhost:8080
+      - name: Sync Test — Xpub Scan Report (artifact)
+        continue-on-error: true
+        uses: actions/upload-artifact@v2
+        with:
+          name: xpub_scan_report
+          path: |
+            ${{ github.workspace }}/xpub_scan_report/**.*
       - name: Run e2e tests
         run: SBT_OPTS="-Xss512m" sbt -Dsbt.ivy.home=.ivy2 -sbt-dir .sbt bitcoinApi/it:test
     env:
       LOG_APPENDER: STDOUT
+

@@ -2,7 +2,7 @@ FROM node:14-alpine
 
 ENV PYTHONUNBUFFERED=1
 
-RUN apk add --no-cache --virtual .persistent-deps \
+RUN apk add --quiet --no-cache --virtual .persistent-deps \
         curl \
         openssl \
         make \
@@ -15,21 +15,16 @@ RUN apk add --no-cache --virtual .persistent-deps \
         typescript
 
 RUN python3 -m ensurepip \
-    && pip3 install --no-cache --upgrade pip setuptools \
-    && pip3 install requests argparse
+    && pip3 -q install --no-cache --upgrade pip setuptools \
+    && pip3 -q install requests argparse
 
-# install xpub-scan (PR)
-# TODO: replace with main branch once this PR is merged
-RUN cd / \
-    && git clone https://github.com/LedgerHQ/xpub-scan.git \
-    && cd xpub-scan \
-    && git pull origin pull/29/head
+RUN cd / && git clone --quiet https://github.com/LedgerHQ/xpub-scan.git
 
 WORKDIR /xpub-scan
 
 RUN mkdir -p /xpub-scan/report
 
-RUN npm install && tsc -p .
+RUN ( npm install &> /dev/null ) && tsc -p .
 
 COPY . .
 
