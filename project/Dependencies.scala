@@ -11,7 +11,7 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
     "org.http4s" %% "http4s-prometheus-metrics" % http4sVersion
   )
 
-  val circeVersion = "0.13.0"
+  val circeVersion = "0.14.1"
   val circe: Seq[ModuleID] = Seq(
     "io.circe" %% "circe-core"           % circeVersion,
     "io.circe" %% "circe-parser"         % circeVersion,
