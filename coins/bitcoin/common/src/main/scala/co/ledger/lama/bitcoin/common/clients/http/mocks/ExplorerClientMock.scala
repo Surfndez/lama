@@ -8,6 +8,8 @@ import co.ledger.lama.bitcoin.common.models.transactor.FeeInfo
 import co.ledger.lama.common.logging.LamaLogContext
 import fs2.Stream
 
+import scala.collection.mutable
+
 class ExplorerClientMock(
     blockchain: Map[Address, List[ConfirmedTransaction]] = Map.empty,
     mempool: Map[Address, List[UnconfirmedTransaction]] = Map.empty
@@ -57,4 +59,14 @@ class ExplorerClientMock(
       lc: LamaLogContext
   ): IO[String] =
     IO.pure("raw hex for " ++ transactionHash)
+
+  val txs: mutable.Map[String, Transaction] = mutable.Map()
+  def addToBC(tx: Transaction): Unit        = txs.update(tx.hash, tx)
+  def removeFromBC(hash: String): Unit      = txs.remove(hash)
+
+  def getTransaction(
+      transactionHash: String
+  )(implicit lc: LamaLogContext): IO[Option[Transaction]] = {
+    IO.pure(txs.get(transactionHash))
+  }
 }

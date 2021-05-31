@@ -54,6 +54,15 @@ object TransactionQueries extends DoobieLogHandler {
        """.update.run
   }
 
+  def deleteUnconfirmedTransaction(accountId: UUID, hash: String): doobie.ConnectionIO[String] = {
+    sql"""DELETE FROM transaction
+         WHERE account_id = $accountId
+         AND block_hash IS NULL
+         AND hash = $hash
+         RETURNING hash
+       """.query[String].unique
+  }
+
   private def insertTx(
       accountId: UUID,
       tx: TransactionView

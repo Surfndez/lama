@@ -59,6 +59,8 @@ trait ExplorerClient {
   def broadcastTransaction(tx: String)(implicit lc: LamaLogContext): IO[String]
 
   def getRawTransactionHex(transactionHash: String)(implicit lc: LamaLogContext): IO[String]
+
+  def getTransaction(transactionHash: String)(implicit lc: LamaLogContext): IO[Option[Transaction]]
 }
 
 object ExplorerClient {
@@ -182,6 +184,15 @@ class ExplorerHttpClient(httpClient: Client[IO], conf: ExplorerConfig, coin: Coi
       )
       hex <- IO.fromOption(rawResponse.headOption.map(_.hex))(new Exception(""))
     } yield hex
+
+  def getTransaction(
+      transactionHash: String
+  )(implicit lc: LamaLogContext): IO[Option[Transaction]] =
+    for {
+      rawResponse <- callExpect[Option[Transaction]](
+        conf.uri.withPath(s"$coinBasePath/transactions/$transactionHash")
+      )
+    } yield rawResponse
 
   def getSmartFees(implicit lc: LamaLogContext): IO[FeeInfo] = {
     val feeUri = conf.uri.withPath(s"$coinBasePath/fees")

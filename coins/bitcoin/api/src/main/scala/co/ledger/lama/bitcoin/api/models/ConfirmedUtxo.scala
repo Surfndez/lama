@@ -37,7 +37,7 @@ object ConfirmedUtxo {
   implicit val encoder: Encoder[ConfirmedUtxo] = deriveConfiguredEncoder[ConfirmedUtxo]
   implicit val decoder: Decoder[ConfirmedUtxo] = deriveConfiguredDecoder[ConfirmedUtxo]
 
-  def fromCommon(utxo: interpreter.ConfirmedUtxo): ConfirmedUtxo =  {
+  def fromCommon(utxo: interpreter.ConfirmedUtxo): ConfirmedUtxo = {
     ConfirmedUtxo(
       utxo.height,
       utxo.confirmations,

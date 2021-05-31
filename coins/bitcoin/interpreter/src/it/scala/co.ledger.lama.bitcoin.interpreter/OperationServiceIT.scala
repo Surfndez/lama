@@ -85,16 +85,13 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
   "operation saved in db" should "be fetched" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.db.batchConcurrency)
+        val operationService = new OperationService(db)
         val flaggingService  = new FlaggingService(db)
 
         for {
-          _ <- QueryUtils.saveTx(db, insertTx1, accountId)
+          _ <- ITUtils.saveTx(db, insertTx1, accountId)
           _ <- flaggingService.flagInputsAndOutputs(accountId, List(inputAddress, outputAddress2))
-          _ <- operationService
-            .compute(accountId)
-            .compile
-            .toList
+          _ <- ITUtils.compute(operationService, accountId)
 
           res <- operationService.getOperations(
             accountId,
@@ -128,17 +125,13 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
 
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.db.batchConcurrency)
+        val operationService = new OperationService(db)
         val flaggingService  = new FlaggingService(db)
 
         for {
-          _ <- QueryUtils.saveTx(db, insertTx1, accountId)
+          _ <- ITUtils.saveTx(db, insertTx1, accountId)
           _ <- flaggingService.flagInputsAndOutputs(accountId, List(inputAddress, outputAddress2))
-          _ <- operationService
-            .compute(accountId)
-            .compile
-            .toList
-
+          _ <- ITUtils.compute(operationService, accountId)
           foundOperation <- operationService.getOperation(
             Operation.AccountId(accountId),
             Operation.uid(
@@ -175,17 +168,14 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
   it should "fetched only ops from a cursor" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.db.batchConcurrency)
+        val operationService = new OperationService(db)
         val flaggingService  = new FlaggingService(db)
 
         for {
-          _ <- QueryUtils.saveTx(db, insertTx1, accountId)
-          _ <- QueryUtils.saveTx(db, insertTx2, accountId)
+          _ <- ITUtils.saveTx(db, insertTx1, accountId)
+          _ <- ITUtils.saveTx(db, insertTx2, accountId)
           _ <- flaggingService.flagInputsAndOutputs(accountId, List(inputAddress, outputAddress2))
-          _ <- operationService
-            .compute(accountId)
-            .compile
-            .toList
+          _ <- ITUtils.compute(operationService, accountId)
 
           resFirstPage <- operationService.getOperations(
             accountId,
@@ -241,16 +231,13 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
   it should "have made utxos" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.db.batchConcurrency)
+        val operationService = new OperationService(db)
         val flaggingService  = new FlaggingService(db)
 
         for {
-          _ <- QueryUtils.saveTx(db, insertTx1, accountId)
-          _ <- flaggingService.flagInputsAndOutputs(accountId, List(inputAddress, outputAddress1))
-          _ <- operationService
-            .compute(accountId)
-            .compile
-            .toList
+          _   <- ITUtils.saveTx(db, insertTx1, accountId)
+          _   <- flaggingService.flagInputsAndOutputs(accountId, List(inputAddress, outputAddress1))
+          _   <- ITUtils.compute(operationService, accountId)
           res <- operationService.getUtxos(accountId, Sort.Ascending, 20, 0)
           GetUtxosResult(utxos, total, trunc) = res
         } yield {
@@ -269,7 +256,7 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
   "unconfirmed Transactions" should "have made utxos" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.db.batchConcurrency)
+        val operationService = new OperationService(db)
 
         val unconfirmedTransaction1 = TransactionView(
           "txId1",
@@ -354,8 +341,8 @@ class OperationServiceIT extends AnyFlatSpecLike with Matchers with TestResource
         )
 
         for {
-          _     <- QueryUtils.saveTx(db, unconfirmedTransaction1, accountId)
-          _     <- QueryUtils.saveTx(db, unconfirmedTransaction2, accountId)
+          _     <- ITUtils.saveTx(db, unconfirmedTransaction1, accountId)
+          _     <- ITUtils.saveTx(db, unconfirmedTransaction2, accountId)
           utxos <- operationService.getUnconfirmedUtxos(accountId)
         } yield {
           utxos should have size 2

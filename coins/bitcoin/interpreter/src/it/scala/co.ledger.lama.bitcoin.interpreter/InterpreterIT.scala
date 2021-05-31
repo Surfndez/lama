@@ -7,6 +7,8 @@ import java.util.UUID
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.implicits._
+import co.ledger.lama.bitcoin.common.clients.http.mocks.ExplorerClientMock
+import co.ledger.lama.bitcoin.common.models.explorer.UnconfirmedTransaction
 import co.ledger.lama.bitcoin.common.models.interpreter._
 import co.ledger.lama.bitcoin.interpreter.Config.Db
 import co.ledger.lama.bitcoin.interpreter.models.AccountTxView
@@ -17,6 +19,8 @@ import org.scalatest.matchers.should.Matchers
 import fs2.Stream
 
 class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
+
+  val explorer = new ExplorerClientMock()
 
   val account: Account =
     Account(
@@ -83,7 +87,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
   "a transaction" should "have a full lifecycle" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val interpreter = new Interpreter(_ => IO.unit, db, 1, Db.BatchConcurrency(1))
+        val interpreter =
+          new Interpreter(_ => IO.unit, _ => explorer, db, 1, Db.BatchConcurrency(1))
 
         val block2 = BlockView(
           "0000000000000000000cc9cc204cf3b314d106e69afbea68f2ae7f9e5047ba74",
@@ -98,6 +103,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
 
         // intentionally disordered
         val blocksToSave = List(block2, block, block3)
+
+        addToExplorer(insertTx)
 
         for {
           _ <- saveTxs(
@@ -197,7 +204,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
   "an unconfirmed transaction" should "have a full lifecycle" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val interpreter = new Interpreter(_ => IO.unit, db, 1, Db.BatchConcurrency(1))
+        val interpreter =
+          new Interpreter(_ => IO.unit, _ => explorer, db, 1, Db.BatchConcurrency(1))
 
         val uTx = TransactionView(
           "txId",
@@ -214,6 +222,9 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
           id = "txId2",
           hash = "a8a935c6bc2bd8b3a7c20f107a9eb5f10a315ce27de9d72f3f4e27ac9ec1eb1e"
         )
+
+        addToExplorer(uTx)
+        addToExplorer(uTx2)
 
         for {
           _ <- saveTxs(interpreter, List(uTx, uTx2))
@@ -243,7 +254,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
   "an unconfirmed transaction" should "be updated if it's been mined" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val interpreter = new Interpreter(_ => IO.unit, db, 1, Db.BatchConcurrency(1))
+        val interpreter =
+          new Interpreter(_ => IO.unit, _ => explorer, db, 1, Db.BatchConcurrency(1))
 
         val uTx = TransactionView(
           "txId",
@@ -256,6 +268,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
           None,
           1
         )
+        addToExplorer(uTx)
 
         val tx = TransactionView(
           "txId",
@@ -289,7 +302,8 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
   "an account" should "go through multiple cycles" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val interpreter = new Interpreter(_ => IO.unit, db, 1, Db.BatchConcurrency(1))
+        val interpreter =
+          new Interpreter(_ => IO.unit, _ => explorer, db, 1, Db.BatchConcurrency(1))
 
         val uTx1 = TransactionView(
           "tx1",
@@ -306,6 +320,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
           None,
           1
         )
+        addToExplorer(uTx1)
 
         val uTx2 = uTx1.copy(
           id = "tx2",
@@ -314,6 +329,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
             OutputView(0, 5000, outputAddress2.accountAddress, "script", None, None)
           ) // receive
         )
+        addToExplorer(uTx2)
 
         val uTx3 = uTx1.copy(
           id = "tx3",
@@ -333,6 +349,7 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
           ),
           outputs = List(OutputView(0, 99000, inputAddress.accountAddress, "script", None, None))
         )
+        addToExplorer(uTx3)
 
         for {
           _             <- saveTxs(interpreter, List(uTx1))
@@ -411,5 +428,69 @@ class InterpreterIT extends AnyFlatSpecLike with Matchers with TestResources {
         }
       }
 
+  }
+
+  "A transaction rejected by the network" should "not stay in db" in IOAssertion {
+    setup() *>
+      appResources.use { db =>
+        val interpreter =
+          new Interpreter(_ => IO.unit, _ => explorer, db, 1, Db.BatchConcurrency(1))
+
+        val uTx1 = AccountTxView(
+          accountId,
+          TransactionView(
+            "utx1",
+            "utx1",
+            time,
+            0,
+            1000,
+            List(
+              InputView(".", 0, 0, 101000, inputAddress.accountAddress, "script", List(), 0L, None)
+            ),
+            List(
+              OutputView(0, 100000, outputAddress1.accountAddress, "script", None, None)
+            ),
+            None,
+            1
+          )
+        )
+
+        // We add the transaction to the explorer
+        addToExplorer(uTx1.tx)
+
+        for {
+          _      <- Stream.emit(uTx1).through(interpreter.saveTransactions).compile.drain
+          _      <- interpreter.compute(account, UUID.randomUUID(), List(outputAddress1))
+          first  <- interpreter.getOperations(accountId, 10, Sort.Ascending, None)
+          _      <- Stream.emit(uTx1).through(interpreter.saveTransactions).compile.drain
+          _      <- interpreter.compute(account, UUID.randomUUID(), List(outputAddress1))
+          second <- interpreter.getOperations(accountId, 10, Sort.Ascending, None)
+          // The third time the transaction is not saved again, meaning that it disapeared from the network without being mined.
+          // We now remove the transaction from the explorer
+          _ = explorer.removeFromBC(uTx1.tx.hash)
+          _     <- interpreter.compute(account, UUID.randomUUID(), List(outputAddress1))
+          third <- interpreter.getOperations(accountId, 10, Sort.Ascending, None)
+        } yield {
+          first.total shouldBe 1
+          second.total shouldBe 1
+          third.total shouldBe 0
+        }
+
+      }
+  }
+
+  private def addToExplorer(tx: TransactionView) = {
+    explorer.addToBC(
+      UnconfirmedTransaction(
+        tx.hash,
+        tx.hash,
+        tx.receivedAt,
+        tx.lockTime,
+        tx.fees,
+        Seq(),
+        Seq(),
+        tx.confirmations
+      )
+    )
   }
 }

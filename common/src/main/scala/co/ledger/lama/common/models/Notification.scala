@@ -62,6 +62,22 @@ object BalanceUpdatedNotification {
     deriveConfiguredDecoder[BalanceUpdatedNotification]
 }
 
+case class TransactionDeleted(
+    account: Account,
+    syncId: UUID,
+    hash: String
+) extends Notification {
+  val status: Notification.Status = Notification.TransactionDeleted
+  val payload: Json               = Json.obj("transaction_hash" -> Json.fromString(hash))
+}
+
+object TransactionDeleted {
+  implicit val encoder: Encoder[TransactionDeleted] =
+    deriveConfiguredEncoder[TransactionDeleted]
+  implicit val decoder: Decoder[TransactionDeleted] =
+    deriveConfiguredDecoder[TransactionDeleted]
+}
+
 object Notification {
   implicit val encoder: Encoder[Notification] = Encoder.instance {
     case x: OperationsComputedNotification => x.asJson
@@ -79,6 +95,7 @@ object Notification {
   // OperationsComputed event sent when account operations are computed
   // The payload should be the count of operations computed
   case object OperationsComputed extends Status(name = "operations_computed")
+  case object TransactionDeleted extends Status(name = "transaction_deleted")
   case object BalanceUpdated     extends Status(name = "balance_updated")
   case object Operation          extends Status(name = "operation")
 
@@ -86,6 +103,7 @@ object Notification {
     val all: Map[String, Status] =
       Map(
         OperationsComputed.name -> OperationsComputed,
+        TransactionDeleted.name -> TransactionDeleted,
         BalanceUpdated.name     -> BalanceUpdated,
         Operation.name          -> Operation
       )

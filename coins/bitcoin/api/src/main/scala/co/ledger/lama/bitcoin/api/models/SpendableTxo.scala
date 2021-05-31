@@ -37,7 +37,7 @@ object SpendableTxo {
   implicit val encoder: Encoder[SpendableTxo] = deriveConfiguredEncoder[SpendableTxo]
   implicit val decoder: Decoder[SpendableTxo] = deriveConfiguredDecoder[SpendableTxo]
 
-  def fromCommon(utxo: interpreter.SpendableTxo, pubKey: String): SpendableTxo =  {
+  def fromCommon(utxo: interpreter.SpendableTxo, pubKey: String): SpendableTxo = {
     SpendableTxo(
       utxo.transactionHash,
       utxo.transactionRawHex,

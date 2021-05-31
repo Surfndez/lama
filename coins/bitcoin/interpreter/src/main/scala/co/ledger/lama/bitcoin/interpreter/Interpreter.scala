@@ -14,10 +14,18 @@ import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-import co.ledger.lama.bitcoin.interpreter.models.AccountTxView
+import co.ledger.lama.bitcoin.common.clients.http.ExplorerClient
+import co.ledger.lama.bitcoin.interpreter.models.{
+  AccountTxView,
+  Action,
+  Delete,
+  Save,
+  TransactionAmounts
+}
 
 class Interpreter(
     publish: Notification => IO[Unit],
+    explorer: Coin => ExplorerClient,
     db: Transactor[IO],
     maxConcurrent: Int,
     batchConcurrency: Db.BatchConcurrency
@@ -25,7 +33,7 @@ class Interpreter(
     extends ContextLogging {
 
   val transactionService = new TransactionService(db, maxConcurrent)
-  val operationService   = new OperationService(db, batchConcurrency)
+  val operationService   = new OperationService(db)
   val flaggingService    = new FlaggingService(db)
   val balanceService     = new BalanceService(db, batchConcurrency)
 
@@ -122,38 +130,24 @@ class Interpreter(
 
     for {
       balanceHistoryCount <- balanceService.getBalanceHistoryCount(account.id)
-      start               <- clock.monotonic(TimeUnit.MILLISECONDS)
       _                   <- log.info(s"Flagging inputs and outputs belong")
       _                   <- flaggingService.flagInputsAndOutputs(account.id, addresses)
-      flaggingEnd         <- clock.monotonic(TimeUnit.MILLISECONDS)
       _                   <- operationService.deleteUnconfirmedOperations(account.id)
-      cleanUnconfirmedEnd <- clock.monotonic(TimeUnit.MILLISECONDS)
 
       _ <- log.info(s"Computing operations")
       nbSavedOps <- operationService
-        .compute(account.id)
-        .through(
-          notify(
-            account,
-            syncId,
-            balanceHistoryCount > 0
-          )
+        .getUncomputedOperations(account.id)
+        .evalMap(tx => getAppropriateAction(account, tx))
+        .broadcastThrough(
+          newOperationPipe(account, syncId, balanceHistoryCount > 0),
+          rejectedTransactionPipe(account, syncId)
         )
         .compile
         .foldMonoid
+      _ <- log.info(s"$nbSavedOps operations saved")
 
-      computeOperationEnd <- clock.monotonic(TimeUnit.MILLISECONDS)
-
-      _ <- log.info(s"Computing balance history")
-      _ <- balanceService.computeNewBalanceHistory(account.id)
-
-      end <- clock.monotonic(TimeUnit.MILLISECONDS)
-
-      _ <- log.info(s"$nbSavedOps operations saved in ${end - start}ms ")
-      _ <- log.info(
-        s"flagging: ${flaggingEnd - start}ms, cleaning: ${cleanUnconfirmedEnd - flaggingEnd}ms, compute operations: ${computeOperationEnd - cleanUnconfirmedEnd}ms"
-      )
-
+      _              <- log.info(s"Computing balance history")
+      _              <- balanceService.computeNewBalanceHistory(account.id)
       currentBalance <- balanceService.getCurrentBalance(account.id)
 
       _ <- log.info(s"Notifying computation end with balance $currentBalance")
@@ -168,7 +162,65 @@ class Interpreter(
     } yield nbSavedOps
   }
 
-  private def notify(
+  private def getAppropriateAction(
+      account: Account,
+      tx: TransactionAmounts
+  )(implicit lc: LamaLogContext): IO[Action] =
+    tx.blockHeight match {
+      case Some(_) => IO.pure(Save(tx))
+      case None =>
+        explorer(account.coin).getTransaction(tx.hash).map {
+          case Some(_) => Save(tx)
+          case None    => Delete(tx)
+        }
+    }
+
+  private def newOperationPipe(
+      account: Account,
+      syncId: UUID,
+      shouldNotify: Boolean
+  )(implicit
+      cs: ContextShift[IO],
+      clock: Clock[IO],
+      lc: LamaLogContext
+  ): Pipe[IO, Action, Int] = {
+    _.through(saveOperationPipe)
+      .through(
+        notifyNewOperation(
+          account,
+          syncId,
+          shouldNotify
+        )
+      )
+  }
+
+  private def saveOperationPipe(implicit
+      cs: ContextShift[IO],
+      clock: Clock[IO],
+      lc: LamaLogContext
+  ): Pipe[IO, Action, Operation.UID] = {
+
+    val batchSize = Math.max(1000 / batchConcurrency.value, 100)
+
+    in =>
+      in.collect { case Save(tx) => tx }
+        .flatMap(_.computeOperations)
+        .chunkN(batchSize)
+        .parEvalMap(batchConcurrency.value) { operations =>
+          for {
+            start    <- clock.monotonic(TimeUnit.MILLISECONDS)
+            savedOps <- operationService.saveOperations(operations.toList)
+            end      <- clock.monotonic(TimeUnit.MILLISECONDS)
+            _ <- log.debug(
+              s"${operations.head.map(_.uid)}: $savedOps operations saved in ${end - start} ms"
+            )
+          } yield operations.map(_.uid)
+
+        }
+        .flatMap(Stream.chunk)
+  }
+
+  private def notifyNewOperation(
       account: Account,
       syncId: UUID,
       shouldNotify: Boolean
@@ -187,6 +239,37 @@ class Interpreter(
             )
           )
         } *> IO.pure(1)
+    }
+  }
+
+  private def rejectedTransactionPipe(
+      account: Account,
+      syncId: UUID
+  ): Pipe[IO, Action, Int] = {
+    _.through(deleteRejectedTransactionPipe)
+      .through(notifyDeleteTransaction(account, syncId))
+  }
+
+  private def deleteRejectedTransactionPipe: Pipe[IO, Action, String] = { stream =>
+    stream
+      .collect { case Delete(tx) => tx }
+      .evalMap { tx =>
+        transactionService.deleteUnconfirmedTransaction(tx.accountId, tx.hash)
+      }
+  }
+
+  private def notifyDeleteTransaction(
+      account: Account,
+      syncId: UUID
+  ): Pipe[IO, String, Int] = {
+    _.parEvalMap(maxConcurrent) { hash =>
+      publish(
+        TransactionDeleted(
+          account = account,
+          syncId = syncId,
+          hash = hash
+        )
+      ) *> IO.pure(1)
     }
   }
 
@@ -219,7 +302,7 @@ class Interpreter(
         "Invalid parameters : 'start' should not be after 'end' and 'interval' should be positive"
       )
       log.error(
-        s"""GetBalanceHistory error with parameters : 
+        s"""GetBalanceHistory error with parameters :
            start    : $startO
            end      : $endO
            interval : $interval""",

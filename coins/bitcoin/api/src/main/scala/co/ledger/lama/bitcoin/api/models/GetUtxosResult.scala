@@ -19,7 +19,7 @@ object GetUtxosResult {
 
   def fromCommon(
       getUtxos: interpreter.GetUtxosResult,
-      utxos: List[ConfirmedUtxo],
+      utxos: List[ConfirmedUtxo]
   ): GetUtxosResult =
     GetUtxosResult(
       utxos,

@@ -30,7 +30,7 @@ case class SpendableTxo(
 }
 
 object SpendableTxo {
-  def fromCommon(utxo: interpreter.Utxo, rawHex: String): SpendableTxo =  {
+  def fromCommon(utxo: interpreter.Utxo, rawHex: String): SpendableTxo = {
     SpendableTxo(
       utxo.transactionHash,
       rawHex,

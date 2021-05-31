@@ -9,15 +9,20 @@ import co.ledger.lama.bitcoin.common.models.interpreter.{
   TransactionView
 }
 import co.ledger.lama.bitcoin.interpreter.models.OperationToSave
-import co.ledger.lama.bitcoin.interpreter.services.{OperationQueries, TransactionQueries}
+import co.ledger.lama.bitcoin.interpreter.services.{
+  OperationQueries,
+  OperationService,
+  TransactionQueries
+}
 import co.ledger.lama.common.models.{Sort, TxHash}
 import doobie.implicits._
 import doobie.util.transactor.Transactor
-import fs2.Chunk
-
 import java.util.UUID
 
-object QueryUtils {
+import co.ledger.lama.common.logging.LamaLogContext
+
+object ITUtils {
+
   def fetchInputAndOutputs(
       db: Transactor[IO],
       accountId: UUID,
@@ -53,9 +58,19 @@ object QueryUtils {
 
   def saveOp(db: Transactor[IO], operation: OperationToSave): IO[Unit] = {
     OperationQueries
-      .saveOperations(Chunk(operation))
+      .saveOperations(List(operation))
       .transact(db)
       .void
   }
+
+  def compute(operationService: OperationService, accountId: UUID)(implicit lc: LamaLogContext) =
+    for {
+      ops <- operationService
+        .getUncomputedOperations(accountId)
+        .flatMap(_.computeOperations)
+        .compile
+        .toList
+      saved <- operationService.saveOperations(ops)
+    } yield saved
 
 }

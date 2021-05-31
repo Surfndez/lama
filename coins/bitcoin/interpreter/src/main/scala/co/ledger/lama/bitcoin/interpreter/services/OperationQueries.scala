@@ -77,7 +77,7 @@ object OperationQueries extends DoobieLogHandler {
       }
   }
 
-  def fetchTransactionAmounts(
+  def fetchUncomputedTransactionAmounts(
       accountId: UUID
   ): Stream[ConnectionIO, TransactionAmounts] =
     sql"""SELECT tx.account_id,
@@ -166,7 +166,7 @@ object OperationQueries extends DoobieLogHandler {
               AND i.address IS NULL
          """.query[Utxo].stream
 
-  def saveOperations(operation: Chunk[OperationToSave]): ConnectionIO[Int] = {
+  def saveOperations(operation: List[OperationToSave]): ConnectionIO[Int] = {
     val query =
       """INSERT INTO operation (
          uid, account_id, hash, operation_type, amount, fees, time, block_hash, block_height

@@ -71,9 +71,9 @@ class QueriesIT extends AnyFlatSpecLike with Matchers with TestResources {
     setup() *>
       appResources.use { db =>
         for {
-          _ <- QueryUtils.saveTx(db, transactionToInsert, accountId)
-          _ <- QueryUtils.saveTx(db, transactionToInsert, accountId) // check upsert
-          inputsWithOutputs <- QueryUtils.fetchInputAndOutputs(
+          _ <- ITUtils.saveTx(db, transactionToInsert, accountId)
+          _ <- ITUtils.saveTx(db, transactionToInsert, accountId) // check upsert
+          inputsWithOutputs <- ITUtils.fetchInputAndOutputs(
             db,
             accountId,
             TxHash(transactionToInsert.hash)
@@ -81,7 +81,7 @@ class QueriesIT extends AnyFlatSpecLike with Matchers with TestResources {
 
           account = Operation.AccountId(accountId)
 
-          opWithTx <- QueryUtils.fetchOpAndTx(
+          opWithTx <- ITUtils.fetchOpAndTx(
             db,
             account,
             Operation.uid(
@@ -130,9 +130,9 @@ class QueriesIT extends AnyFlatSpecLike with Matchers with TestResources {
     setup() *>
       appResources.use { db =>
         for {
-          _   <- QueryUtils.saveTx(db, transactionToInsert, accountId)
-          _   <- QueryUtils.saveOp(db, opToSave)
-          ops <- QueryUtils.fetchOps(db, accountId)
+          _   <- ITUtils.saveTx(db, transactionToInsert, accountId)
+          _   <- ITUtils.saveOp(db, opToSave)
+          ops <- ITUtils.fetchOps(db, accountId)
         } yield {
           ops.map(_.op) should contain only
             Op(

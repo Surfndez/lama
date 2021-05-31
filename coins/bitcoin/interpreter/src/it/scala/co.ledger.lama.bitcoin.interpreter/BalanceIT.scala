@@ -149,7 +149,7 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
   it should "have the correct balance" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.db.batchConcurrency)
+        val operationService = new OperationService(db)
         val balanceService   = new BalanceService(db, conf.db.batchConcurrency)
         val flaggingService  = new FlaggingService(db)
 
@@ -158,31 +158,25 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
 
         for {
           // save two transaction and compute balance
-          _ <- QueryUtils.saveTx(db, tx1, accountId)
-          _ <- QueryUtils.saveTx(db, tx2, accountId)
+          _ <- ITUtils.saveTx(db, tx1, accountId)
+          _ <- ITUtils.saveTx(db, tx2, accountId)
           _ <- flaggingService.flagInputsAndOutputs(
             accountId,
             List(address2, address3, address1)
           )
-          _ <- operationService
-            .compute(accountId)
-            .compile
-            .toList
+          _ <- ITUtils.compute(operationService, accountId)
           _ <- balanceService.computeNewBalanceHistory(accountId)
 
           current  <- balanceService.getCurrentBalance(accountId)
           balances <- balanceService.getBalanceHistory(accountId, Some(start), Some(end), None)
 
           // save another transaction and compute balance
-          _ <- QueryUtils.saveTx(db, tx3, accountId)
+          _ <- ITUtils.saveTx(db, tx3, accountId)
           _ <- flaggingService.flagInputsAndOutputs(
             accountId,
             List(address2, address3, address1)
           )
-          _ <- operationService
-            .compute(accountId)
-            .compile
-            .toList
+          _ <- ITUtils.compute(operationService, accountId)
           _ <- balanceService.computeNewBalanceHistory(accountId)
 
           newCurrent  <- balanceService.getCurrentBalance(accountId)
@@ -210,7 +204,7 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
   it should "be able to give intervals of balance" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.db.batchConcurrency)
+        val operationService = new OperationService(db)
         val balanceService   = new BalanceService(db, conf.db.batchConcurrency)
         val flaggingService  = new FlaggingService(db)
 
@@ -219,17 +213,14 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
 
         for {
           // save two transaction and compute balance
-          _ <- QueryUtils.saveTx(db, tx1, accountId)
-          _ <- QueryUtils.saveTx(db, tx2, accountId)
-          _ <- QueryUtils.saveTx(db, tx3, accountId)
+          _ <- ITUtils.saveTx(db, tx1, accountId)
+          _ <- ITUtils.saveTx(db, tx2, accountId)
+          _ <- ITUtils.saveTx(db, tx3, accountId)
           _ <- flaggingService.flagInputsAndOutputs(
             accountId,
             List(address2, address3, address1)
           )
-          _ <- operationService
-            .compute(accountId)
-            .compile
-            .toList
+          _ <- ITUtils.compute(operationService, accountId)
           _ <- balanceService.computeNewBalanceHistory(accountId)
 
           current  <- balanceService.getCurrentBalance(accountId)
@@ -246,7 +237,7 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
   it should "give last balance before time range no balance exists in time range" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.db.batchConcurrency)
+        val operationService = new OperationService(db)
         val balanceService   = new BalanceService(db, conf.db.batchConcurrency)
         val flaggingService  = new FlaggingService(db)
 
@@ -255,17 +246,14 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
 
         for {
           // save two transaction and compute balance
-          _ <- QueryUtils.saveTx(db, tx1, accountId)
-          _ <- QueryUtils.saveTx(db, tx2, accountId)
-          _ <- QueryUtils.saveTx(db, tx3, accountId)
+          _ <- ITUtils.saveTx(db, tx1, accountId)
+          _ <- ITUtils.saveTx(db, tx2, accountId)
+          _ <- ITUtils.saveTx(db, tx3, accountId)
           _ <- flaggingService.flagInputsAndOutputs(
             accountId,
             List(address2, address3, address1)
           )
-          _ <- operationService
-            .compute(accountId)
-            .compile
-            .toList
+          _ <- ITUtils.compute(operationService, accountId)
           _ <- balanceService.computeNewBalanceHistory(accountId)
 
           current  <- balanceService.getCurrentBalance(accountId)
@@ -282,24 +270,21 @@ class BalanceIT extends AnyFlatSpecLike with Matchers with TestResources {
   it should "have unconfirmed transactions balance" in IOAssertion {
     setup() *>
       appResources.use { db =>
-        val operationService = new OperationService(db, conf.db.batchConcurrency)
+        val operationService = new OperationService(db)
         val balanceService   = new BalanceService(db, conf.db.batchConcurrency)
         val flaggingService  = new FlaggingService(db)
 
         for {
           // save two transaction and compute balance
-          _ <- QueryUtils.saveTx(db, tx1, accountId)
-          _ <- QueryUtils.saveTx(db, tx2, accountId)
-          _ <- QueryUtils.saveTx(db, tx3, accountId)
-          _ <- QueryUtils.saveTx(db, unconfirmedTx, accountId)
+          _ <- ITUtils.saveTx(db, tx1, accountId)
+          _ <- ITUtils.saveTx(db, tx2, accountId)
+          _ <- ITUtils.saveTx(db, tx3, accountId)
+          _ <- ITUtils.saveTx(db, unconfirmedTx, accountId)
           _ <- flaggingService.flagInputsAndOutputs(
             accountId,
             List(address2, address3, address1)
           )
-          _ <- operationService
-            .compute(accountId)
-            .compile
-            .toList
+          _ <- ITUtils.compute(operationService, accountId)
           _ <- balanceService.computeNewBalanceHistory(accountId)
 
           current  <- balanceService.getCurrentBalance(accountId)

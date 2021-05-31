@@ -40,4 +40,9 @@ class TransactionService(db: Transactor[IO], maxConcurrent: Int) extends Default
       .fetchMostRecentBlocks(accountId)
       .transact(db)
 
+  def deleteUnconfirmedTransaction(accountId: UUID, hash: String): IO[String] =
+    TransactionQueries
+      .deleteUnconfirmedTransaction(accountId, hash)
+      .transact(db)
+
 }

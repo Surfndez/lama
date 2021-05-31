@@ -5,6 +5,7 @@ import dev.profunktor.fs2rabbit.config.{Fs2RabbitConfig, Fs2RabbitNodeConfig}
 import dev.profunktor.fs2rabbit.model.ExchangeName
 import pureconfig.generic.semiauto.deriveReader
 import cats.implicits._
+import co.ledger.lama.bitcoin.common.config.ExplorerConfig
 import co.ledger.lama.bitcoin.interpreter.Config.Db
 import pureconfig.ConfigReader
 import pureconfig.error.CannotConvert
@@ -13,6 +14,7 @@ import pureconfig.module.cats._
 case class Config(
     lamaNotificationsExchangeName: ExchangeName,
     rabbit: Fs2RabbitConfig,
+    explorer: ExplorerConfig,
     grpcServer: GrpcServerConfig,
     maxConcurrent: Int = 50, // TODO : bench [Runtime.getRuntime.availableProcessors() * x]
     db: Db
