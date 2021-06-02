@@ -3,8 +3,14 @@ package co.ledger.lama.bitcoin.api
 import cats.effect.{ExitCode, IO, IOApp}
 import cats.implicits._
 import co.ledger.lama.bitcoin.api.Config.Config
+import co.ledger.lama.bitcoin.api.middlewares.AccountMiddleware
 import co.ledger.lama.bitcoin.api.middlewares.LoggingMiddleware._
-import co.ledger.lama.bitcoin.api.routes.{AccountController, HealthController}
+import co.ledger.lama.bitcoin.api.routes.{
+  AccountController,
+  HealthController,
+  InternalsController,
+  RegistrationController
+}
 import co.ledger.lama.bitcoin.common.clients.grpc.{
   InterpreterGrpcClient,
   KeychainGrpcClient,
@@ -63,19 +69,33 @@ object App extends IOApp {
       val accountManager = new AccountManagerGrpcClient(res.accountManagerGrpcChannel)
       val keychainClient = new KeychainGrpcClient(res.keychainGrpcChannel)
 
+      val interpreterClient = new InterpreterGrpcClient(res.interpreterGrpcChannel)
+
+      val transactorClient = new TransactorGrpcClient(res.transactorGrpcChannel)
       val httpRoutes = Router[IO](
         "accounts" -> CORS(
           loggingMiddleWare(
             AccountController
-              .routes(
+              .accountStatusRoutes(
+                accountManager,
+                interpreterClient
+              ) <+> RegistrationController
+              .registrationRoutes(
                 keychainClient,
                 accountManager,
-                new InterpreterGrpcClient(res.interpreterGrpcChannel)
-              ) <+> AccountController
-              .transactionsRoutes(
-                keychainClient,
-                accountManager,
-                new TransactorGrpcClient(res.transactorGrpcChannel)
+                interpreterClient
+              ) <+> InternalsController
+              .internalRoutes(
+                transactorClient
+              ) <+>
+              AccountMiddleware(accountManager)(
+                AccountController
+                  .accountRoutes(
+                    keychainClient,
+                    accountManager,
+                    interpreterClient,
+                    transactorClient
+                  )
               )
           ),
           methodConfig

@@ -248,6 +248,11 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
               ),
               _.lastSyncEvent.exists(_.status == Deleted)
             )
+
+            requestAfterDeletion <- client.status(
+              validateAddresses(accountRegistered.accountId, invalidAddress :: validAddresses)
+            )
+
           } yield {
             val accountStr =
               s"Account: ${accountInfoAfterRegister.accountId} (${account.registerRequest.scheme})"
@@ -328,6 +333,10 @@ trait AccountControllerIT extends AnyFlatSpecLike with Matchers {
             it should "be unregistered" in {
               accountDeletedStatus.code shouldBe 200
               deletedAccountResult.lastSyncEvent.map(_.status) should contain(Deleted)
+            }
+
+            it should "return 404 on a path using account id" in {
+              requestAfterDeletion.code shouldBe 404
             }
           }
         }

@@ -12,7 +12,7 @@ import co.ledger.lama.bitcoin.common.clients.grpc.TransactorClient.{
   AddressValidation,
   Rejected
 }
-import co.ledger.lama.bitcoin.common.clients.grpc.mocks.KeychainClientMock
+import co.ledger.lama.bitcoin.common.clients.grpc.mocks.{InterpreterClientMock, KeychainClientMock}
 import co.ledger.lama.bitcoin.common.models.interpreter.Utxo
 import co.ledger.lama.bitcoin.common.models.transactor._
 import co.ledger.lama.common.clients.grpc.AccountManagerClient
@@ -26,8 +26,10 @@ import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Method, Request}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
 import java.util.UUID
+
+import co.ledger.lama.bitcoin.api.middlewares.AccountMiddleware
+
 import scala.language.reflectiveCalls
 
 class AccountControllerSpec extends AnyFlatSpec with Matchers {
@@ -65,12 +67,15 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
 
     assert(accountManager.resyncAccountCount == 0)
 
-    val response =
-      AccountController
-        .transactionsRoutes(keychainService, accountManager, transactor)
+    val response = {
+      AccountMiddleware(accountManager)(
+        AccountController
+          .accountRoutes(keychainService, accountManager, new InterpreterClientMock(), transactor)
+      )
         .run(
           broadcastEndpoint.withEntity(broadcastBody)
         )
+    }
 
     response
       .getOrElse(fail("Request was not handled: "))
@@ -100,8 +105,10 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
     assert(accountManager.resyncAccountCount == 0)
 
     val response =
-      AccountController
-        .transactionsRoutes(keychainService, accountManager, transactor)
+      AccountMiddleware(accountManager)(
+        AccountController
+          .accountRoutes(keychainService, accountManager, new InterpreterClientMock, transactor)
+      )
         .run(
           broadcastEndpoint.withEntity(broadcastBody)
         )
@@ -136,16 +143,22 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
         |
         |""".stripMargin)
 
-    val controller = AccountController.transactionsRoutes(
-      keychainClient = new KeychainClientMock,
-      accountManagerClient = accountManagerClient(
-        getAccountInfoResponse = validAccount,
-        resyncAccountResponse = unusedStub
-      ),
-      transactorClient = transactorClient(
-        validateAddressesResponse = allAccepted
-      )
+    val accountManager = accountManagerClient(
+      getAccountInfoResponse = validAccount,
+      resyncAccountResponse = unusedStub
     )
+
+    val controller =
+      AccountMiddleware(accountManager)(
+        AccountController.accountRoutes(
+          keychainClient = new KeychainClientMock,
+          accountManagerClient = accountManager,
+          new InterpreterClientMock,
+          transactorClient = transactorClient(
+            validateAddressesResponse = allAccepted
+          )
+        )
+      )
 
     (
       for {
@@ -169,16 +182,21 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
 
   it should "refuse an empty list" in {
 
-    val controller = AccountController.transactionsRoutes(
-      keychainClient = new KeychainClientMock,
-      accountManagerClient = accountManagerClient(
-        getAccountInfoResponse = validAccount,
-        resyncAccountResponse = unusedStub
-      ),
-      transactorClient = transactorClient(
-        validateAddressesResponse = allAccepted
-      )
+    val accountManager = accountManagerClient(
+      getAccountInfoResponse = validAccount,
+      resyncAccountResponse = unusedStub
     )
+    val controller =
+      AccountMiddleware(accountManager)(
+        AccountController.accountRoutes(
+          keychainClient = new KeychainClientMock,
+          accountManagerClient = accountManager,
+          new InterpreterClientMock,
+          transactorClient = transactorClient(
+            validateAddressesResponse = allAccepted
+          )
+        )
+      )
 
     a[org.http4s.InvalidMessageBodyFailure] should be thrownBy {
       controller
@@ -199,16 +217,21 @@ class AccountControllerSpec extends AnyFlatSpec with Matchers {
          |
          |""".stripMargin)
 
-    val controller = AccountController.transactionsRoutes(
-      keychainClient = new KeychainClientMock,
-      accountManagerClient = accountManagerClient(
-        getAccountInfoResponse = validAccount,
-        resyncAccountResponse = unusedStub
-      ),
-      transactorClient = transactorClient(
-        validateAddressesResponse = firstRejected
-      )
+    val accountManager = accountManagerClient(
+      getAccountInfoResponse = validAccount,
+      resyncAccountResponse = unusedStub
     )
+    val controller =
+      AccountMiddleware(accountManager)(
+        AccountController.accountRoutes(
+          keychainClient = new KeychainClientMock,
+          accountManagerClient = accountManager,
+          new InterpreterClientMock,
+          transactorClient = transactorClient(
+            validateAddressesResponse = firstRejected
+          )
+        )
+      )
 
     (
       for {
