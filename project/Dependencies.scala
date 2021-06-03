@@ -49,7 +49,7 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
     "com.github.pureconfig"      %% "pureconfig-cats"          % pureconfigVersion
   )
 
-  val fs2RabbitVersion = "3.0.1"
+  val fs2RabbitVersion = "4.1.0"
   val rabbit: Seq[ModuleID] = Seq(
     "dev.profunktor" %% "fs2-rabbit" % fs2RabbitVersion
   )
