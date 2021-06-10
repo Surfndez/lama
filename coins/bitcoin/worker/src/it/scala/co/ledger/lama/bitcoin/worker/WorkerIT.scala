@@ -101,19 +101,14 @@ class WorkerIT extends AnyFlatSpecLike with Matchers {
             .last
             .map { reportEvent =>
               it should "have 35 used addresses for the account" in {
-                keychainClient.usedAddresses.size shouldBe 35
+                keychainClient.usedAddresses.size shouldBe 19 + 35
               }
 
               val expectedTxsSize         = 73
               val expectedLastBlockHeight = 644553L
 
               it should s"have synchronized $expectedTxsSize txs with last blockHeight > $expectedLastBlockHeight" in {
-                interpreterClient.savedTransactions
-                  .getOrElse(
-                    account.id,
-                    List.empty
-                  )
-                  .distinctBy(_.hash) should have size expectedTxsSize
+                interpreterClient.getSavedTransaction(account.id) should have size expectedTxsSize
 
                 reportEvent should not be empty
                 reportEvent.get.account shouldBe account

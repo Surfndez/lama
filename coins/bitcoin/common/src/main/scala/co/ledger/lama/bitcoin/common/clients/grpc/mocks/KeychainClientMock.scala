@@ -55,10 +55,11 @@ class KeychainClientMock extends KeychainClient {
     AccountAddress("1Aj3Gi1j5UsvZh4ccjaqdnogPMWy54Z5ii", change, derivations)
   ) ++ (1 to 20).map(i => AccountAddress(s"unused$i", change, derivations))
 
-  private val derivationsInternal: NonEmptyList[Int]   = NonEmptyList(1, List(1))
-  private val changeInternal: ChangeType.Internal.type = ChangeType.Internal
+  private val derivationsInternal: NonEmptyList[Int] = NonEmptyList(1, List(1))
   val derivedAddressesInternal: List[AccountAddress] =
-    (1 to 20).map(i => AccountAddress(s"changeAddr$i", changeInternal, derivationsInternal)).toList
+    (1 to 20)
+      .map(i => AccountAddress(s"changeAddr$i", ChangeType.Internal, derivationsInternal))
+      .toList
 
   def create(
       accountKey: AccountKey,
@@ -109,6 +110,23 @@ class KeychainClientMock extends KeychainClient {
     } else {
       IO.delay(derivedAddressesInternal.slice(fromIndex, toIndex))
     }
+
+  def getKnownAddresses(
+      keychainId: UUID,
+      changeType: Option[ChangeType] = None
+  ): IO[List[AccountAddress]] =
+    for {
+      knownAddresses <- IO(
+        derivedAddresses.filter(a => usedAddresses.contains(a.accountAddress))
+      )
+
+      newAddresses <- getAddresses(
+        keychainId,
+        knownAddresses.size - 1,
+        knownAddresses.size + 20 - 1
+      )
+
+    } yield knownAddresses ++ newAddresses
 
   def getFreshAddresses(
       keychainId: UUID,

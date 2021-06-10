@@ -4,10 +4,11 @@ import cats.Id
 import co.ledger.lama.bitcoin.worker.KeychainFixture
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
 import java.util.UUID
 
-class KeychainTest extends AnyFlatSpec with Matchers {
+import co.ledger.lama.common.logging.DefaultContextLogging
+
+class KeychainTest extends AnyFlatSpec with Matchers with DefaultContextLogging {
 
   "Keychain.addressesRanges" should "give ranges of the matching size" in {
 
@@ -34,7 +35,7 @@ class KeychainTest extends AnyFlatSpec with Matchers {
 
     val firstAddresses =
       keychain
-        .addresses(UUID.randomUUID())
+        .discoverAddresses(UUID.randomUUID())
         .map(_.map(_.accountAddress))
         .take(3)
         .compile

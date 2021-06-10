@@ -101,7 +101,7 @@ class WorkerSpec extends AnyFlatSpec with Matchers {
 
     val interpreter = new InterpreterClientMock
 
-    assert(interpreter.savedTransactions.isEmpty)
+    assert(interpreter.getSavedTransaction(accountIdentifier.id).isEmpty)
 
     for {
       events <- SyncEventServiceFixture.workableEvents
@@ -114,7 +114,7 @@ class WorkerSpec extends AnyFlatSpec with Matchers {
 
     } yield {
 
-      val txs: List[TransactionView] = interpreter.savedTransactions(accountIdentifier.id)
+      val txs: List[TransactionView] = interpreter.getSavedTransaction(accountIdentifier.id)
       txs should have size 4
     }
   }
@@ -126,7 +126,7 @@ class WorkerSpec extends AnyFlatSpec with Matchers {
     val explorer =
       new ExplorerClientMock(blockchain.flatMap(_._2).toMap)
 
-    assert(interpreter.savedTransactions.isEmpty)
+    assert(interpreter.getSavedTransaction(accountIdentifier.id).isEmpty)
 
     for {
       events <- SyncEventServiceFixture.workableEvents
@@ -139,7 +139,7 @@ class WorkerSpec extends AnyFlatSpec with Matchers {
 
     } yield {
 
-      interpreter.savedTransactions.get(accountIdentifier.id) shouldBe empty
+      interpreter.getSavedTransaction(accountIdentifier.id) shouldBe empty
       explorer.getConfirmedTransactionsCount = 0
     }
   }

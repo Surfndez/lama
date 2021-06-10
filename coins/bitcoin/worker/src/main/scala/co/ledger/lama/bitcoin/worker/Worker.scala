@@ -17,6 +17,8 @@ import fs2.Stream
 import io.circe.syntax._
 import java.util.UUID
 
+import co.ledger.lama.bitcoin.common.models.interpreter.ChangeType
+
 import scala.math.Ordering.Implicits._
 import scala.util.Try
 
@@ -62,8 +64,10 @@ class Worker(
       workerEvent: WorkableEvent[Block]
   )(implicit cs: ContextShift[IO], t: Timer[IO], lc: LamaLogContext): IO[ReportableEvent[Block]] = {
 
+    val keychain = new Keychain(keychainClient)
+
     val bookkeeper = Bookkeeper(
-      new Keychain(keychainClient),
+      keychain,
       explorerClient,
       interpreterClient
     )
@@ -76,17 +80,25 @@ class Worker(
 
       keychainId <- IO.fromTry(Try(UUID.fromString(account.identifier)))
 
-      addressesUsedByMempool <- bookkeeper
+      addressesUsedByMempool <- (bookkeeper
         .record[UnconfirmedTransaction](
           account.coin,
           account.id,
           keychainId,
+          ChangeType.Internal,
           None
-        )
+        ) ++ bookkeeper
+        .record[UnconfirmedTransaction](
+          account.coin,
+          account.id,
+          keychainId,
+          ChangeType.External,
+          None
+        )).compile.toList
 
       lastMinedBlock <- lastMinedBlock(account.coin)
 
-      addresses <- Stream
+      addressesUsed <- Stream
         .emit(previousBlockState)
         .filter {
           case Some(previous) => previous < lastMinedBlock.block
@@ -95,13 +107,21 @@ class Worker(
         .evalTap(b => log.info(s"Syncing from cursor state: $b"))
         .evalMap(b => b.map(rewindToLastValidBlock(account, _, workerEvent.syncId)).sequence)
         .evalMap { lastValidBlock =>
-          bookkeeper
+          (bookkeeper
             .record[ConfirmedTransaction](
               account.coin,
               account.id,
               keychainId,
+              ChangeType.Internal,
               lastValidBlock.map(_.hash)
-            )
+            ) ++ bookkeeper
+            .record[ConfirmedTransaction](
+              account.coin,
+              account.id,
+              keychainId,
+              ChangeType.External,
+              lastValidBlock.map(_.hash)
+            )).compile.toList
         }
         .compile
         .toList
@@ -112,7 +132,7 @@ class Worker(
       opsCount <- interpreterClient.compute(
         account,
         workerEvent.syncId,
-        (addresses ++ addressesUsedByMempool).distinct
+        (addressesUsed ++ addressesUsedByMempool).distinct
       )
 
       _ <- log.info(s"$opsCount operations computed")

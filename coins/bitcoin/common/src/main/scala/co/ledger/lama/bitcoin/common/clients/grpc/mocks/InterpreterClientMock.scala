@@ -40,6 +40,13 @@ class InterpreterClientMock extends InterpreterClient {
       IO.unit
     }
 
+  def getSavedTransaction(accountId: UUID): List[TransactionView] = savedTransactions
+    .getOrElse(
+      accountId,
+      List.empty
+    )
+    .distinctBy(_.id)
+
   def removeDataFromCursor(
       accountId: UUID,
       blockHeightCursor: Option[Long],

@@ -14,7 +14,7 @@ import scala.collection.mutable
 object KeychainFixture {
 
   trait UsedAddressesTracker {
-    val newlyMarkedAddresses: mutable.ArrayDeque[Address] = mutable.ArrayDeque.empty
+    val newlyMarkedAddresses: mutable.Map[Address, Address] = mutable.Map.empty
   }
 
   def keychainClient(
@@ -57,8 +57,29 @@ object KeychainFixture {
             .toList
         )
 
-      override def markAddressesAsUsed(keychainId: UUID, addresses: List[String]): IO[Unit] =
-        IO.delay(newlyMarkedAddresses.addAll(addresses))
+      override def markAddressesAsUsed(keychainId: UUID, addresses: List[String]): IO[Unit] = {
+        addresses.foreach(a => newlyMarkedAddresses.update(a, a))
+        IO.unit
+      }
+
+      override def getKnownAddresses(
+          keychainId: UUID,
+          changeType: Option[ChangeType]
+      ): IO[List[AccountAddress]] =
+        for {
+          knownAddresses <- IO(
+            newlyMarkedAddresses.keys.toList.map(
+              AccountAddress(_, ChangeType.External, derivation = NonEmptyList.one(1))
+            )
+          )
+
+          newAddresses <- getAddresses(
+            keychainId,
+            newlyMarkedAddresses.size - 1,
+            newlyMarkedAddresses.size + lookaheadSize - 1
+          )
+
+        } yield knownAddresses ++ newAddresses
 
       override def getFreshAddresses(
           keychainId: UUID,
@@ -74,6 +95,7 @@ object KeychainFixture {
       override def deleteKeychain(keychainId: UUID): IO[Unit] = ???
 
       override def resetKeychain(keychainId: UUID): IO[Unit] = ???
+
     }
 
 }

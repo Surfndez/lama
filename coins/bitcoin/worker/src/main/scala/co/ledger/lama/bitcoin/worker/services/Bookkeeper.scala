@@ -9,24 +9,25 @@ import co.ledger.lama.bitcoin.common.models.explorer.{
   Transaction,
   UnconfirmedTransaction
 }
-import co.ledger.lama.bitcoin.common.models.interpreter.AccountAddress
+import co.ledger.lama.bitcoin.common.models.interpreter.{AccountAddress, ChangeType}
 import co.ledger.lama.bitcoin.worker.services.Keychain.KeychainId
 import co.ledger.lama.common.models.Coin
 import fs2.{Pipe, Stream}
 import java.util.UUID
 
-import co.ledger.lama.common.logging.LamaLogContext
+import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 
 trait Bookkeeper[F[_]] {
   def record[Tx <: Transaction: Bookkeeper.Recordable](
       coin: Coin,
       accountId: UUID,
       keychainId: UUID,
+      change: ChangeType,
       blockHash: Option[Bookkeeper.BlockHash]
-  ): F[List[AccountAddress]]
+  )(implicit lc: LamaLogContext): Stream[F, AccountAddress]
 }
 
-object Bookkeeper {
+object Bookkeeper extends ContextLogging {
   type AccountId = UUID
   type Address   = String
   type BlockHash = String
@@ -41,10 +42,24 @@ object Bookkeeper {
         coin: Coin,
         accountId: AccountId,
         keychainId: AccountId,
+        change: ChangeType,
         blockHash: Option[BlockHash]
-    ): IO[List[AccountAddress]] =
-      keychain
-        .addresses(keychainId)
+    )(implicit lc: LamaLogContext): Stream[IO, AccountAddress] = {
+      val keychainAddresses = for {
+
+        // knownAddresses will provided addresses previously marked as used AND 20 new addresses.
+        knownAddresses <- keychain.knownAddresses(keychainId, Some(change))
+
+        addresses <- Stream
+          .emit(knownAddresses) ++ keychain.discoverAddresses(
+          keychainId,
+          Some(change),
+          knownAddresses.size - 1
+        )
+
+      } yield addresses
+
+      keychainAddresses
         .flatMap { addresses =>
           Stream
             .emit(addresses)
@@ -55,9 +70,10 @@ object Bookkeeper {
         }
         .takeWhile(_.nonEmpty)
         .foldMonoid
-        .compile
-        .toList
-        .map(_.flatten)
+        .flatMap(Stream.emits(_))
+
+    }
+
   }
 
   case class TransactionRecord[Tx <: Transaction: Recordable](
@@ -87,7 +103,7 @@ object Bookkeeper {
       Stream
         .chunk(chunk.map(_.tx))
         .through(recordable.save(interpreter)(accountId))
-        .as(chunk.map(_.usedAddresses).toList.flatten)
+        .as(chunk.map(a => a.usedAddresses).toList.flatten)
     }
 
   def addressUsedBy(tx: Transaction)(accountAddress: AccountAddress): Boolean = {

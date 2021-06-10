@@ -29,6 +29,11 @@ trait KeychainClient {
 
   def markAddressesAsUsed(keychainId: UUID, addresses: List[String]): IO[Unit]
 
+  def getKnownAddresses(
+      keychainId: UUID,
+      changeType: Option[ChangeType] = None
+  ): IO[List[AccountAddress]]
+
   def getFreshAddresses(keychainId: UUID, change: ChangeType, size: Int): IO[List[AccountAddress]]
 
   def getAddressesPublicKeys(
@@ -114,6 +119,31 @@ class KeychainGrpcClient(
         new Metadata
       )
       .void
+
+  // getAllObservableAddresses with no indexes given will always return all known addresses
+  // plus 20 new addresses (for free !)
+
+  def getKnownAddresses(
+      keychainId: UUID,
+      changeType: Option[ChangeType] = None
+  ): IO[List[AccountAddress]] =
+    client
+      .getAllObservableAddresses(
+        changeType
+          .map(change =>
+            keychain.GetAllObservableAddressesRequest(
+              keychainId = UuidUtils.uuidToBytes(keychainId),
+              change = change.toKeychainProto
+            )
+          )
+          .getOrElse(
+            keychain.GetAllObservableAddressesRequest(
+              keychainId = UuidUtils.uuidToBytes(keychainId)
+            )
+          ),
+        new Metadata
+      )
+      .map(_.addresses.map(AccountAddress.fromKeychainProto).toList)
 
   def getFreshAddresses(keychainId: UUID, change: ChangeType, size: Int): IO[List[AccountAddress]] =
     client
