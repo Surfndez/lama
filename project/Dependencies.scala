@@ -80,7 +80,7 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
     "com.google.protobuf"   % "protobuf-java"     % protobufJava
   )
 
-  val bouncyCastleCryptoVersion = "1.68"
+  val bouncyCastleCryptoVersion = "1.69"
   val crypto: Seq[ModuleID] = Seq(
     "org.bouncycastle" % "bcprov-jdk15on" % bouncyCastleCryptoVersion
   )
