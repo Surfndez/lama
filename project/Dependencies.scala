@@ -21,7 +21,7 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
 
   val H2Version     = "1.4.200"
   val flywayVersion = "7.8.1"
-  val doobieVersion = "1.0.0-M1"
+  val doobieVersion = "1.0.0-M4"
   val postgres: Seq[ModuleID] = Seq(
     "com.h2database" % "h2"              % H2Version,
     "org.flywaydb"   % "flyway-core"     % flywayVersion,
