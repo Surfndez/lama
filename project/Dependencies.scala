@@ -54,7 +54,7 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
     "dev.profunktor" %% "fs2-rabbit" % fs2RabbitVersion
   )
 
-  val scalaRedisVersion = "3.30"
+  val scalaRedisVersion = "3.40"
   val redis: Seq[ModuleID] = Seq(
     "net.debasishg" %% "redisclient" % scalaRedisVersion
   )
