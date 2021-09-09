@@ -1,6 +1,6 @@
-[![release](https://img.shields.io/github/v/release/ledgerhq/lama?color=0366d6&include_prereleases)](https://github.com/LedgerHQ/lama/releases)
-[![build](https://github.com/LedgerHQ/lama/workflows/build/badge.svg?branch=master)](https://github.com/LedgerHQ/lama/actions?query=workflow%3Abuild+branch%3Amaster)
-[![publish](https://github.com/LedgerHQ/lama/workflows/publish/badge.svg?branch=master)](https://github.com/LedgerHQ/lama/actions?query=workflow%3Apublish+branch%3Amaster)
+[![release](https://img.shields.io/github/v/release/ledgerhq/lama-scheduler?color=0366d6&include_prereleases)](https://github.com/LedgerHQ/lama-scheduler/releases)
+[![build](https://github.com/LedgerHQ/lama-scheduler/workflows/build/badge.svg?branch=main)](https://github.com/LedgerHQ/lama-scheduler/actions?query=workflow%3Abuild+branch%3Amain)
+[![publish](https://github.com/LedgerHQ/lama-scheduler/workflows/publish/badge.svg?branch=main)](https://github.com/LedgerHQ/lama-scheduler/actions?query=workflow%3Apublish+branch%3Amain)
 
 # Lama
 
@@ -115,7 +115,7 @@ Please have a look on `docker-compose.yml` file for more details on the configur
 Please refer to the [getting started][bitcoin-transactor-getting-started] section of the bitcoin transactor README.
 
 [docker]: https://docs.docker.com/get-docker/
-[account-manager]: https://github.com/LedgerHQ/lama/tree/master/account-manager
+[account-manager]: https://github.com/LedgerHQ/lama/tree/main/account-manager
 [account-manager-getting-started]: lama-scheduler/README.md#getting-started
 [bitcoin-api-getting-started]: coins/bitcoin/api//README.md#getting-started
 [bitcoin-interpreter-getting-started]: coins/bitcoin/interpreter/README.md#getting-started
