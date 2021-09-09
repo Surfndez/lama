@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [accountManager]
+        component: [lamaScheduler]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -42,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [accountManager]
+        component: [lamaScheduler]
     services:
       rabbitmq:
         image: rabbitmq:3.8.5
