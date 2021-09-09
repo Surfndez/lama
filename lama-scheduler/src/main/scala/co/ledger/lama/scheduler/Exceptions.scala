@@ -1,8 +1,7 @@
 package co.ledger.lama.scheduler
 
 import java.util.UUID
-
-import co.ledger.lama.common.models.{Coin, CoinFamily}
+import co.ledger.lama.scheduler.domain.models.{Coin, CoinFamily}
 
 object Exceptions {
 

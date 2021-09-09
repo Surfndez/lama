@@ -1,7 +1,7 @@
 package co.ledger.lama.common
 
-import co.ledger.lama.common.models.{Account, AccountGroup, Coin, CoinFamily}
 import co.ledger.lama.common.utils.UuidUtils
+import co.ledger.lama.scheduler.domain.models.{Account, AccountGroup, Coin, CoinFamily}
 import org.scalacheck.Gen
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers

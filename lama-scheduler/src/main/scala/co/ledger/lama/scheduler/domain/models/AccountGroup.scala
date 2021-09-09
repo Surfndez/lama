@@ -1,6 +1,6 @@
-package co.ledger.lama.common.models
+package co.ledger.lama.scheduler.domain.models
 
-import co.ledger.lama.common.models.implicits._
+import co.ledger.lama.scheduler.domain.models.implicits._
 import co.ledger.lama.scheduler.protobuf
 import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
 import io.circe.{Decoder, Encoder}

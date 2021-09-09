@@ -1,22 +1,9 @@
-package co.ledger.lama.scheduler
-
-import java.util.UUID
+package co.ledger.lama.scheduler.domain.adapters.secondary.persistence
 
 import cats.data.NonEmptyList
 import co.ledger.lama.common.logging.DoobieLogHandler
-import co.ledger.lama.common.models.{
-  Account,
-  AccountInfo,
-  Coin,
-  CoinFamily,
-  Sort,
-  SyncEvent,
-  TriggerableEvent,
-  TriggerableStatus,
-  WorkableEvent
-}
-import co.ledger.lama.scheduler.models._
-import co.ledger.lama.scheduler.models.implicits._
+import co.ledger.lama.scheduler.domain.models._
+import co.ledger.lama.scheduler.domain.models.implicits._
 import doobie.{Fragment, Fragments}
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
@@ -25,6 +12,8 @@ import fs2.Stream
 import io.circe.JsonObject
 import io.circe.syntax.EncoderOps
 import org.postgresql.util.PGInterval
+
+import java.util.UUID
 
 object Queries extends DoobieLogHandler {
 

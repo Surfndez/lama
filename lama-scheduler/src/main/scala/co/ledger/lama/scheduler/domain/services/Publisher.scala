@@ -1,22 +1,21 @@
-package co.ledger.lama.scheduler
-
-import java.util.UUID
+package co.ledger.lama.scheduler.domain.services
 
 import cats.effect.IO
 import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
-import co.ledger.lama.common.models.{WithBusinessId, WorkableEvent}
 import co.ledger.lama.scheduler.Exceptions.RedisUnexpectedException
+import co.ledger.lama.scheduler.domain.models.{WithBusinessId, WorkableEvent}
 import com.redis.RedisClient
-import com.redis.serialization.{Format, Parse}
 import com.redis.serialization.Parse.Implicits._
+import com.redis.serialization.{Format, Parse}
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.{ExchangeName, RoutingKey}
 import fs2.Stream
-import io.circe.{Decoder, Encoder, JsonObject}
 import io.circe.parser.decode
 import io.circe.syntax._
+import io.circe.{Decoder, Encoder, JsonObject}
 
+import java.util.UUID
 import scala.annotation.nowarn
 
 /** Publisher publishing events sequentially.

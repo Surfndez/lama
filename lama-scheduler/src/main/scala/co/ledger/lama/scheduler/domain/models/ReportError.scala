@@ -1,9 +1,9 @@
-package co.ledger.lama.common.models
+package co.ledger.lama.scheduler.domain.models
 
 import co.ledger.lama.common.Exceptions.GrpcClientException
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.extras.semiauto._
-import co.ledger.lama.common.models.implicits._
+import co.ledger.lama.scheduler.domain.models.implicits._
 
 case class ReportError(code: String, message: Option[String])
 

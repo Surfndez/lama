@@ -3,9 +3,10 @@ package co.ledger.lama.scheduler
 import java.time.Instant
 import java.util.UUID
 import cats.effect.{ContextShift, IO, Timer}
-import co.ledger.lama.common.models._
 import co.ledger.lama.common.utils.IOAssertion
 import co.ledger.lama.common.utils.rabbitmq.AutoAckMessage
+import co.ledger.lama.scheduler.domain.models.{Account, AccountGroup, Coin, CoinFamily, ReportableEvent, Status, SyncEvent, TriggerableEvent, WorkableEvent}
+import co.ledger.lama.scheduler.domain.services.{Orchestrator, SyncEventTask}
 import dev.profunktor.fs2rabbit.model.DeliveryTag
 import fs2.{Pipe, Stream}
 import io.circe.JsonObject
