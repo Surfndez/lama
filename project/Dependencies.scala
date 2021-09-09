@@ -80,18 +80,5 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
     "com.google.protobuf"   % "protobuf-java"     % protobufJava
   )
 
-  val bouncyCastleCryptoVersion = "1.68"
-  val crypto: Seq[ModuleID] = Seq(
-    "org.bouncycastle" % "bcprov-jdk15on" % bouncyCastleCryptoVersion
-  )
-
-  val lamaCommon: Seq[ModuleID] = circe ++ rabbit ++ utilities ++ postgres ++ http4s
-
-  val btcCommon: Seq[ModuleID]      = lamaCommon
-  val btcWorker: Seq[ModuleID]      = btcCommon
-  val btcInterpreter: Seq[ModuleID] = btcCommon ++ crypto
-  val btcApi: Seq[ModuleID]         = btcCommon
-  val btcTransactor: Seq[ModuleID]  = btcCommon
-
-  val accountManager: Seq[ModuleID] = lamaCommon ++ redis
+  val lamaScheduler: Seq[ModuleID] = circe ++ rabbit ++ utilities ++ postgres ++ http4s ++ redis
 }

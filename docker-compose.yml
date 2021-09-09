@@ -2,7 +2,7 @@ version: '3'
 
 services:
   account-manager:
-    image: docker.pkg.github.com/ledgerhq/lama/lama-account-manager:${LAMA_VERSION}
+    image: docker.pkg.github.com/ledgerhq/lama-scheduler/lama-scheduler:${LAMA_VERSION}
     environment:
       JAVA_OPTS: ${ACCOUNT_MANAGER_JAVA_OPTS}
       ACCOUNT_MANAGER_PORT: ${ACCOUNT_MANAGER_PORT}
@@ -134,7 +134,7 @@ services:
     ports:
       - ${BITCOIN_API_PORT}:${BITCOIN_API_PORT}
     depends_on:
-      - account-manager
+      - lama-scheduler
       - bitcoin-keychain
       - bitcoin-interpreter
       - bitcoin-worker

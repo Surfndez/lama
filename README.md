@@ -116,7 +116,7 @@ Please refer to the [getting started][bitcoin-transactor-getting-started] sectio
 
 [docker]: https://docs.docker.com/get-docker/
 [account-manager]: https://github.com/LedgerHQ/lama/tree/master/account-manager
-[account-manager-getting-started]: account-manager/README.md#getting-started
+[account-manager-getting-started]: lama-scheduler/README.md#getting-started
 [bitcoin-api-getting-started]: coins/bitcoin/api//README.md#getting-started
 [bitcoin-interpreter-getting-started]: coins/bitcoin/interpreter/README.md#getting-started
 [bitcoin-worker-getting-started]: coins/bitcoin/worker/README.md#getting-started

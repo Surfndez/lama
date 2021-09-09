@@ -55,13 +55,13 @@ lazy val lamaProtobuf = (project in file("protobuf"))
   )
   .settings(disableDocGeneration)
 
-lazy val accountManager = (project in file("account-manager"))
+lazy val lamaScheduler = (project in file("lama-scheduler"))
   .enablePlugins(JavaAgent, JavaServerAppPackaging, DockerPlugin, BuildInfoPlugin)
   .configs(IntegrationTest)
   .settings(
-    name := "lama-account-manager",
+    name := "lama-scheduler",
     sharedSettings,
     buildInfoSettings,
-    libraryDependencies ++= (Dependencies.accountManager ++ Dependencies.test)
+    libraryDependencies ++= (Dependencies.lamaScheduler ++ Dependencies.test)
   )
   .dependsOn(lamaProtobuf)
