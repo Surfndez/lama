@@ -1,4 +1,4 @@
-package co.ledger.lama.common.models
+package co.ledger.lama.scheduler.domain.models
 
 import io.circe.{Decoder, Encoder}
 import pureconfig.ConfigReader

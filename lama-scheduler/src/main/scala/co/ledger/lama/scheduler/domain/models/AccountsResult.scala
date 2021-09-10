@@ -1,9 +1,9 @@
-package co.ledger.lama.common.models
+package co.ledger.lama.scheduler.domain.models
 
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
 import co.ledger.lama.scheduler.protobuf
-import co.ledger.lama.common.models.implicits._
+import co.ledger.lama.scheduler.domain.models.implicits._
 
 case class AccountsResult(accounts: List[AccountInfo], total: Int) {
   def toProto: protobuf.AccountsResult =

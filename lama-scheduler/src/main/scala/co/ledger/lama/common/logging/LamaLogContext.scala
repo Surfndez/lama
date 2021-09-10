@@ -1,8 +1,7 @@
 package co.ledger.lama.common.logging
 
 import java.util.UUID
-
-import co.ledger.lama.common.models.{Account, AccountGroup, Coin, CoinFamily}
+import co.ledger.lama.scheduler.domain.models.{Account, AccountGroup, Coin, CoinFamily}
 
 case class LamaLogContext(
     accountId: Option[UUID] = None,

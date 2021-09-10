@@ -1,6 +1,7 @@
-package co.ledger.lama.common.models
+package co.ledger.lama.scheduler.domain.models
 
 import cats.Show
+
 import java.time.Instant
 import java.util.UUID
 
@@ -8,7 +9,7 @@ import io.circe.{Decoder, Encoder}
 import io.circe.generic.extras.semiauto._
 import io.circe.syntax.EncoderOps
 import co.ledger.lama.scheduler.protobuf
-import co.ledger.lama.common.models.implicits._
+import co.ledger.lama.scheduler.domain.models.implicits._
 import co.ledger.lama.common.utils.{ByteStringUtils, TimestampProtoUtils, UuidUtils}
 
 sealed trait SyncEvent[T] {

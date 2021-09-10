@@ -1,11 +1,11 @@
 package co.ledger.lama.scheduler
 
 import java.util.UUID
-
 import cats.effect.IO
-import co.ledger.lama.common.models.WithBusinessId
-import co.ledger.lama.common.models.implicits._
+import co.ledger.lama.scheduler.domain.models.implicits._
 import co.ledger.lama.common.utils.IOAssertion
+import co.ledger.lama.scheduler.domain.models.WithBusinessId
+import co.ledger.lama.scheduler.domain.services.Publisher
 import com.redis.RedisClient
 import fs2.Stream
 import io.circe.generic.extras.semiauto._
@@ -105,7 +105,7 @@ class TestPublisher(
     val enc: Encoder[TestEvent],
     val dec: Decoder[TestEvent]
 ) extends Publisher[UUID, TestEvent] {
-  import Publisher._
+  import co.ledger.lama.scheduler.domain.services.Publisher._
 
   val key: UUID = UUID.randomUUID()
 

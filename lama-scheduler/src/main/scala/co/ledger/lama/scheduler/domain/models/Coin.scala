@@ -1,4 +1,4 @@
-package co.ledger.lama.common.models
+package co.ledger.lama.scheduler.domain.models
 
 import cats.effect.IO
 import io.circe.{Decoder, Encoder}

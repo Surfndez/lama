@@ -1,11 +1,12 @@
-package co.ledger.lama.scheduler
+package co.ledger.lama.scheduler.domain.services
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits.showInterpolator
 import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
-import co.ledger.lama.common.models._
 import co.ledger.lama.common.utils.rabbitmq.{AutoAckMessage, RabbitUtils}
 import co.ledger.lama.scheduler.config.CoinConfig
+import co.ledger.lama.scheduler.domain.adapters.secondary.persistence.Queries
+import co.ledger.lama.scheduler.domain.models.{ReportableEvent, TriggerableEvent, WorkableEvent}
 import com.redis.RedisClient
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.ExchangeName

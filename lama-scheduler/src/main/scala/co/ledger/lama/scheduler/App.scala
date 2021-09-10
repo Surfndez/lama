@@ -1,14 +1,19 @@
 package co.ledger.lama.scheduler
 
-import cats.effect.{ExitCode, IO, IOApp}
+import cats.effect.{ExitCode, IO, IOApp, Resource}
 import co.ledger.lama.common.services.grpc.HealthService
-import co.ledger.lama.common.utils.DbUtils
+import co.ledger.lama.common.utils.{DbUtils, GrpcServerConfig}
 import co.ledger.lama.common.utils.ResourceUtils.{grpcServer, postgresTransactor}
 import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import co.ledger.lama.scheduler.config.{Config, OrchestratorConfig}
+import co.ledger.lama.scheduler.domain.LamaSchedulerModule
+import co.ledger.lama.scheduler.domain.adapters.primary.grpc.AccountManagerGrpcService
 import co.ledger.lama.scheduler.utils.RedisUtils
+import com.redis.RedisClient
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.ExchangeType
+import doobie.util.transactor.Transactor
+import io.grpc.Server
 import pureconfig.ConfigSource
 
 object App extends IOApp {
@@ -16,50 +21,51 @@ object App extends IOApp {
   def run(args: List[String]): IO[ExitCode] = {
     val conf = ConfigSource.default.loadOrThrow[Config]
 
-    val resources = for {
-
-      // create the db transactor
-      db <- postgresTransactor(conf.postgres)
-
-      // rabbitmq client
-      rabbitClient <- RabbitUtils.createClient(conf.rabbit)
-
-      // redis client
-      redisClient <- RedisUtils.createClient(conf.redis)
-
-      accountManager = new AccountManager(db, conf.orchestrator.coins)
-
-      // define rpc service definitions
-      serviceDefinitions = List(
-        new AccountManagerGrpcService(
-          accountManager
-        ).definition,
-        new HealthService().definition
+    val appResources = for {
+      t <- makeResources(conf)
+      (db, rabbitClient, redisClient) = t
+      module = new LamaSchedulerModule(
+        db,
+        conf.orchestrator.coins,
+        conf.orchestrator,
+        rabbitClient,
+        redisClient
       )
+      server <- makeGrpcServer(conf.grpcServer, module)
+    } yield (rabbitClient, module, server)
 
-      // create the grpc server
-      grpcServer <- grpcServer(conf.grpcServer, serviceDefinitions)
-
-    } yield (db, rabbitClient, redisClient, grpcServer)
-
-    // start the grpc server and run the orchestrator stream
-    resources
-      .use { case (db, rabbitClient, redisClient, server) =>
-        // create the orchestrator
-        val orchestrator = new CoinOrchestrator(
-          conf.orchestrator,
-          db,
-          rabbitClient,
-          redisClient
-        )
-
+    appResources
+      .use { case (rabbitClient, module, server) =>
         declareExchangesAndBindings(rabbitClient, conf.orchestrator) *>
           DbUtils.flywayMigrate(conf.postgres) *>
           IO(server.start()) *>
-          orchestrator.run().compile.drain
+          module.orchestrator.run().compile.drain
+
       }
       .as(ExitCode.Success)
   }
+
+  private def makeGrpcServer(config: GrpcServerConfig, module: LamaSchedulerModule): Resource[IO, Server] = {
+    // define rpc service definitions
+    val serviceDefinitions = List(
+      new AccountManagerGrpcService(
+        module.accountManager
+      ).definition,
+      new HealthService().definition
+    )
+
+    // create the grpc server
+    grpcServer(config, serviceDefinitions)
+  }
+
+  private def makeResources(
+      conf: Config
+  ): Resource[IO, (Transactor[IO], RabbitClient[IO], RedisClient)] =
+    for {
+      db <- postgresTransactor(conf.postgres)
+      rabbitClient <- RabbitUtils.createClient(conf.rabbit)
+      redisClient <- RedisUtils.createClient(conf.redis)
+    } yield (db, rabbitClient, redisClient)
 
   // Declare rabbitmq exchanges and bindings used by workers and the orchestrator.
   private def declareExchangesAndBindings(

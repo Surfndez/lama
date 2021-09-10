@@ -1,17 +1,31 @@
-package co.ledger.lama.scheduler.models
+package co.ledger.lama.scheduler.domain.models
 
 import java.time.Instant
 import java.util.UUID
-
-import co.ledger.lama.common.models._
-import co.ledger.lama.common.models.implicits._
+import cats.implicits._
 import doobie.util.meta.Meta
 import doobie.postgres.implicits._
 import doobie.util.{Get, Put, Read}
+import io.circe.generic.extras.Configuration
+import io.circe.parser.parse
 import io.circe.{Decoder, Encoder, Json, JsonObject}
 import io.circe.syntax._
+import org.postgresql.util.PGobject
 
 object implicits {
+
+  implicit val defaultCirceConfig: Configuration =
+    Configuration.default.withSnakeCaseConstructorNames.withSnakeCaseMemberNames
+
+  implicit val jsonMeta: Meta[Json] =
+    Meta.Advanced
+      .other[PGobject]("json")
+      .timap[Json](a => parse(a.getValue).leftMap[Json](e => throw e).merge)(a => {
+        val o = new PGobject
+        o.setType("json")
+        o.setValue(a.noSpaces)
+        o
+      })
 
   implicit val uuidEncoder: Encoder[UUID] = Encoder.encodeString.contramap(_.toString)
   implicit val uuidDecoder: Decoder[UUID] = Decoder.decodeString.map(UUID.fromString)

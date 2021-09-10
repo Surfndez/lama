@@ -2,10 +2,12 @@ package co.ledger.lama.scheduler
 
 import cats.effect.IO
 import co.ledger.lama.common.logging.DefaultContextLogging
-import co.ledger.lama.common.models._
 import co.ledger.lama.common.utils.IOAssertion
-import co.ledger.lama.scheduler.config.CoinConfig
 import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
+import co.ledger.lama.scheduler.config.CoinConfig
+import co.ledger.lama.scheduler.domain.adapters.secondary.persistence.Queries
+import co.ledger.lama.scheduler.domain.models._
+import co.ledger.lama.scheduler.domain.services.{AccountManager, CoinOrchestrator}
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.ExchangeName
 import doobie.implicits._
@@ -337,12 +339,13 @@ class AccountManagerIT
 
 }
 
+
 class SimpleWorker(
-    rabbit: RabbitClient[IO],
-    inExchangeName: ExchangeName,
-    outExchangeName: ExchangeName,
-    coinConf: CoinConfig
-) {
+                    rabbit: RabbitClient[IO],
+                    inExchangeName: ExchangeName,
+                    outExchangeName: ExchangeName,
+                    coinConf: CoinConfig
+                  ) {
 
   private val consumer: Stream[IO, WorkableEvent[JsonObject]] =
     RabbitUtils

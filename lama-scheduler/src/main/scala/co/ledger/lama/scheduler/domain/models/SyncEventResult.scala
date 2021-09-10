@@ -1,12 +1,12 @@
-package co.ledger.lama.common.models
-
-import java.util.UUID
+package co.ledger.lama.scheduler.domain.models
 
 import co.ledger.lama.common.utils.UuidUtils
 import co.ledger.lama.scheduler.protobuf
-import co.ledger.lama.common.models.implicits._
 import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
+import co.ledger.lama.scheduler.domain.models.implicits._
 import io.circe.{Decoder, Encoder}
+
+import java.util.UUID
 
 case class SyncEventResult(accountId: UUID, syncId: UUID) {
   def toProto: protobuf.SyncEventResult =

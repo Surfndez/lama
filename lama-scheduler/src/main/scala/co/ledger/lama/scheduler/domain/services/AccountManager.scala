@@ -1,18 +1,18 @@
-package co.ledger.lama.scheduler
-
-import java.time.Instant
+package co.ledger.lama.scheduler.domain.services
 
 import cats.effect.IO
 import cats.implicits._
 import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
+import co.ledger.lama.scheduler.Exceptions._
 import co.ledger.lama.scheduler.config.CoinConfig
+import co.ledger.lama.scheduler.domain.adapters.secondary.persistence.Queries
+import co.ledger.lama.scheduler.domain.models._
 import doobie.implicits._
 import doobie.util.transactor.Transactor
-import java.util.UUID
-
-import co.ledger.lama.common.models._
-import co.ledger.lama.scheduler.Exceptions._
 import io.circe.JsonObject
+
+import java.time.Instant
+import java.util.UUID
 
 class AccountManager(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
     extends ContextLogging {

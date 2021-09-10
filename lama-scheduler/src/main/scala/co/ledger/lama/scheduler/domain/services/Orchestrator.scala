@@ -1,4 +1,4 @@
-package co.ledger.lama.scheduler
+package co.ledger.lama.scheduler.domain.services
 
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import co.ledger.lama.scheduler.config.OrchestratorConfig

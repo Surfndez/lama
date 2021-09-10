@@ -1,6 +1,6 @@
-package co.ledger.lama.common.models
+package co.ledger.lama.scheduler.domain.models
 
-import co.ledger.lama.common.models.Status._
+import co.ledger.lama.scheduler.domain.models.Status._
 import io.circe.{Decoder, Encoder}
 
 sealed trait Status {

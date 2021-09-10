@@ -1,10 +1,12 @@
-package co.ledger.lama.scheduler
+package co.ledger.lama.scheduler.domain.adapters.primary.grpc
 
 import cats.effect.{ConcurrentEffect, IO}
 import co.ledger.lama.common.logging.DefaultContextLogging
-import co.ledger.lama.common.models.{Account, AccountGroup, Sort}
 import co.ledger.lama.common.utils.UuidUtils
+import co.ledger.lama.scheduler.domain.models.{Account, AccountGroup, Sort}
+import co.ledger.lama.scheduler.domain.services.AccountManager
 import co.ledger.lama.scheduler.protobuf.{ResyncAccountRequest, SyncEventResult}
+import co.ledger.lama.scheduler.protobuf
 import com.google.protobuf.empty.Empty
 import io.grpc.{Metadata, ServerServiceDefinition, Status}
 

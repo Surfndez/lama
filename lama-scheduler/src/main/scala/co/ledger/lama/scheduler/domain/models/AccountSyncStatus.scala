@@ -1,9 +1,8 @@
-package co.ledger.lama.scheduler.models
+package co.ledger.lama.scheduler.domain.models
 
 import java.time.Instant
 import java.util.UUID
 
-import co.ledger.lama.common.models.{Account, AccountInfo, ReportError, Status, SyncEvent}
 import io.circe.JsonObject
 
 case class AccountSyncStatus(

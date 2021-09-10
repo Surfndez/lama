@@ -1,7 +1,7 @@
 package co.ledger.lama.scheduler
 
-import co.ledger.lama.common.models.{Coin, CoinFamily}
 import co.ledger.lama.common.utils.{GrpcServerConfig, PostgresConfig}
+import co.ledger.lama.scheduler.domain.models.{Coin, CoinFamily}
 import dev.profunktor.fs2rabbit.config.{Fs2RabbitConfig, Fs2RabbitNodeConfig}
 import dev.profunktor.fs2rabbit.model.{ExchangeName, QueueName, RoutingKey}
 import pureconfig.ConfigReader

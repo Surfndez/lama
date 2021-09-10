@@ -2,10 +2,11 @@ package co.ledger.lama.scheduler
 
 import cats.effect.{Blocker, ContextShift, IO, Resource, Timer}
 import cats.implicits._
-import co.ledger.lama.common.models.{AccountGroup, Account, Coin, CoinFamily}
 import co.ledger.lama.common.utils.DbUtils
 import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import co.ledger.lama.scheduler.config.Config
+import co.ledger.lama.scheduler.domain.models.{Account, AccountGroup, Coin, CoinFamily}
+import co.ledger.lama.scheduler.domain.services.Publisher
 import co.ledger.lama.scheduler.utils.RedisUtils
 import com.redis.RedisClient
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
