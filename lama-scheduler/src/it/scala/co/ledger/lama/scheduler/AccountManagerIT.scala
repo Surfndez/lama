@@ -3,11 +3,14 @@ package co.ledger.lama.scheduler
 import cats.effect.IO
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.utils.IOAssertion
-import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
-import co.ledger.lama.scheduler.config.CoinConfig
+import co.ledger.lama.common.utils.rabbitmq.{AutoAckMessage, RabbitUtils}
+import co.ledger.lama.scheduler.config.NotifierConfig
+import co.ledger.lama.scheduler.config.config.CoinConfig
+import co.ledger.lama.scheduler.domain.adapters.secondary.notifier.lama.RabbitNotifier
 import co.ledger.lama.scheduler.domain.adapters.secondary.persistence.Queries
+import co.ledger.lama.scheduler.domain.adapters.secondary.queue.RedisPublishingQueue
 import co.ledger.lama.scheduler.domain.models._
-import co.ledger.lama.scheduler.domain.services.{AccountManager, CoinOrchestrator}
+import co.ledger.lama.scheduler.domain.services.{AccountManager, CoinOrchestrator, Notifier, PublishingQueue}
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.ExchangeName
 import doobie.implicits._
@@ -16,6 +19,7 @@ import io.circe.{Json, JsonObject}
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
+import java.util.UUID
 import scala.concurrent.duration._
 
 class AccountManagerIT
@@ -27,14 +31,29 @@ class AccountManagerIT
   IOAssertion {
     setup() *>
       appResources.use { case (db, redisClient, rabbitClient) =>
+        val outExchangeName = conf.notifier.asInstanceOf[NotifierConfig.Lama].exchangeName
+
+        def mkNotifier(coinConfig: CoinConfig): Notifier = new RabbitNotifier(rabbitClient, outExchangeName, coinConfig.routingKey)
+
+        def mkPublishingQueue(publish: WorkableEvent[JsonObject] => IO[Unit]): PublishingQueue[UUID, WorkableEvent[JsonObject]] =
+          new RedisPublishingQueue[UUID, WorkableEvent[JsonObject]](publish, redisClient)
+
+        def mkEventStream(coinConfig: CoinConfig): Stream[IO, AutoAckMessage[ReportableEvent[JsonObject]]] =
+          RabbitUtils
+            .createConsumer[ReportableEvent[JsonObject]](
+              rabbitClient,
+              coinConfig.queueName(conf.orchestrator.lamaEventsExchangeName)
+            )
+
+
         val service = new AccountManager(db, conf.orchestrator.coins)
 
         val coinOrchestrator =
-          new CoinOrchestrator(conf.orchestrator, db, rabbitClient, redisClient)
+          new CoinOrchestrator(conf.orchestrator, db, mkEventStream, mkNotifier, mkPublishingQueue)
 
         val worker = new SimpleWorker(
           rabbitClient,
-          conf.orchestrator.workerEventsExchangeName,
+          outExchangeName,
           conf.orchestrator.lamaEventsExchangeName,
           conf.orchestrator.coins.head
         )

@@ -4,8 +4,9 @@ import java.util.UUID
 import cats.effect.IO
 import co.ledger.lama.scheduler.domain.models.implicits._
 import co.ledger.lama.common.utils.IOAssertion
+import co.ledger.lama.scheduler.domain.adapters.secondary.queue.RedisPublishingQueue
 import co.ledger.lama.scheduler.domain.models.WithBusinessId
-import co.ledger.lama.scheduler.domain.services.Publisher
+import co.ledger.lama.scheduler.domain.services.PublishingQueue
 import com.redis.RedisClient
 import fs2.Stream
 import io.circe.generic.extras.semiauto._
@@ -100,12 +101,14 @@ object TestEvent {
 class TestPublisher(
     val redis: RedisClient,
     val nbEvents: Int,
-    override val maxOnGoingEvents: Int
+    val maxOnGoingEvents: Int
 )(implicit
     val enc: Encoder[TestEvent],
     val dec: Decoder[TestEvent]
-) extends Publisher[UUID, TestEvent] {
-  import co.ledger.lama.scheduler.domain.services.Publisher._
+) extends PublishingQueue[UUID, TestEvent] {
+  import co.ledger.lama.scheduler.domain.services.PublishingQueue._
+
+  val delegate = new RedisPublishingQueue[UUID, TestEvent](publish, redis, maxOnGoingEvents)
 
   val key: UUID = UUID.randomUUID()
 
@@ -113,11 +116,14 @@ class TestPublisher(
 
   var publishedEvents: mutable.Seq[TestEvent] = mutable.Seq.empty
 
-  def publish(event: TestEvent): IO[Unit] =
+  def countPendingEvents: Option[Long] = redis.llen(pendingEventsKey(key.toString))
+
+  override def publish = (event: TestEvent) =>
     IO.pure {
       publishedEvents = publishedEvents ++ Seq(event)
     }
 
-  def countPendingEvents: Option[Long] = redis.llen(pendingEventsKey(key.toString))
+  override def enqueue(e: TestEvent): IO[Unit] = delegate.enqueue(e)
 
+  override def dequeue(key: UUID): IO[Unit] = delegate.dequeue(key)
 }

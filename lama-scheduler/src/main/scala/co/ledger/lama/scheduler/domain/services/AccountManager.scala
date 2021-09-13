@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.implicits._
 import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
 import co.ledger.lama.scheduler.Exceptions._
-import co.ledger.lama.scheduler.config.CoinConfig
+import co.ledger.lama.scheduler.config.config.CoinConfig
 import co.ledger.lama.scheduler.domain.adapters.secondary.persistence.Queries
 import co.ledger.lama.scheduler.domain.models._
 import doobie.implicits._

@@ -4,7 +4,7 @@ import java.util.UUID
 import cats.effect.{Blocker, ContextShift, IO, Resource}
 import co.ledger.lama.common.utils.{DbUtils, IOAssertion, PostgresConfig}
 import co.ledger.lama.scheduler.Exceptions.AccountNotFoundException
-import co.ledger.lama.scheduler.config.CoinConfig
+import co.ledger.lama.scheduler.config.config.CoinConfig
 import co.ledger.lama.scheduler.domain.models.{Account, AccountGroup, Coin, CoinFamily, Status, SyncEvent}
 import co.ledger.lama.scheduler.domain.services.AccountManager
 import com.opentable.db.postgres.embedded.EmbeddedPostgres

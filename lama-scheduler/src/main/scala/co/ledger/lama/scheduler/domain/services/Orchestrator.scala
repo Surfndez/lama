@@ -1,12 +1,14 @@
 package co.ledger.lama.scheduler.domain.services
 
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
-import co.ledger.lama.scheduler.config.OrchestratorConfig
-import com.redis.RedisClient
-import dev.profunktor.fs2rabbit.interpreter.RabbitClient
+import co.ledger.lama.common.utils.rabbitmq.AutoAckMessage
+import co.ledger.lama.scheduler.config.config.{CoinConfig, OrchestratorConfig}
+import co.ledger.lama.scheduler.domain.models.{ReportableEvent, WorkableEvent}
 import doobie.util.transactor.Transactor
 import fs2.Stream
+import io.circe.JsonObject
 
+import java.util.UUID
 import scala.concurrent.duration._
 
 trait Orchestrator {
@@ -38,8 +40,11 @@ trait Orchestrator {
 class CoinOrchestrator(
     val conf: OrchestratorConfig,
     val db: Transactor[IO],
-    val rabbit: RabbitClient[IO],
-    val redis: RedisClient
+    val mkEventStream: CoinConfig => Stream[IO, AutoAckMessage[ReportableEvent[JsonObject]]],
+    val mkNotifier: CoinConfig => Notifier,
+    val mkPublishingQueue: (
+      WorkableEvent[JsonObject] => IO[Unit]
+      ) => PublishingQueue[UUID, WorkableEvent[JsonObject]]
 )(implicit cs: ContextShift[IO])
     extends Orchestrator {
 
@@ -47,12 +52,11 @@ class CoinOrchestrator(
     conf.coins
       .map { coinConf =>
         new CoinSyncEventTask(
-          conf.workerEventsExchangeName,
-          conf.lamaEventsExchangeName,
           coinConf,
           db,
-          rabbit,
-          redis
+          mkEventStream,
+          mkNotifier,
+          mkPublishingQueue
         )
       }
 

@@ -3,7 +3,7 @@ package co.ledger.lama.scheduler.utils
 import cats.effect.{IO, Resource, Timer}
 import co.ledger.lama.common.logging.DefaultContextLogging
 import co.ledger.lama.common.utils.ResourceUtils
-import co.ledger.lama.scheduler.config.RedisConfig
+import co.ledger.lama.scheduler.config.config.RedisConfig
 import com.redis.RedisClient
 import javax.net.ssl.SSLContext
 

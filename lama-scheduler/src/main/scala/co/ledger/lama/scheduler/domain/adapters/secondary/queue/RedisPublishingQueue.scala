@@ -1,41 +1,25 @@
-package co.ledger.lama.scheduler.domain.services
+package co.ledger.lama.scheduler.domain.adapters.secondary.queue
 
 import cats.effect.IO
-import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
-import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import co.ledger.lama.scheduler.Exceptions.RedisUnexpectedException
-import co.ledger.lama.scheduler.domain.models.{WithBusinessId, WorkableEvent}
+import co.ledger.lama.scheduler.domain.models.WithBusinessId
+import co.ledger.lama.scheduler.domain.services.PublishingQueue
+import co.ledger.lama.scheduler.domain.services.PublishingQueue.{onGoingEventsCounterKey, pendingEventsKey}
 import com.redis.RedisClient
-import com.redis.serialization.Parse.Implicits._
-import com.redis.serialization.{Format, Parse}
-import dev.profunktor.fs2rabbit.interpreter.RabbitClient
-import dev.profunktor.fs2rabbit.model.{ExchangeName, RoutingKey}
-import fs2.Stream
 import io.circe.parser.decode
+import com.redis.serialization.Parse.Implicits._
 import io.circe.syntax._
-import io.circe.{Decoder, Encoder, JsonObject}
+import com.redis.serialization.{Format, Parse}
+import io.circe.{Decoder, Encoder}
 
-import java.util.UUID
 import scala.annotation.nowarn
 
-/** Publisher publishing events sequentially.
-  * Redis is used as a FIFO queue to guarantee the sequence.
-  */
-trait Publisher[K, V <: WithBusinessId[K]] {
-  import Publisher._
-
-  // Max concurrent ongoing events.
-  val maxOnGoingEvents: Int = 1
-
-  // Redis client.
-  def redis: RedisClient
-
-  // The inner publish function.
-  def publish(event: V): IO[Unit]
-
-  // Implicits for serializing data as json and storing it as binary in redis.
-  implicit val dec: Decoder[V]
-  implicit val enc: Encoder[V]
+final class RedisPublishingQueue[K, V <: WithBusinessId[K]](
+                                                             override val publish: V => IO[Unit],
+                                                             redis: RedisClient,
+                                                             val maxOnGoingEvents: Int = 1
+                                                           )(implicit val encoder: Encoder[V], decoder: Decoder[V])
+  extends PublishingQueue[K, V] {
 
   implicit val parse: Parse[V] =
     Parse { bytes =>
@@ -51,9 +35,7 @@ trait Publisher[K, V <: WithBusinessId[K]] {
       v.asJson.noSpaces.getBytes()
     }
 
-  // If the counter of ongoing events for the key has reached max ongoing events, add the event to the pending list.
-  // Otherwise, publish and increment the counter of ongoing events.
-  def enqueue(e: V): IO[Unit] =
+  override def enqueue(e: V): IO[Unit] =
     hasMaxOnGoingMessages(e.businessId).flatMap {
       case true =>
         // enqueue pending events in redis
@@ -64,9 +46,7 @@ trait Publisher[K, V <: WithBusinessId[K]] {
           .flatMap(_ => incrOnGoingMessages(e.businessId))
     }.void
 
-  // Remove the top pending event of a key and take the next pending event.
-  // If next pending event exists, publish it.
-  def dequeue(key: K): IO[Unit] =
+  override def dequeue(key: K): IO[Unit] =
     for {
       _         <- decrOnGoingMessages(key)
       nextEvent <- lpopPendingMessages(key)
@@ -110,39 +90,4 @@ trait Publisher[K, V <: WithBusinessId[K]] {
   // Remove the first from a key and if exists, return the next one.
   private def lpopPendingMessages(key: K): IO[Option[V]] =
     IO(redis.lpop[V](pendingEventsKey(key)))
-
-}
-
-object Publisher {
-  // Stored keys.
-  def onGoingEventsCounterKey[K](key: K): String = s"on_going_events_counter_$key"
-  def pendingEventsKey[K](key: K): String        = s"pending_events_$key"
-}
-
-class WorkableEventPublisher(
-    val redis: RedisClient,
-    rabbit: RabbitClient[IO],
-    exchangeName: ExchangeName,
-    routingKey: RoutingKey
-)(implicit val enc: Encoder[WorkableEvent[JsonObject]], val dec: Decoder[WorkableEvent[JsonObject]])
-    extends Publisher[UUID, WorkableEvent[JsonObject]]
-    with ContextLogging {
-
-  def publish(event: WorkableEvent[JsonObject]): IO[Unit] =
-    publisher
-      .evalMap(p =>
-        p(event) *> log.info(s"Published event to worker: ${event.asJson.toString}")(
-          LamaLogContext().withAccount(event.account).withFollowUpId(event.syncId)
-        )
-      )
-      .compile
-      .drain
-
-  private val publisher: Stream[IO, WorkableEvent[JsonObject] => IO[Unit]] =
-    RabbitUtils.createPublisher[WorkableEvent[JsonObject]](
-      rabbit,
-      exchangeName,
-      routingKey
-    )
-
 }

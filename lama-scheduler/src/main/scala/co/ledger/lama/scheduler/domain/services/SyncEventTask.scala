@@ -3,19 +3,17 @@ package co.ledger.lama.scheduler.domain.services
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits.showInterpolator
 import co.ledger.lama.common.logging.{ContextLogging, LamaLogContext}
-import co.ledger.lama.common.utils.rabbitmq.{AutoAckMessage, RabbitUtils}
-import co.ledger.lama.scheduler.config.CoinConfig
+import co.ledger.lama.common.utils.rabbitmq.AutoAckMessage
+import co.ledger.lama.scheduler.config.config.CoinConfig
 import co.ledger.lama.scheduler.domain.adapters.secondary.persistence.Queries
 import co.ledger.lama.scheduler.domain.models.{ReportableEvent, TriggerableEvent, WorkableEvent}
-import com.redis.RedisClient
-import dev.profunktor.fs2rabbit.interpreter.RabbitClient
-import dev.profunktor.fs2rabbit.model.ExchangeName
 import doobie.implicits._
 import doobie.util.transactor.Transactor
 import fs2.{Pipe, Stream}
 import io.circe.JsonObject
 import io.circe.syntax._
 
+import java.util.UUID
 import scala.concurrent.duration.FiniteDuration
 
 trait SyncEventTask {
@@ -70,12 +68,13 @@ trait SyncEventTask {
 }
 
 class CoinSyncEventTask(
-    workerExchangeName: ExchangeName,
-    eventsExchangeName: ExchangeName,
     conf: CoinConfig,
     db: Transactor[IO],
-    rabbit: RabbitClient[IO],
-    redis: RedisClient
+    mkEventStream: CoinConfig => Stream[IO, AutoAckMessage[ReportableEvent[JsonObject]]],
+    mkNotifier: CoinConfig => Notifier,
+    mkPublishingQueue: (
+      WorkableEvent[JsonObject] => IO[Unit]
+      ) => PublishingQueue[UUID, WorkableEvent[JsonObject]]
 )(implicit cs: ContextShift[IO])
     extends SyncEventTask
     with ContextLogging {
@@ -87,13 +86,9 @@ class CoinSyncEventTask(
       .transact(db)
 
   // Publisher publishing to the worker exchange with routingKey = "coinFamily.coin".
-  private val publisher =
-    new WorkableEventPublisher(
-      redis,
-      rabbit,
-      workerExchangeName,
-      conf.routingKey
-    )
+  private val notifier = mkNotifier(conf)
+
+  private val publisher = mkPublishingQueue(notifier.publish)
 
   // Publish events to the worker exchange queue, mark event as published then insert.
   def publishWorkerEventsPipe: Pipe[IO, WorkableEvent[JsonObject], Unit] =
@@ -106,12 +101,7 @@ class CoinSyncEventTask(
     }
 
   // Consume events to report from the events exchange queue.
-  def reportableEvents: Stream[IO, AutoAckMessage[ReportableEvent[JsonObject]]] =
-    RabbitUtils
-      .createConsumer[ReportableEvent[JsonObject]](
-        rabbit,
-        conf.queueName(eventsExchangeName)
-      )
+  def reportableEvents: Stream[IO, AutoAckMessage[ReportableEvent[JsonObject]]] = mkEventStream(conf)
 
   // Insert reportable events in database and publish next pending event.
   def reportEventPipe: Pipe[IO, AutoAckMessage[ReportableEvent[JsonObject]], Unit] =

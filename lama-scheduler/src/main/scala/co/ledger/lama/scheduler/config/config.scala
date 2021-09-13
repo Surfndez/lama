@@ -1,4 +1,4 @@
-package co.ledger.lama.scheduler
+package co.ledger.lama.scheduler.config
 
 import co.ledger.lama.common.utils.PostgresConfig
 import co.ledger.lama.scheduler.domain.models.{Coin, CoinFamily}
@@ -7,6 +7,7 @@ import dev.profunktor.fs2rabbit.model.{ExchangeName, QueueName, RoutingKey}
 import pureconfig.ConfigReader
 import pureconfig.generic.semiauto._
 import pureconfig.module.cats._
+import implicits._
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -17,7 +18,8 @@ object config {
       postgres: PostgresConfig,
       orchestrator: OrchestratorConfig,
       rabbit: Fs2RabbitConfig,
-      redis: RedisConfig
+      redis: RedisConfig,
+      notifier: NotifierConfig
   )
 
   object Config {
@@ -44,7 +46,6 @@ object config {
   }
 
   case class OrchestratorConfig(
-      workerEventsExchangeName: ExchangeName,
       lamaEventsExchangeName: ExchangeName,
       coins: List[CoinConfig]
   )
@@ -52,9 +53,6 @@ object config {
   object OrchestratorConfig {
     implicit val configReader: ConfigReader[OrchestratorConfig] =
       deriveReader[OrchestratorConfig]
-
-    implicit val exchangeNameConfigReader: ConfigReader[ExchangeName] =
-      ConfigReader.fromString(str => Right(ExchangeName(str)))
 
     implicit val coinConfigReader: ConfigReader[CoinConfig] =
       deriveReader[CoinConfig]
