@@ -10,9 +10,6 @@ object Exceptions {
 
   case object RedisUnexpectedException extends Exception("Unexpected exception from Redis")
 
-  case class MalformedProtobufException(message: scalapb.GeneratedMessage)
-      extends Exception(s"Malformed protobuf: ${message.toProtoString}")
-
   case class AccountNotFoundException(accountId: UUID)
       extends Exception(s"Account not found: $accountId")
 

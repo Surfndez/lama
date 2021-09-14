@@ -35,14 +35,11 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
   val logbackVersion      = "1.2.3"
   val logbackJsonVersion  = "6.6"
   val fs2Version          = "2.5.5"
-  val fs2GrpcVersion      = "0.9.0"
-  val protobufJava        = "3.15.8"
   val scalaLoggingVersion = "3.9.3"
 
   val utilities: Seq[ModuleID] = Seq(
     "com.typesafe.scala-logging" %% "scala-logging"            % scalaLoggingVersion,
     "co.fs2"                     %% "fs2-core"                 % fs2Version,
-    "org.lyranthe.fs2-grpc"      %% "java-runtime"             % fs2GrpcVersion,
     "ch.qos.logback"              % "logback-classic"          % logbackVersion,
     "net.logstash.logback"        % "logstash-logback-encoder" % logbackJsonVersion,
     "com.github.pureconfig"      %% "pureconfig"               % pureconfigVersion,
@@ -71,13 +68,6 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
     "org.tpolecat"            %% "doobie-scalatest" % doobieVersion        % "it, test",
     "com.opentable.components" % "otj-pg-embedded"  % otjPgEmbeddedVersion % Test,
     "it.ozimov"                % "embedded-redis"   % embeddedRedisVersion % Test
-  )
-
-  // https://scalapb.github.io/docs/faq/#i-am-getting-import-was-not-found-or-had-errors
-  val commonProtos: Seq[ModuleID] = Seq(
-    "com.thesamet.scalapb" %% "scalapb-runtime"   % scalapb.compiler.Version.scalapbVersion % "protobuf",
-    "io.grpc"               % "grpc-netty-shaded" % scalapb.compiler.Version.grpcJavaVersion,
-    "com.google.protobuf"   % "protobuf-java"     % protobufJava
   )
 
   val lamaScheduler: Seq[ModuleID] = circe ++ rabbit ++ utilities ++ postgres ++ http4s ++ redis

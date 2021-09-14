@@ -1,31 +1,14 @@
 package co.ledger.lama.scheduler.domain.models
 
-import co.ledger.lama.scheduler.protobuf
 import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
 import io.circe.{Decoder, Encoder}
 import co.ledger.lama.scheduler.domain.models.implicits._
 
-case class SyncEventsResult[T](syncEvents: List[SyncEvent[T]], total: Int) {
-  def toProto(implicit enc: Encoder[T]): protobuf.GetSyncEventsResult =
-    protobuf.GetSyncEventsResult(
-      syncEvents.map(_.toProto),
-      total
-    )
-}
+case class SyncEventsResult[T](syncEvents: List[SyncEvent[T]], total: Int)
 
 object SyncEventsResult {
-
   implicit def decoder[T: Decoder]: Decoder[SyncEventsResult[T]] =
     deriveConfiguredDecoder[SyncEventsResult[T]]
   implicit def encoder[T: Encoder]: Encoder[SyncEventsResult[T]] =
     deriveConfiguredEncoder[SyncEventsResult[T]]
-
-  def fromProto[T](
-      proto: protobuf.GetSyncEventsResult
-  )(implicit dec: Decoder[T]): SyncEventsResult[T] =
-    SyncEventsResult[T](
-      proto.syncEvents.map(SyncEvent.fromProto[T]).toList,
-      proto.total
-    )
-
 }

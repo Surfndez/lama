@@ -48,15 +48,6 @@ lazy val coverageSettings = Seq(
 lazy val sharedSettings =
   dockerSettings ++ Defaults.itSettings ++ coverageSettings ++ disableDocGeneration
 
-lazy val lamaProtobuf = (project in file("protobuf"))
-  .enablePlugins(Fs2Grpc)
-  .settings(
-    name := "lama-protobuf",
-    scalapbCodeGeneratorOptions += CodeGeneratorOption.FlatPackage,
-    libraryDependencies ++= Dependencies.commonProtos
-  )
-  .settings(disableDocGeneration)
-
 lazy val lamaScheduler = (project in file("lama-scheduler"))
   .enablePlugins(JavaAgent, JavaServerAppPackaging, DockerPlugin, BuildInfoPlugin)
   .configs(IntegrationTest)
@@ -66,4 +57,3 @@ lazy val lamaScheduler = (project in file("lama-scheduler"))
     buildInfoSettings,
     libraryDependencies ++= (Dependencies.lamaScheduler ++ Dependencies.test)
   )
-  .dependsOn(lamaProtobuf)

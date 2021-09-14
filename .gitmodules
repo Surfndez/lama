@@ -1,6 +1,0 @@
-[submodule "coins/bitcoin/keychain"]
-	path = coins/bitcoin/keychain
-	url = https://github.com/LedgerHQ/bitcoin-keychain.git
-[submodule "coins/bitcoin/lib-grpc"]
-	path = coins/bitcoin/lib-grpc
-	url = https://github.com/LedgerHQ/bitcoin-lib-grpc.git

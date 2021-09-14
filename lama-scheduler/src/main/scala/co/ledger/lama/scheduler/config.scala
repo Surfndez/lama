@@ -1,6 +1,6 @@
 package co.ledger.lama.scheduler
 
-import co.ledger.lama.common.utils.{GrpcServerConfig, PostgresConfig}
+import co.ledger.lama.common.utils.PostgresConfig
 import co.ledger.lama.scheduler.domain.models.{Coin, CoinFamily}
 import dev.profunktor.fs2rabbit.config.{Fs2RabbitConfig, Fs2RabbitNodeConfig}
 import dev.profunktor.fs2rabbit.model.{ExchangeName, QueueName, RoutingKey}
@@ -13,8 +13,8 @@ import scala.concurrent.duration.FiniteDuration
 object config {
 
   case class Config(
+      server: ServerConfig,
       postgres: PostgresConfig,
-      grpcServer: GrpcServerConfig,
       orchestrator: OrchestratorConfig,
       rabbit: Fs2RabbitConfig,
       redis: RedisConfig
@@ -31,6 +31,16 @@ object config {
 
   object RedisConfig {
     implicit val configReader: ConfigReader[RedisConfig] = deriveReader[RedisConfig]
+  }
+
+  case class ServerConfig(
+      host: String,
+      port: Int
+  )
+
+  object ServerConfig {
+    implicit val configReader: ConfigReader[ServerConfig] =
+      deriveReader[ServerConfig]
   }
 
   case class OrchestratorConfig(

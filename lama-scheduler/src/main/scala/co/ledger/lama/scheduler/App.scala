@@ -1,20 +1,25 @@
 package co.ledger.lama.scheduler
 
 import cats.effect.{ExitCode, IO, IOApp, Resource}
-import co.ledger.lama.common.services.grpc.HealthService
-import co.ledger.lama.common.utils.{DbUtils, GrpcServerConfig}
-import co.ledger.lama.common.utils.ResourceUtils.{grpcServer, postgresTransactor}
+import co.ledger.lama.common.utils.DbUtils
+import co.ledger.lama.common.utils.ResourceUtils.postgresTransactor
 import co.ledger.lama.common.utils.rabbitmq.RabbitUtils
 import co.ledger.lama.scheduler.config.{Config, OrchestratorConfig}
 import co.ledger.lama.scheduler.domain.LamaSchedulerModule
-import co.ledger.lama.scheduler.domain.adapters.primary.grpc.AccountManagerGrpcService
+import co.ledger.lama.scheduler.routes.AccountController
 import co.ledger.lama.scheduler.utils.RedisUtils
 import com.redis.RedisClient
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.ExchangeType
 import doobie.util.transactor.Transactor
-import io.grpc.Server
+import org.http4s.server.Router
+import org.http4s.server.blaze.BlazeServerBuilder
+import org.http4s.server.middleware.{CORS, CORSConfig}
+import org.http4s.implicits.http4sKleisliResponseSyntaxOptionT
 import pureconfig.ConfigSource
+
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
 object App extends IOApp {
 
@@ -24,6 +29,21 @@ object App extends IOApp {
     val appResources = for {
       t <- makeResources(conf)
       (db, rabbitClient, redisClient) = t
+
+      methodConfig = CORSConfig(
+        anyOrigin = true,
+        anyMethod = true,
+        allowCredentials = false,
+        maxAge = 1.day.toSeconds
+      )
+
+      httpRoutes = Router[IO](
+        "accounts" -> CORS(
+          AccountController.accountRoutes(),
+          methodConfig
+        )
+      ).orNotFound
+
       module = new LamaSchedulerModule(
         db,
         conf.orchestrator.coins,
@@ -31,40 +51,30 @@ object App extends IOApp {
         rabbitClient,
         redisClient
       )
-      server <- makeGrpcServer(conf.grpcServer, module)
-    } yield (rabbitClient, module, server)
+    } yield (rabbitClient, module, httpRoutes)
 
     appResources
-      .use { case (rabbitClient, module, server) =>
+      .use { case (rabbitClient, module, httpRoutes) =>
         declareExchangesAndBindings(rabbitClient, conf.orchestrator) *>
           DbUtils.flywayMigrate(conf.postgres) *>
-          IO(server.start()) *>
-          module.orchestrator.run().compile.drain
-
+          module.orchestrator.run().compile.drain *>
+          BlazeServerBuilder[IO](ExecutionContext.global)
+            .bindHttp(conf.server.port, conf.server.host)
+            .withHttpApp(httpRoutes)
+            .serve
+            .compile
+            .drain
       }
       .as(ExitCode.Success)
-  }
-
-  private def makeGrpcServer(config: GrpcServerConfig, module: LamaSchedulerModule): Resource[IO, Server] = {
-    // define rpc service definitions
-    val serviceDefinitions = List(
-      new AccountManagerGrpcService(
-        module.accountManager
-      ).definition,
-      new HealthService().definition
-    )
-
-    // create the grpc server
-    grpcServer(config, serviceDefinitions)
   }
 
   private def makeResources(
       conf: Config
   ): Resource[IO, (Transactor[IO], RabbitClient[IO], RedisClient)] =
     for {
-      db <- postgresTransactor(conf.postgres)
+      db           <- postgresTransactor(conf.postgres)
       rabbitClient <- RabbitUtils.createClient(conf.rabbit)
-      redisClient <- RedisUtils.createClient(conf.redis)
+      redisClient  <- RedisUtils.createClient(conf.redis)
     } yield (db, rabbitClient, redisClient)
 
   // Declare rabbitmq exchanges and bindings used by workers and the orchestrator.

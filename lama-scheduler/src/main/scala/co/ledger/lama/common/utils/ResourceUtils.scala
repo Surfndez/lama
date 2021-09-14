@@ -6,8 +6,6 @@ import com.zaxxer.hikari.HikariConfig
 import doobie.ExecutionContexts
 import doobie.hikari.HikariTransactor
 import fs2.Stream
-import io.grpc._
-import org.lyranthe.fs2_grpc.java_runtime.implicits._
 
 object ResourceUtils extends DefaultContextLogging {
 
@@ -66,25 +64,4 @@ object ResourceUtils extends DefaultContextLogging {
       _ = log.logger.info("Postgres client created")
     } yield db
 
-  def grpcServer(
-      conf: GrpcServerConfig,
-      services: List[ServerServiceDefinition]
-  ): Resource[IO, Server] =
-    services
-      .foldLeft(ServerBuilder.forPort(conf.port)) { case (builder, service) =>
-        builder.addService(service)
-      }
-      .resource[IO]
-
-  def grpcManagedChannel(conf: GrpcClientConfig): Resource[IO, ManagedChannel] =
-    if (conf.ssl) {
-      ManagedChannelBuilder
-        .forAddress(conf.host, conf.port)
-        .resource[IO]
-    } else {
-      ManagedChannelBuilder
-        .forAddress(conf.host, conf.port)
-        .usePlaintext()
-        .resource[IO]
-    }
 }
