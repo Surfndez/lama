@@ -36,7 +36,7 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
   val logbackJsonVersion  = "6.6"
   val fs2Version          = "2.5.5"
   val fs2GrpcVersion      = "0.9.0"
-  val protobufJava        = "3.15.8"
+  val protobufJava        = "3.18.0"
   val scalaLoggingVersion = "3.9.3"
 
   val utilities: Seq[ModuleID] = Seq(
