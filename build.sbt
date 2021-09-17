@@ -1,7 +1,7 @@
 import sbt.Compile
 // Build shared info
 ThisBuild / organization := "co.ledger"
-ThisBuild / scalaVersion := "2.13.3"
+ThisBuild / scalaVersion := "2.13.6"
 ThisBuild / resolvers += Resolver.sonatypeRepo("releases")
 ThisBuild / scalacOptions ++= CompilerFlags.all
 
@@ -21,7 +21,7 @@ lazy val disableDocGeneration = Seq(
 lazy val ignoreFiles = List("application.conf.sample")
 
 // Runtime
-scalaVersion := "2.13.3"
+scalaVersion := "2.13.6"
 scalacOptions ++= CompilerFlags.all
 resolvers += Resolver.sonatypeRepo("releases")
 addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3")
